@@ -1,5 +1,8 @@
 """
 CAN bus interface
+
+See https://github.com/nos86/micropython/blob/esp32-can-driver/examples/esp32_can.py
+for driver details.
 """
 
 # pylint: disable=import-error, missing-docstring, redefined-builtin, too-many-arguments
@@ -20,11 +23,13 @@ CANID_DATALOGGER_AM2302 = const(0x6f1)
 CANID_PING = const(0x7e0)
 CANID_WEBREPL_STARTED = const(0x3c6)
 
+# CAN commands and configuration handled by each device
+HARD_RESET = const(0xf0)
+SOFT_RESET = const(0xf1)
+SEND_PING = const(0xf2)
 
-# CAN command to start up WEBREPL
-START_WEBREPL = const(0xfe)
-SOFT_RESET = const(0xfd)
-HARD_RESET = const(0xfc)
+START_WEBREPL = const(0xfd)
+START_WEBREPL_HOTSPOT = const(0xfe)
 
 
 # default connects to tx=4, rx=2; BAD, because 2 == LED
@@ -98,35 +103,38 @@ class CAN:
                 utime.sleep_ms(1)
         print('ERROR: CAN cannot send message #{:03x} {}'.format(id, _payloadstring(data)))
 
+    def _read_and_process_input(self):
+        # catch errors to sure we catch all interrupts so we can re-enable the IRQ
+        try:
+            packet = self.can.recv()
+            id = packet[0]
+            if id != self._subscribed_to:
+                return
+            payload = packet[3]
+            if self._handle_config_command(payload):
+                return
+            self._callback(Message(id, payload))
+        except: # pylint: disable=bare-except
+            pass
+
     def _dispatch_input(self, _):
-        """Called when IRQ has detected new data. This function is running outside IRQ context"""
-        #print("Hier ist dispatch")
+        """Called after IRQ has detected new data. This function is running outside IRQ context"""
         for _ in range(5):
             if self.can.any():
                 # found data
                 while self.can.any():
-                    # catch errors to sure we catch all interrupts so we can re-enable the IRQ
-                    try:
-                        packet = self.can.recv()
-                        id = packet[0]
-                        if id != self._subscribed_to:
-                            continue
-                        payload = packet[3]
-                        if self._handle_config_command(payload):
-                            continue
-                        self._callback(Message(id, payload))
-                    except: # pylint: disable=bare-except
-                        pass
+                    self._read_and_process_input()
                 self._enable_irq()
                 # could that happen? Racing condition when we just missed the last bit?
                 if self.can.any():
-                    try:
-                        self._callback(self.can.recv())
-                    except: # pylint: disable=bare-except
-                        pass
+                    self._read_and_process_input()
                 return
+            # hm, no data available. Is that possible?
             utime.sleep_ms(1)
         self._enable_irq() # trust nobody
+        # make sure we dont miss a packet due to some racing condition
+        if self.can.any():
+            self._read_and_process_input()
         machine.idle()
 
     def _enable_irq(self):
@@ -147,19 +155,33 @@ class CAN:
             pass
 
     def _handle_config_command(self, payload):
-        if len(payload) == 1 and payload[0] == START_WEBREPL:
+        if payload == bytearray([START_WEBREPL]):
             ip = net.connect_to_wlan()
-            print('GOT IP: ', ip)
             net.start_repl()
             ipx = ip[0].split('.')
-            print('GOT IPx: ', ipx)
             self.send(CANID_WEBREPL_STARTED, [self.id >>8, self.id & 0xff, ipx[0], ipx[1], ipx[2], ipx[3]])
             return True
-        if len(payload) == 3:
-            if payload[1] != 0xaf or payload[2] != 0xfe:
-                return False
-            if payload[0] == SOFT_RESET:
-                machine.soft_reset()
-            if payload[0] == HARD_RESET:
-                machine.reset()
+
+        if payload == bytearray([START_WEBREPL_HOTSPOT]):
+            ip = net.start_hotspot()
+            net.start_repl()
+            self.send(CANID_WEBREPL_STARTED, [self.id >>8, self.id & 0xff, ip[0], ip[1], ip[2], ip[3]])
+            return True
+
+        if payload == bytearray([SEND_PING]):
+            sendping()
+            return True
+
+        if payload == bytearray([SOFT_RESET, 0xaf, 0xfe]):
+            machine.soft_reset()
+
+        if payload == bytearray([HARD_RESET, 0xaf, 0xfe]):
+            machine.reset()
+
         return False
+
+def sendping():
+    now = utime.time()
+    CANDevice.send(CANID_PING, [
+        CANDevice.id >> 8, CANDevice.id & 0xff,
+        (now >> 24) & 0xff, (now >> 16) & 0xff, (now >> 8) & 0xff, (now >> 0) & 0xff])

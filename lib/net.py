@@ -10,6 +10,7 @@ ampy -p /dev/ttyUSB0 run net.py
 import time
 
 import secrets
+import machine
 import network
 import webrepl
 
@@ -43,6 +44,15 @@ def connect_to_wlan():
     cfg = wlan.ifconfig()
     print("Connected to ", cfg)
     return cfg
+
+def start_hotspot():
+    serial = machine.unique_id()
+    ap = network.WLAN(network.AP_IF) # create access-point interface
+    ap.config(essid='ESP-AP-{:02x}{:02x}'.format(serial[-2], serial[-1]))
+    ap.config(max_clients=3) # set how many clients can connect to the network
+    ap.active(True)         # activate the interface
+    time.sleep(1)
+    return serial
 
 def start_repl():
     webrepl.start(password='x')

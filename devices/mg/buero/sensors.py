@@ -104,11 +104,7 @@ class PingDevice(PolledDevice):
         super().__init__(can.CANID_PING, 0, poll_intervall_in_ms)
 
     def send(self, _):
-        now = utime.time()
-        can.CANDevice.send(self.packetid, [
-            can.CANDevice.id >> 8, can.CANDevice.id & 0xff,
-            (now >> 24) & 0xff, (now >> 16) & 0xff, (now >> 8) & 0xff, (now >> 0) & 0xff])
-
+        can.sendping()
 
 class WDT(PolledDevice):
     """Triggers the watchdog. Does not send any message, is simply sharing
