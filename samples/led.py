@@ -2,10 +2,12 @@
 Test LED PWM
 """
 
+# pylint: disable=import-error, missing-docstring
+
 import math
 import time
-
 import machine
+
 
 class FPWM:
     """Wrapper for PMW class. Use float values from 0..1 and provide dimming"""
@@ -20,9 +22,9 @@ class FPWM:
         return self.pwm.duty()/1023.0
 
 
-def pulse(l, t):
+def pulse(pwm, t):
     for i in range(20):
-        l.set(int(math.sin(i / 10 * math.pi) * 500 + 500))
+        pwm.set(int(math.sin(i / 10 * math.pi) * 500 + 500))
         time.sleep_ms(t)
 
 def main():

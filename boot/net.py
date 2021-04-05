@@ -10,8 +10,8 @@ ampy -p /dev/ttyUSB0 run net.py
 import time
 
 import secrets
-import webrepl
 import network
+import webrepl
 
 # ap = network.WLAN(network.AP_IF)
 # print(ap.ifconfig())
@@ -21,6 +21,10 @@ import network
 
 def connect_to_wlan():
     wlan = network.WLAN(network.STA_IF) # create station interface
+    if wlan.isconnected():
+        cfg = wlan.ifconfig()
+        print("Already connected to ", cfg)
+        return cfg
     wlan.active(True)       # activate the interface
     wlan.scan()             # scan for access points
     wlan.connect(secrets.network, secrets.password) # connect to an AP

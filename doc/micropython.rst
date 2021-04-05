@@ -9,6 +9,8 @@ Connect via USB
 
     screen /dev/ttyUSB0 115200
 
+
+
 Run ampy
 #################
 
@@ -16,6 +18,10 @@ Run ampy
 
     conda activate ampy
     alias a='ampy -p /dev/ttyUSB0'
+
+    a put myfile.py
+    a run myfile.py
+    a get boot.py
 
 
 Install ampy
