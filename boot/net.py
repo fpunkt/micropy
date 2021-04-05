@@ -25,8 +25,12 @@ def connect_to_wlan():
         cfg = wlan.ifconfig()
         print("Already connected to ", cfg)
         return cfg
+    # need some sleep, otherwise screen disconnects right away (gets reset??)
     wlan.active(True)       # activate the interface
+    time.sleep(1)
     wlan.scan()             # scan for access points
+    time.sleep(1)
+    # pylint: disable=no-member
     wlan.connect(secrets.network, secrets.password) # connect to an AP
     for i in range(30):
         if wlan.isconnected():
