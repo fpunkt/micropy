@@ -2,11 +2,21 @@
 CAN bus interface
 """
 
-# pylint: disable=import-error, missing-docstring
+# pylint: disable=import-error, missing-docstring, redefined-builtin, too-many-arguments
 
 import time
 import machine
 import micropython
+
+if 0 == 1:
+    # make pylint think that it knows about 'const' variable
+    # pylint: disable=used-before-assignment, undefined-variable, self-assigning-variable
+    const = const
+    time.sleep_ms = time.sleep_ms
+
+
+POWER_ON = const(0x3c4)
+
 
 # default connects to tx=4, rx=2; BAD, because 2 == LED
 
@@ -17,21 +27,33 @@ import micropython
 class Message:
     """A CAN message"""
     # pylint: disable=too-few-public-methods
-    def __init__(self, lst):
-        self.id = lst(0)
-        self.payload = lst(3)
+    def __init__(self, id, payload):
+        self.id = id
+        self.payload = payload
 
 class CAN:
-    def __init__(self, rx=13, tx=12, baudrate=125, mode=machine.CAN.NORMAL):
+    """Wrapper for machine.CAN that provides some kind of interrupt and callback"""
+    def __init__(self, id=None, rx=13, tx=12, baudrate=125, mode=machine.CAN.NORMAL):
         # bus = CAN(0, mode=CAN.NORMAL, baudrate=125, rx_io=13, tx_io=12)
         self.can = machine.CAN(0, mode=mode, baudrate=baudrate, rx_io=rx, tx_io=tx)
         self.rx = rx
         self.prx = machine.Pin(rx)
         #p0.irq(trigger=Pin.IRQ_FALLING, handler=callback)
         self._callback = None
+        self._subscribed_to = 0
+        self.id = id
+        if id is not None:
+            self.can.send([self.id >>8, self.id & 0xff,
+            0, # startup reason
+            2, # HClib Version
+            12, # HW Type -- make this 12 for ESP32 ..
+            0xa0, # Application type and Version - make this the library version
+            0, 0], # CPU serial
+            POWER_ON)
 
-    def callback(self, func):
-        self._callback = func
+    def subscribe(self, id, callback):
+        self._subscribed_to = id
+        self._callback = callback
         self._enable_irq()
 
     def any(self):
@@ -53,9 +75,13 @@ class CAN:
             if self.can.any():
                 # found data
                 while self.can.any():
-                    # make sure we catch all interrupts so we can re-enable the IRQ
+                    # catch errors to sure we catch all interrupts so we can re-enable the IRQ
                     try:
-                        self._callback(self.can.recv())
+                        packet = self.can.recv()
+                        id = packet[0]
+                        if id == self._subscribed_to:
+                            payload = packet[3]
+                        self._callback(Message(id, payload))
                     except: # pylint: disable=bare-except
                         pass
                 self._enable_irq()
@@ -68,7 +94,6 @@ class CAN:
                 return
             time.sleep_ms(1)
         self._enable_irq() # trust nobody
-
 
     def _enable_irq(self):
         if self._callback is None:
@@ -86,7 +111,3 @@ class CAN:
         except: # pylint: disable=bare-except
             # OK to ignore errors here, _dispatch input will process all items in the queue
             pass
-
-
-def cb(msg):
-    print("Got CAN message: ", msg)

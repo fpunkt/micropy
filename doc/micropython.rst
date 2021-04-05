@@ -63,13 +63,6 @@ Use GUI and run
 
 Build with CAN support
 
-Don't fiddle around: load https://github.com/Tbruno25/pycom-esp32-universal
-
-.. code-block:: shell
-
-    pycom-fwtool-cli --port /dev/ttyUSB0 erase_all
-    pycom-fwtool-cli -r --port /dev/ttyUSB0 flash --tar ESP32-4MB-1.20.2.rc11.tar.gz
-
 .. code-block:: shell
 
     git clone --recursive https://github.com/espressif/esp-idf.git
@@ -98,21 +91,42 @@ Don't fiddle around: load https://github.com/Tbruno25/pycom-esp32-universal
     esptool.py --chip esp32 --port /dev/ttyUSB0 --baud 460800 write_flash -z 0x1000 build-GENERIC/firmware.bin
 
 
-You need to patch
+You need to patch around
 
-.. code-block:: c++
+.. code-block:: diff
 
-    // recv(list=None, *, timeout=5000)
-    STATIC mp_obj_t machine_hw_can_recv(size_t n_args, const mp_obj_t *pos_args, mp_map_t *kw_args) {
-        enum {
-            ARG_list,
+    index 56c806bd5..3622d1fd2 100644
+    --- a/ports/esp32/machine_can.c
+    +++ b/ports/esp32/machine_can.c
+    @@ -267,7 +267,7 @@ STATIC mp_obj_t machine_hw_can_send(size_t n_args, const mp_obj_t *pos_args, mp_
+            flags += CAN_MSG_FLAG_EXTD;
+            id &= 0x1FFFFFFF;
+        } else {
+    -        id &= 0x1FF;
+    +        id &= 0x7FF;
+        }
+        if (self->loopback) {
+            flags += CAN_MSG_FLAG_SELF;
+    @@ -298,7 +298,9 @@ STATIC mp_obj_t machine_hw_can_recv(size_t n_args, const mp_obj_t *pos_args, mp_
             ARG_timeout
         };
-    static const mp_arg_t allowed_args[] = {
-    // -------
-    //       { MP_QSTR_list, MP_ARG_OBJ, {.u_rom_obj = MP_ROM_NONE} },
-    // +++++++
-        { MP_QSTR_list, MP_ARG_OBJ, {.u_rom_obj = MP_ROM_PTR(&mp_const_none_obj)} },
-        { MP_QSTR_timeout, MP_ARG_KW_ONLY | MP_ARG_INT, {.u_int = 5000} },
-    };
+        static const mp_arg_t allowed_args[] = {
+    -        { MP_QSTR_list, MP_ARG_OBJ, {.u_rom_obj = MP_ROM_NONE} },
+    +//        { MP_QSTR_list, MP_ARG_OBJ, {.u_rom_obj = MP_ROM_NONE} },
+    +        { MP_QSTR_list, MP_ARG_OBJ, {.u_rom_obj = MP_ROM_PTR(&mp_const_none_obj)} },
+    +
+            { MP_QSTR_timeout, MP_ARG_KW_ONLY | MP_ARG_INT, {.u_int = 5000} },
+        };
+
+
+
+Precompiled binary doesn't work
+================================
+
+Don't fiddle around: load https://github.com/Tbruno25/pycom-esp32-universal
+
+.. code-block:: shell
+
+    pycom-fwtool-cli --port /dev/ttyUSB0 erase_all
+    pycom-fwtool-cli -r --port /dev/ttyUSB0 flash --tar ESP32-4MB-1.20.2.rc11.tar.gz
 
