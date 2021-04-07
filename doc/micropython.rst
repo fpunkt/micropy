@@ -76,7 +76,7 @@ Build with CAN support
     pip install pyserial
 
 
-    export ESPIDF=~/NoBackup/00_external/esp-idf
+
     git clone https://github.com/nos86/micropython.git micropython-nos86-with-CAN
     cd micropython-nos86-with-CAN
     git checkout esp32-can-driver
@@ -85,6 +85,8 @@ Build with CAN support
     cd ..
     cd ports/esp32
     git submodule update --init
+
+    export ESPIDF=~/NoBackup/00_external/esp-idf
     make
 
     esptool.py --chip esp32 --port /dev/ttyUSB0 erase_flash

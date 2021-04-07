@@ -17,36 +17,49 @@ class PolledDeviceList:
         self.devices = []
         self.timer = machine.Timer(1)
         self.stopped = False
+        self._next_pol_ref = self._next_poll
+        self._irq_ref = self._irq
 
     def append(self, device):
         self.devices.append(device)
 
     def _next_poll(self, _):
+        # print('running next poll')
         if len(self.devices) == 0:
             return
         ticks = utime.ticks_ms()
         for d in self.devices:
             if utime.ticks_diff(d.next_call, ticks) <= 0:
-                d.measure()
-                d.next_call = utime.ticks_add(ticks, d.poll_intervall_in_ms)
+                try:
+                    d.measure()
+                    d.next_call = utime.ticks_add(ticks, d.poll_intervall_in_ms)
+                except: # pylint: disable=bare-except
+                    d.next_call = utime.ticks_add(ticks, 1000)
             else:
                 break
+        # print('handled all sensors')
         if self.stopped:
             return
         self.devices = sorted(self.devices, key=lambda x: x.next_call)
 
         wait_ms = utime.ticks_diff(self.devices[0].next_call, ticks)
         if wait_ms <= 0:
-            wait_ms = 100
+            wait_ms = 1000
         # print('schedule next for ', wait_ms)
-        self.timer.init(period=wait_ms, mode=machine.Timer.ONE_SHOT, callback=self._irq)
-        machine.idle()
+        self.timer.init(period=wait_ms, mode=machine.Timer.ONE_SHOT, callback=self._irq_ref)
+        # print('scheduled next for ', wait_ms)
+        #machine.idle()
 
     def next_poll(self):
-        self._next_poll(0)
+        self._next_poll(None)
 
     def _irq(self, _):
-        micropython.schedule(self._next_poll, 1)
+        try:
+            micropython.schedule(self._next_pol_ref, 1)
+        except: # pylint: disable=bare-except
+            # schedule queue is full, try again later
+            self.timer.init(period=100, mode=machine.Timer.ONE_SHOT, callback=self._irq_ref)
+
 
     def dump(self):
         print('{} entries'.format(len(self.devices)))
@@ -80,7 +93,9 @@ class PolledDevice:
     def send(self, payload):
         if can.CANDevice is None:
             return
-        bytearray = [can.CANDevice.id >> 8, can.CANDevice.id & 0xff, self.sensorid] + payload
+        bytearray = [
+            (can.CANDevice.id >> 8) & 0xff, can.CANDevice.id & 0xff,
+            self.sensorid] + payload
         can.CANDevice.send(self.packetid, bytearray)
 
     def poll(self):
