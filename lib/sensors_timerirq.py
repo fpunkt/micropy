@@ -1,7 +1,7 @@
 """
 Misc Sensors
 
-This file uses Timer(1)
+This file uses virtual timers (-1)
 """
 
 # pylint: disable=import-error, missing-docstring, redefined-builtin, too-many-arguments
@@ -15,7 +15,7 @@ import micropython
 class PolledDeviceList:
     def __init__(self):
         self.devices = []
-        self.timer = machine.Timer(1)
+        self.timer = machine.Timer(-1)
         self.stopped = False
         self.debug = False
         self._next_pol_ref = self._next_poll

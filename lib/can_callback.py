@@ -22,7 +22,10 @@ class CAN:
     def subscribe(self, canid, callback):
         self._subscribed_to = canid
         self._callback = callback
-        self.can.callback(self._cbrunner)
+        if callback is None:
+            self.can.callback(None)
+        else:
+            self.can.callback(self._cbrunner)
 
     def _run_callback(self, candev):
         # print('this is __callback', self, candev)
@@ -31,8 +34,11 @@ class CAN:
             return
         packet = self.can.recv()
         canid = packet[0]
+        payload = packet[3]
+        if cancommon.handle_standard_config_command(self, payload):
+            return
         if self._subscribed_to is True or self._subscribed_to == canid:
-            self._callback(cancommon.Message(canid, packet[3]))
+            self._callback(cancommon.Message(canid, payload))
 
     def any(self):
         return self.can.any()

@@ -20,17 +20,29 @@ if 0 == 1:
 
 # CANID_POWER_ON message sent to the CAN Bus
 CANID_POWER_ON = const(0x3c4)
+CANID_IDENTIFY = const(0x3c5)
 CANID_DATALOGGER_AM2302 = const(0x6f1)
 CANID_PING = const(0x7e0)
-CANID_WEBREPL_STARTED = const(0x3c6)
+CANID_WLAN_CONNECTED = const(0x3c6)
 
 # CAN commands and configuration handled by each device
-HARD_RESET = const(0xf0)
-SOFT_RESET = const(0xf1)
-SEND_PING = const(0xf2)
+# All general config commands must be >= 0xe8
 
-START_WEBREPL = const(0xfd)
-START_WEBREPL_HOTSPOT = const(0xfe)
+CONFIG_BEGIN = const(0xf0)
+
+CONFIG_HARD_RESET = const(0xf0)
+CONFIG_SOFT_RESET = const(0xf1)
+CONFIG_SEND_PING = const(0xf2)
+CONFIG_INDENTIFY = const(0xf3)
+
+# Network config
+CONFIG_WLAN_CONNECT = const(0xfa)
+CONFIG_WLAN_HOTSPOT = const(0xfb)
+CONFIG_WLAN_STOP = const(0xfc)
+CONFIG_WEBREPL_START = const(0xfd)
+CONFIG_WEBREPL_STOP = const(0xfe)
+
+
 
 def _payloadstring(payload):
     return ' '.join('{:02x}'.format(x) for x in payload)
@@ -67,9 +79,8 @@ def send_ping(self):
     payload = [(i >> 8) & 0xff, i & 0xff, (ts >> 24) & 0xff, (ts >> 16) & 0xff, (ts >> 8) & 0xff, (ts >> 0) & 0xff]
     self.can.send(payload, CANID_PING)
 
-def send_poweron(self):
-    """Send a power-on message to the bus"""
-    # Hack ... this should be a member of class CAN, we treat self like this
+# power-on or identify token
+def _identify(self, packetid):
     if self.canid is not None:
         serial = machine.unique_id()
         self.can.send([self.canid >>8, self.canid & 0xff,
@@ -78,7 +89,13 @@ def send_poweron(self):
                 12, # HW Type -- make this 12 for ESP32 ..
                 0xa0, # Application type and Version - make this the library version
                 serial[-2], serial[-1]], # CPU serial
-            CANID_POWER_ON)
+            packetid)
+
+
+def send_poweron(self):
+    """Send a power-on message to the bus"""
+    # Hack ... this should be a member of class CAN, we treat self like this
+    _identify(self, CANID_POWER_ON)
 
 def register(self):
     """Register global CAN device to be used by other modules"""
@@ -88,30 +105,59 @@ def register(self):
     send_poweron(self)
 
 
+
+# Compile one to save mallocs
+
+_CONFIG_HARD_RESET = bytearray([CONFIG_HARD_RESET])
+_CONFIG_SOFT_RESET = bytearray([CONFIG_SOFT_RESET])
+_CONFIG_SEND_PING = bytearray([CONFIG_SEND_PING])
+_CONFIG_WLAN_CONNECT = bytearray([CONFIG_WLAN_CONNECT])
+_CONFIG_WLAN_HOTSPOT = bytearray([CONFIG_WLAN_HOTSPOT])
+_CONFIG_WLAN_STOP = bytearray([CONFIG_WLAN_STOP])
+_CONFIG_WEBREPL_START = bytearray([CONFIG_WEBREPL_START])
+_CONFIG_WEBREPL_STOP = bytearray([CONFIG_WEBREPL_STOP])
+_CONFIG_INDENTIFY = bytearray([CONFIG_INDENTIFY])
+
 def handle_standard_config_command(self, payload):
     """Return True if standard CAN command has been found and processed"""
     # Hack ... this should be a member of class CAN, we treat self like this
-    if payload == bytearray([START_WEBREPL]):
-        ip = net.connect_to_wlan()
-        net.start_repl()
+    # pylint: disable=too-many-return-statements
+    if len(payload) < 1 or payload[0] < CONFIG_BEGIN:
+        return False
+
+    if payload in (_CONFIG_WLAN_CONNECT, _CONFIG_WLAN_HOTSPOT):
+        if payload == _CONFIG_WLAN_CONNECT:
+            ip = net.connect_to_wlan()
+        else:
+            ip = net.start_hotspot()
         ipx = ip[0].split('.')
-        self.send(CANID_WEBREPL_STARTED, [self.canid >>8, self.canid & 0xff, ipx[0], ipx[1], ipx[2], ipx[3]])
+        self.send(CANID_WLAN_CONNECTED, [self.canid >>8, self.canid & 0xff, ipx[0], ipx[1], ipx[2], ipx[3]])
         return True
 
-    if payload == bytearray([START_WEBREPL_HOTSPOT]):
-        ip = net.start_hotspot()
+    if payload == _CONFIG_INDENTIFY:
+        _identify(self, CANID_IDENTIFY)
+        return True
+
+    if payload == _CONFIG_WLAN_STOP:
+        net.wlan_stop()
+        return True
+
+    if payload == _CONFIG_WEBREPL_START:
         net.start_repl()
-        self.send(CANID_WEBREPL_STARTED, [self.canid >>8, self.canid & 0xff, ip[0], ip[1], ip[2], ip[3]])
         return True
 
-    if payload == bytearray([SEND_PING]):
+    if payload == _CONFIG_WEBREPL_STOP:
+        net.stop_repl()
+        return True
+
+    if payload == _CONFIG_SEND_PING:
         send_ping(self)
         return True
 
-    if payload == bytearray([SOFT_RESET, 0xaf, 0xfe]):
+    if payload == _CONFIG_SOFT_RESET:
         machine.soft_reset()
 
-    if payload == bytearray([HARD_RESET, 0xaf, 0xfe]):
+    if payload == _CONFIG_HARD_RESET:
         machine.reset()
 
     return False

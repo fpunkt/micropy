@@ -54,5 +54,15 @@ def start_hotspot():
     time.sleep(1)
     return serial
 
+def wlan_stop():
+    try:
+        webrepl.stop()
+    except: # pylint: disable=bare-except
+        pass
+    network.WLAN().disconnect()
+
 def start_repl():
     webrepl.start(password='x')
+
+def stop_repl():
+    webrepl.stop()
