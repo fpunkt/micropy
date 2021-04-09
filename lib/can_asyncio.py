@@ -41,22 +41,22 @@ def _payloadstring(payload):
 class Message:
     """A CAN message"""
     # pylint: disable=too-few-public-methods
-    def __init__(self, id, payload):
-        self.id = id
+    def __init__(self, canid, payload):
+        self.canid = canid
         self.payload = payload
 
     def payloadstring(self):
         return _payloadstring(self.payload)
 
     def __repr__(self):
-        return '<Message #{:03x} [{}] {}>'.format(self.id, len(self.payload), self.payloadstring())
+        return '<Message #{:03x} [{}] {}>'.format(self.canid, len(self.payload), self.payloadstring())
 
 
 class CAN:
     def __init__(self, id=None, rx=13, tx=12, baudrate=125, mode=machine.CAN.NORMAL):
         # bus = CAN(0, mode=CAN.NORMAL, baudrate=125, rx_io=13, tx_io=12)
         # c = machine.CAN(0, mode=machine.CAN.NORMAL, baudrate=125, rx_io=13, tx_io=12)
-        self.id = id
+        self.canid = canid
         self.can = machine.CAN(0, mode=mode, baudrate=baudrate, rx_io=rx, tx_io=tx, rx_queue=10, tx_queue=4)
         self.callback = None
         self.subscribed_to = 0
@@ -97,13 +97,13 @@ class CAN:
     def ping(self):
         now = utime.time()
         self.send(CANID_PING, [
-            self.id >> 8, self.id & 0xff,
+            self.canid >> 8, self.canid & 0xff,
             (now >> 24) & 0xff, (now >> 16) & 0xff, (now >> 8) & 0xff, (now >> 0) & 0xff])
 
     def _startupmessage(self):
         if id is not None:
             serial = machine.unique_id()
-            self.can.send([self.id >>8, self.id & 0xff,
+            self.can.send([self.canid >>8, self.canid & 0xff,
                     machine.reset_cause(), # startup reason
                     2, # HClib Version
                     12, # HW Type -- make this 12 for ESP32 ..

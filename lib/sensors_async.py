@@ -45,7 +45,7 @@ class PolledDevice:
         if can.CANDevice is None:
             return
         bytearray = [
-            (can.CANDevice.id >> 8) & 0xff, can.CANDevice.id & 0xff,
+            (can.CANDevice.canid >> 8) & 0xff, can.CANDevice.canid & 0xff,
             self.sensorid] + payload
         can.CANDevice.send(self.packetid, bytearray)
 

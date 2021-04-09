@@ -44,31 +44,31 @@ def _payloadstring(payload):
 class Message:
     """A CAN message"""
     # pylint: disable=too-few-public-methods
-    def __init__(self, id, payload):
-        self.id = id
+    def __init__(self, canid, payload):
+        self.canid = canid
         self.payload = payload
 
     def payloadstring(self):
         return _payloadstring(self.payload)
 
     def __repr__(self):
-        return '<Message #{:03x} [{}] {}>'.format(self.id, len(self.payload), self.payloadstring())
+        return '<Message #{:03x} [{}] {}>'.format(self.canid, len(self.payload), self.payloadstring())
 
 CANDevice = None
 
 class CAN:
     """Wrapper for machine.CAN, providing (some kind of) interrupt and callback"""
     # pylint: disable=too-many-instance-attributes
-    def __init__(self, id=None, rx=13, tx=12, baudrate=125, mode=machine.CAN.NORMAL):
+    def __init__(self, canid=None, rx=13, tx=12, baudrate=125, mode=machine.CAN.NORMAL):
         # bus = CAN(0, mode=CAN.NORMAL, baudrate=125, rx_io=13, tx_io=12)
         self.can = machine.CAN(0, mode=mode, baudrate=baudrate, rx_io=rx, tx_io=tx, rx_queue=10, tx_queue=4)
         self._callback = None
         self._subscribed_to = 0
         self._reading_thread = None
-        self.id = id
-        if id is not None:
+        self.canid = canid
+        if canid is not None:
             serial = machine.unique_id()
-            self.can.send([self.id >>8, self.id & 0xff,
+            self.can.send([self.canid >>8, self.canid & 0xff,
                     machine.reset_cause(), # startup reason
                     2, # HClib Version
                     12, # HW Type -- make this 12 for ESP32 ..
@@ -132,13 +132,13 @@ class CAN:
             ip = net.connect_to_wlan()
             net.start_repl()
             ipx = ip[0].split('.')
-            self.send(CANID_WEBREPL_STARTED, [self.id >>8, self.id & 0xff, ipx[0], ipx[1], ipx[2], ipx[3]])
+            self.send(CANID_WEBREPL_STARTED, [self.canid >>8, self.canid & 0xff, ipx[0], ipx[1], ipx[2], ipx[3]])
             return True
 
         if payload == bytearray([START_WEBREPL_HOTSPOT]):
             ip = net.start_hotspot()
             net.start_repl()
-            self.send(CANID_WEBREPL_STARTED, [self.id >>8, self.id & 0xff, ip[0], ip[1], ip[2], ip[3]])
+            self.send(CANID_WEBREPL_STARTED, [self.canid >>8, self.canid & 0xff, ip[0], ip[1], ip[2], ip[3]])
             return True
 
         if payload == bytearray([SEND_PING]):
@@ -156,5 +156,5 @@ class CAN:
 def sendping():
     now = utime.time()
     CANDevice.send(CANID_PING, [
-        CANDevice.id >> 8, CANDevice.id & 0xff,
+        CANDevice.canid >> 8, CANDevice.canid & 0xff,
         (now >> 24) & 0xff, (now >> 16) & 0xff, (now >> 8) & 0xff, (now >> 0) & 0xff])
