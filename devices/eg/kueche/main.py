@@ -34,11 +34,11 @@ temperature = sensors.DHT(27, 16, poll_intervall_in_ms=5000)
 sensors.start()
 
 def dd(a, b):
-    p1.dim(a)
-    p2.dim(b)
+    p1.idim(a)
+    p2.idim(b)
 
-def d1(): dd(0, 1)
-def d2(): dd(1, 0)
+def d1(): dd(0, 1000)
+def d2(): dd(1000, 0)
 
 running = True
 delay_ms = 100

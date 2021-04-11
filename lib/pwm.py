@@ -14,7 +14,7 @@ import micropython
 import cancommon
 import utime
 
-dimdelay_ms = 20
+dimdelay_ms = 5
 
 class _DimList:
     def __init__(self):
@@ -35,8 +35,8 @@ class _DimList:
             device = self._devices[i]
             if device is not None:
                 i += 1
-                if device.dimcount == 0:
-                    device.iset(device.dimtovalue)
+                if device.ival == device.dimtovalue:
+                    device.send_status_to_can()
                     self._devices[i] = None
         # update _ndevices to avoid looping
         i = self._ndevices-1
@@ -57,12 +57,20 @@ class _DimList:
             i += 1
             if device is None:
                 continue
-            if device.dimcount > 0:
-                device.dimcount -= 1
-                if device.dimcount == 0:
-                    micropython.schedule(self._lastdimstep_ref, device)
-                else:
-                    device.iset_no_can_message(device.ival + device.dimstep)
+            # try smooth dimming
+            # avoid floating point (and malloc)
+            # ds, _ = divmod(device.ival, 10)
+            ds = device.ival >> 2
+            # ds = int(device.ival / 10)
+            ds = min(50, max(1, ds))
+            remaining_counts = device.dimtovalue - device.ival
+            if abs(remaining_counts) <= ds:
+                device.iset_no_can_message(device.dimtovalue)
+                micropython.schedule(self._lastdimstep_ref, device)
+            elif remaining_counts > 0:
+                device.iset_no_can_message(device.ival + ds)
+            else:
+                device.iset_no_can_message(device.ival - ds)
         self._timer.init(period=dimdelay_ms, mode=machine.Timer.ONE_SHOT, callback=self._nextstep_ref)
 
     def append(self, pwm):
@@ -104,8 +112,7 @@ class PWM:
         self.id = id
         self.iset_no_can_message(0) # power off
         self.dimtovalue = 0
-        self.dimcount = 0
-        self.dimstep = 0
+
         # allocate message once to avoid garbage collection
         self.msg = cancommon.Message(cancommon.CANID_PWM_VALUE, [0, 0, 0, 0, 0, 0, 0])
         self.msg.setsender(self.id)
@@ -142,14 +149,13 @@ class PWM:
         """Return current value 0..1"""
         return _tofloat(self.ival)
 
-    def dim(self, value):
-        iv = _toint(value)
-        steps = 20
-        idiff = int((iv-self.ival) / steps)
-        if idiff == 0:
-            self.set(value)
+    def idim(self, value):
+        if abs(self.ival-value) < 5:
+            self.iset(value)
             return
-        self.dimtovalue = iv
-        self.dimstep = idiff
-        self.dimcount = steps
+        self.dimtovalue = value
         dimlist.append(self)
+
+
+    def dim(self, value):
+        self.idim(_toint(value))
