@@ -9,9 +9,7 @@ Common CAN definitions
 import utime
 import net
 import machine
-
-CANDevice = None
-
+import board
 
 if 0 == 1:
     # make pylint think that it knows about 'const' variable
@@ -24,6 +22,7 @@ CANID_IDENTIFY = const(0x3c5)
 CANID_DATALOGGER_AM2302 = const(0x6f1)
 CANID_PING = const(0x7e0)
 CANID_WLAN_CONNECTED = const(0x3c6)
+CANID_PWM_VALUE = const(0x03c8)
 
 # CAN commands and configuration handled by each device
 # All general config commands must be >= 0xe8
@@ -62,7 +61,7 @@ class Message:
 
     def send(self):
         """Send message"""
-        CANDevice.send(self.canid, self.payload)
+        board.CAN.send(self.canid, self.payload)
 
 
 def read(self):
@@ -99,9 +98,7 @@ def send_poweron(self):
 
 def register(self):
     """Register global CAN device to be used by other modules"""
-    # pylint: disable=global-statement
-    global CANDevice
-    CANDevice = self
+    board.CAN = self
     send_poweron(self)
 
 
@@ -130,8 +127,10 @@ def handle_standard_config_command(self, payload):
             ip = net.connect_to_wlan()
         else:
             ip = net.start_hotspot()
+        board.LED.on()
         ipx = ip[0].split('.')
         self.send(CANID_WLAN_CONNECTED, [self.canid >>8, self.canid & 0xff, ipx[0], ipx[1], ipx[2], ipx[3]])
+
         return True
 
     if payload == _CONFIG_INDENTIFY:
@@ -139,7 +138,7 @@ def handle_standard_config_command(self, payload):
         return True
 
     if payload == _CONFIG_WLAN_STOP:
-        net.wlan_stop()
+        net.stop()
         return True
 
     if payload == _CONFIG_WEBREPL_START:

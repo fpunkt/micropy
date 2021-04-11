@@ -4,7 +4,7 @@ Start network and webrepl
 ampy -p /dev/ttyUSB0 run net.py
 """
 
-# pylint: disable=import-error, missing-docstring
+# pylint: disable=import-error, missing-docstring, wrong-import-order
 
 
 import time
@@ -13,6 +13,8 @@ import secrets
 import machine
 import network
 import webrepl
+
+import board
 
 # ap = network.WLAN(network.AP_IF)
 # print(ap.ifconfig())
@@ -66,3 +68,12 @@ def start_repl():
 
 def stop_repl():
     webrepl.stop()
+
+def start():
+    connect_to_wlan()
+    board.LED.on()
+    start_repl()
+
+def stop():
+    webrepl.stop()
+    board.LED.off()

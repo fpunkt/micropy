@@ -9,8 +9,25 @@ This file uses virtual timers (-1)
 import utime
 import machine
 import dht
+import board
 import cancommon
 import micropython
+
+class _RegisteredSensorIDs:
+    def __init__(self):
+        self.r = dict()
+    def register(self, id, value):
+        if id in self.r:
+            raise RuntimeError("sensorid #{} is already registered as {}".format(id, self.r[id]))
+        self.r[id] = value
+    def dump(self):
+        for i, v in self.r:
+            print("ID {:2d} = {}".format(i, v))
+
+registered_sensors = _RegisteredSensorIDs()
+
+def register(id, value):
+    registered_sensors.register(id, value)
 
 class PolledDeviceList:
     def __init__(self):
@@ -76,6 +93,10 @@ class PolledDeviceList:
         """Stop polling"""
         self.stopped = True
 
+    def start(self):
+        self.stopped = False
+        self.next_poll()
+
     def clear(self):
         """Remove all devices from list"""
         self.devices.clear()
@@ -84,11 +105,21 @@ class PolledDeviceList:
 
 polled_devices = PolledDeviceList()
 
+def start():
+    polled_devices.start()
+
+def send(packetid, sensorid, payload):
+    if board.CAN is None:
+        return
+    bytearray = [(board.CAN.canid >> 8) & 0xff, board.CAN.canid & 0xff, sensorid] + payload
+    board.CAN.send(packetid, bytearray)
+
 
 class PolledDevice:
     def __init__(self, packetid, sensorid, poll_intervall_in_ms):
         self.packetid = packetid
         self.sensorid = sensorid
+        registered_sensors.register(sensorid, self)
         if poll_intervall_in_ms < 1000:
             poll_intervall_in_ms = 1000
         self.poll_intervall_in_ms = poll_intervall_in_ms
@@ -102,10 +133,9 @@ class PolledDevice:
             utime.ticks_diff(self.next_call, utime.ticks_ms()))
 
     def send(self, payload):
-        if cancommon.CANDevice is None:
+        if board.CAN is None:
             return
-        bytearray = [(cancommon.CANDevice.canid >> 8) & 0xff, cancommon.CANDevice.canid & 0xff, self.sensorid] + payload
-        cancommon.CANDevice.send(self.packetid, bytearray)
+        send(self.packetid, self.sensorid, payload)
 
     def read(self):
         """poll is called in the background. The function should return max 4 bytes payload"""
@@ -128,7 +158,7 @@ class PingDevice(PolledDevice):
         super().__init__(0, 0, poll_intervall_in_ms)
 
     def send(self, _):
-        cancommon.send_ping(cancommon.CANDevice)
+        cancommon.send_ping(board.CAN)
 
 class WDT(PolledDevice):
     """Triggers the watchdog. Does not send any message, is simply sharing
@@ -147,7 +177,8 @@ class DHT(PolledDevice):
     """Temperature sensor"""
     def __init__(self, pin, sensorid, poll_intervall_in_ms=60000):
         super().__init__(cancommon.CANID_DATALOGGER_AM2302, sensorid, poll_intervall_in_ms)
-        self.dht = dht.DHT22(pin)
+
+        self.dht = dht.DHT22(machine.Pin(pin))
 
     def read(self):
         self.dht.measure()

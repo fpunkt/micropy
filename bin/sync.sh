@@ -1,18 +1,31 @@
 #! /bin/bash
 
-ip="192.168.179.15"
+ip=`cat .espip`
+if [ $? -ne 0 ]; then
+    ip="192.168.179.15"
+fi
 
-files=`find -L . -name '*.py' -newer .lastsync`
+if [ -f .lastsync ]; then
+    files=`find -L . -name '*.py' -newer .lastsync`
+else
+    files=`ls -1 *.py`
+fi
+nfiles=`echo $files | wc -w`
+echo "# syncing $nfiles files to $ip"
 
-# echo "# syncing $files"
+#count=0
 
-count=0
+# echo $files
 
 for f in $files; do
     echo "# $f"
     webrepl_cli.py -p x $f $ip: >/dev/null
-    let "count++"
+    if [ $? -ne 0 ]; then
+        echo "ERROR transfering $f"
+        exit 1
+    fi
+#    let "count++"
 done
 
 touch .lastsync
-echo "# done syncing $count files"
+#echo "# done syncing $count files"

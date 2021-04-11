@@ -1,5 +1,22 @@
 # This file is executed on every boot (including wake-boot from deepsleep)
+
+# Generic for all applications.
+
+# File main.py is loaded after boot.py
+
+# pylint: disable=import-error, missing-docstring, redefined-builtin, too-many-arguments
+# pylint: disable=unused-import, multiple-statements, wrong-import-order
+
+# disable the interrupt catcher
+import machine
+#machine.CAN(0xff)
+
 #import esp
 #esp.osdebug(None)
-#import webrepl
-#webrepl.start()
+
+
+# import time; print('Loading boot, giving time to abort (initializing network) ....'); time.sleep(2)
+import net
+net.start()
+
+# main is loaded automatically after boot
