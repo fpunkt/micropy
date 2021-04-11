@@ -59,9 +59,20 @@ class Message:
     def __repr__(self):
         return '<Message #{:03x} [{}] {}>'.format(self.canid, len(self.payload), self.payloadstring())
 
+    def setsender(self, senderid):
+        """Fill canid and senderid"""
+        self.payload[0] = board.CAN.canid >> 8
+        self.payload[1] = board.CAN.canid & 0xff
+        self.payload[2] = senderid
+
     def send(self):
         """Send message"""
-        board.CAN.send(self.canid, self.payload)
+        board.CAN.can.send(self.payload, self.canid)
+
+def makemessage(canid, size):
+    return Message(canid, [0]*size)
+
+Badmessage = Message(0x777, [1, 2, 3, 4])
 
 
 def read(self):
@@ -70,13 +81,20 @@ def read(self):
     return Message(packet[0], packet[3])
 
 
+_pingmessage = Message(CANID_PING, [0, 0, 0, 0, 0, 0])
 def send_ping(self):
     """Send a ping message"""
     # Hack ... this should be a member of class CAN, we treat self like this
-    ts = utime.time()
-    i = self.canid
-    payload = [(i >> 8) & 0xff, i & 0xff, (ts >> 24) & 0xff, (ts >> 16) & 0xff, (ts >> 8) & 0xff, (ts >> 0) & 0xff]
-    self.can.send(payload, CANID_PING)
+    now = utime.time()
+    # use pre-allocated message to avoid garbage collection
+    b = _pingmessage.payload
+    b[0] = self.canid >> 8
+    b[1] = self.canid & 0xff
+    b[2] = (now >> 24) & 0xff
+    b[3] = (now >> 16) & 0xff
+    b[4] = (now >>  8) & 0xff
+    b[5] = (now >>  0) & 0xff
+    _pingmessage.send()
 
 # power-on or identify token
 def _identify(self, packetid):

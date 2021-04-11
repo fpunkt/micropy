@@ -12,61 +12,79 @@ import machine
 import sensors
 import micropython
 import cancommon
+import utime
+
+dimdelay_ms = 20
 
 class _DimList:
     def __init__(self):
-        self._devices = []
+        self._ndevices = 0
+        self._devices = [None] * 8
         self._lastdimstep_ref = self._lastdimstep
         self._nextstep_ref = self._next_step_isr
-        self._isdimming = False
+        self.isdimming = False
         self._timer = machine.Timer(1)
 
     def __repr__(self):
-        return '<DimList {} entries, dimming={}>'.format(len(self._devices), self._isdimming)
+        return '<DimList {} entries, dimming={}>'.format(len(self._devices), self.isdimming)
 
     def _lastdimstep(self, _):
         # this is called outside the ISR
-        to_remove = []
-        for device in self._devices:
-            if device.dimcount == 0:
-                device.iset(device.dimtovalue)
-                to_remove.append(device)
-
-        irq_state = machine.disable_irq()
-        for device in to_remove:
-            self._devices.remove(device)
-        if len(self._devices) == 0:
-            self._isdimming = False
-        machine.enable_irq(irq_state)
-
+        i = 0
+        while i < self._ndevices:
+            device = self._devices[i]
+            if device is not None:
+                i += 1
+                if device.dimcount == 0:
+                    device.iset(device.dimtovalue)
+                    self._devices[i] = None
+        # update _ndevices to avoid looping
+        i = self._ndevices-1
+        while i >= 0:
+            if self._devices[i] is not None:
+                break
+            i += 1
+        self._ndevices = i
+        if self._ndevices == 0:
+            self.isdimming = False
 
     def _next_step_isr(self, _):
-        if not self._isdimming:
+        if not self.isdimming:
             return
-        for device in self._devices:
+        i = 0
+        while i < self._ndevices:
+            device = self._devices[i]
+            i += 1
+            if device is None:
+                continue
             if device.dimcount > 0:
                 device.dimcount -= 1
                 if device.dimcount == 0:
                     micropython.schedule(self._lastdimstep_ref, device)
                 else:
                     device.iset_no_can_message(device.ival + device.dimstep)
-        self._timer.init(period=10, mode=machine.Timer.ONE_SHOT, callback=self._nextstep_ref)
+        self._timer.init(period=dimdelay_ms, mode=machine.Timer.ONE_SHOT, callback=self._nextstep_ref)
 
-    def start_dimming(self, device):
+    def append(self, pwm):
+        # check if entry is already in list
+        i = 0
+        while i < self._ndevices:
+            if self._devices[i] == pwm:
+                return # keep on running ...
+        if self._ndevices >= len(self._devices)-1:
+            raise RuntimeError('Too many PWMs')
         irq_state = machine.disable_irq()
-        try:
-            self._devices.remove(device)
-        except ValueError:
-            pass
-        except:
-            machine.enable_irq(irq_state)
-            raise
-
-        self._devices.append(device)
-        if not self._isdimming:
-            self._isdimming = True
+        self._devices[self._ndevices] = pwm
+        self._ndevices += 1
+        if not self.isdimming:
+            self.isdimming = True
             self._nextstep_ref(None)
         machine.enable_irq(irq_state)
+
+    def wait(self):
+        """Wait till all dimming is done"""
+        while self.isdimming:
+            utime.sleep_ms(50)
 
 dimlist = _DimList()
 
@@ -88,6 +106,9 @@ class PWM:
         self.dimtovalue = 0
         self.dimcount = 0
         self.dimstep = 0
+        # allocate message once to avoid garbage collection
+        self.msg = cancommon.Message(cancommon.CANID_PWM_VALUE, [0, 0, 0, 0, 0, 0, 0])
+        self.msg.setsender(self.id)
 
     def iset_no_can_message(self, ival):
         self.pwm.duty(ival)
@@ -99,12 +120,19 @@ class PWM:
         self.send_status_to_can()
 
     def send_status_to_can(self):
+        # self.msg.setsender(self.id)
         i1 = self.ival
-        i2 = i1 << 6
+        payload = self.msg.payload
+        # self.msg[0] = board.CAN.canid >> 8
+        # self.msg[1] = board.CAN.canid & 0xff
+        payload[3] = i1 >> 8
+        payload[4] = i1 & 0xff
+        i16 = i1 << 6
         if i1 == 1023:
-            i2 = 0xffff
-        payload = [i1 >> 8, i1 & 0xff, i2 >> 8, i2 & 0xff]
-        sensors.send(cancommon.CANID_PWM_VALUE, self.id, payload)
+            i16 = 0xffff
+        payload[5] = i16 >> 8
+        payload[6] = i16 & 0xff
+        self.msg.send()
 
     def set(self, value):
         """Set values from 0..1"""
@@ -124,4 +152,4 @@ class PWM:
         self.dimtovalue = iv
         self.dimstep = idiff
         self.dimcount = steps
-        dimlist.start_dimming(self)
+        dimlist.append(self)

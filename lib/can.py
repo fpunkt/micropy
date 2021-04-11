@@ -14,7 +14,7 @@ class CAN:
         # self, canid=None, rx=13, tx=12, baudrate=125, mode=machine.CAN.NORMAL
         # bus = CAN(0, mode=CAN.NORMAL, baudrate=125, rx_io=13, tx_io=12)
         # c = machine.CAN(0, mode=machine.CAN.NORMAL, baudrate=125, rx_io=13, tx_io=12)
-        self.can = machine.CAN(0, mode=mode, baudrate=baudrate, rx_io=rx, tx_io=tx, rx_queue=10, tx_queue=4)
+        self.can = machine.CAN(0, mode=mode, baudrate=baudrate, rx_io=rx, tx_io=tx, rx_queue=10, tx_queue=8)
         self._callback = None
         self._subscribed_to = None
         self._cbrunner = self._run_callback
