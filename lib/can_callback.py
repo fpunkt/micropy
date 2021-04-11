@@ -9,7 +9,9 @@ import cancommon
 
 class CAN:
     """Wrapper for machine.CAN, providing (some kind of) interrupt and callback"""
-    def __init__(self, canid=None, rx=13, tx=12, baudrate=125, mode=machine.CAN.NORMAL):
+    def __init__(self, canid=None, rx=33, tx=32, baudrate=125, mode=machine.CAN.NORMAL):
+        # self, canid=None, rx=35, tx=34, baudrate=125, mode=machine.CAN.NORMAL
+        # self, canid=None, rx=13, tx=12, baudrate=125, mode=machine.CAN.NORMAL
         # bus = CAN(0, mode=CAN.NORMAL, baudrate=125, rx_io=13, tx_io=12)
         # c = machine.CAN(0, mode=machine.CAN.NORMAL, baudrate=125, rx_io=13, tx_io=12)
         self.can = machine.CAN(0, mode=mode, baudrate=baudrate, rx_io=rx, tx_io=tx, rx_queue=10, tx_queue=4)
