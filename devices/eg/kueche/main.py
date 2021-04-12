@@ -34,8 +34,8 @@ temperature = sensors.DHT(27, 16, poll_intervall_in_ms=5000)
 sensors.start()
 
 def dd(a, b):
-    p1.idim(a)
-    p2.idim(b)
+    p1.dimi(a)
+    p2.dimi(b)
 
 def d1(): dd(0, 1000)
 def d2(): dd(1000, 0)

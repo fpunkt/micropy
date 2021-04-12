@@ -14,7 +14,7 @@ import micropython
 import cancommon
 import utime
 
-dimdelay_ms = 5
+dimdelay_ms = 8
 
 class _DimList:
     def __init__(self):
@@ -60,17 +60,17 @@ class _DimList:
             # try smooth dimming
             # avoid floating point (and malloc)
             # ds, _ = divmod(device.ival, 10)
-            ds = device.ival >> 2
+            ds = device.ival >> 1
             # ds = int(device.ival / 10)
-            ds = min(50, max(1, ds))
+            ds = min(100, max(1, ds))
             remaining_counts = device.dimtovalue - device.ival
             if abs(remaining_counts) <= ds:
-                device.iset_no_can_message(device.dimtovalue)
+                device.seti_no_can_message(device.dimtovalue)
                 micropython.schedule(self._lastdimstep_ref, device)
             elif remaining_counts > 0:
-                device.iset_no_can_message(device.ival + ds)
+                device.seti_no_can_message(device.ival + ds)
             else:
-                device.iset_no_can_message(device.ival - ds)
+                device.seti_no_can_message(device.ival - ds)
         self._timer.init(period=dimdelay_ms, mode=machine.Timer.ONE_SHOT, callback=self._nextstep_ref)
 
     def append(self, pwm):
@@ -97,11 +97,14 @@ class _DimList:
 dimlist = _DimList()
 
 
-def _toint(value):
+def _float_to_raw(value):
     return max(0, min(1023, int(value*1023)))
 
 def _tofloat(value):
     return value / 1023.0
+
+def _i16_to_raw(v):
+    return v >> 6
 
 class PWM:
     """Wrapper for system PWM, using numbers from 0..1 and provide dimming"""
@@ -110,21 +113,25 @@ class PWM:
         self.pwm = machine.PWM(machine.Pin(pin))
         self.ival = 0
         self.id = id
-        self.iset_no_can_message(0) # power off
+        self.seti_no_can_message(0) # power off
         self.dimtovalue = 0
 
         # allocate message once to avoid garbage collection
         self.msg = cancommon.Message(cancommon.CANID_PWM_VALUE, [0, 0, 0, 0, 0, 0, 0])
         self.msg.setsender(self.id)
 
-    def iset_no_can_message(self, ival):
+    def seti_no_can_message(self, ival):
         self.pwm.duty(ival)
         self.ival = ival
 
-    def iset(self, ival):
+    def seti(self, ival):
         """Set raw integer duty from 0 .. 1023 and send status to CAN"""
-        self.iset_no_can_message(ival)
+        self.seti_no_can_message(ival)
         self.send_status_to_can()
+
+    def seti16(self, i16):
+        """Set integer 0..0xffff"""
+        self.seti(_i16_to_raw(i16))
 
     def send_status_to_can(self):
         # self.msg.setsender(self.id)
@@ -141,21 +148,25 @@ class PWM:
         payload[6] = i16 & 0xff
         self.msg.send()
 
-    def set(self, value):
+    def setf(self, value):
         """Set values from 0..1"""
-        self.iset(_toint(value))
+        self.seti(_float_to_raw(value))
 
-    def get(self):
+    def getf(self):
         """Return current value 0..1"""
         return _tofloat(self.ival)
 
-    def idim(self, value):
+    def dimi(self, value):
+        """dim in raw units"""
         if abs(self.ival-value) < 5:
-            self.iset(value)
+            self.seti(value)
             return
         self.dimtovalue = value
         dimlist.append(self)
 
+    def dimi16(self, value):
+        """dim to values from 0..0xffff"""
+        self.dimi(_i16_to_raw(value))
 
-    def dim(self, value):
-        self.idim(_toint(value))
+    def dimf(self, value):
+        self.dimi(_float_to_raw(value))
