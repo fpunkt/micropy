@@ -1,1 +1,1 @@
-../../../lib/sensors_timerirq.py
+../../../lib/sensors.py

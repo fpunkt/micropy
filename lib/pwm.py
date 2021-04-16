@@ -108,7 +108,7 @@ def _i16_to_raw(v):
 
 class PWM:
     """Wrapper for system PWM, using numbers from 0..1 and provide dimming"""
-    def __init__(self, pin, id):
+    def __init__(self, id, pin):
         sensors.register(id, self)
         self.pwm = machine.PWM(machine.Pin(pin))
         self.ival = 0

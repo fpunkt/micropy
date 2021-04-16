@@ -12,7 +12,7 @@ import cancommon
 import pwm
 import utime
 
-pp = pwm.PWM(2, 0x66)
+pp = pwm.PWM(0x66, 2)
 
 def delay_between_loops():
     utime.sleep_ms(10)

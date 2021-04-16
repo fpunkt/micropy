@@ -178,7 +178,7 @@ class WDT(PolledDevice):
 
 class DHT(PolledDevice):
     """Temperature sensor"""
-    def __init__(self, pin, sensorid, poll_intervall_in_ms=60000):
+    def __init__(self, sensorid, pin, poll_intervall_in_ms=60000):
         super().__init__(cancommon.CANID_DATALOGGER_AM2302, sensorid, poll_intervall_in_ms)
         self.dht = dht.DHT22(machine.Pin(pin))
         self.msg = cancommon.makemessage(cancommon.CANID_DATALOGGER_AM2302, 7)

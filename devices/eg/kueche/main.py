@@ -26,10 +26,10 @@ import sensors
 import memstat
 
 #
-p1 = pwm.PWM(4, 0)
-p2 = pwm.PWM(16, 1)
+p1 = pwm.PWM(0, 4)
+p2 = pwm.PWM(1, 16)
 #
-temperature = sensors.DHT(27, 16, poll_intervall_in_ms=5000)
+temperature = sensors.DHT(16, 27, poll_intervall_in_ms=5000)
 
 sensors.start()
 

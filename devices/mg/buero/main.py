@@ -35,7 +35,7 @@ c.subscribe(True, callback)
 print('CAN initialized, dummy callback installed')
 
 p = sensors.PingDevice(poll_intervall_in_ms=2500)
-t1 = sensors.DHT(machine.Pin(4), 1, poll_intervall_in_ms=5000)
+t1 = sensors.DHT(1, machine.Pin(4), poll_intervall_in_ms=5000)
 
 w = None
 
