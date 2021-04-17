@@ -3,6 +3,14 @@
 cancommon.py
 
 Common CAN definitions
+
+Basic configuration commands common to all applications are handled by this layer.
+
+Config commands (assuming CAN address 100)
+
+cansend 100#fd # START WLAN and repl
+cansend 100#fe # STOP WLAN and repl
+
 """
 # pylint: disable=import-error, missing-docstring, redefined-builtin, too-many-arguments
 
@@ -61,12 +69,16 @@ class Message:
 
     def setsender(self, senderid):
         """Fill canid and senderid"""
+        if board.CAN is None:
+            return
         self.payload[0] = board.CAN.canid >> 8
         self.payload[1] = board.CAN.canid & 0xff
         self.payload[2] = senderid
 
     def send(self):
         """Send message"""
+        if board.CAN is None:
+            return
         board.CAN.can.send(self.payload, self.canid)
 
 def makemessage(canid, size):
@@ -142,13 +154,13 @@ def handle_standard_config_command(self, payload):
 
     if payload in (_CONFIG_WLAN_CONNECT, _CONFIG_WLAN_HOTSPOT):
         if payload == _CONFIG_WLAN_CONNECT:
-            ip = net.connect_to_wlan()
+            ip = net.start_wlan()
         else:
             ip = net.start_hotspot()
         board.LED.on()
-        ipx = ip[0].split('.')
+        ipx = list(map(int, ip[0].split('.')))
+        #print('ipx', ipx)
         self.send(CANID_WLAN_CONNECTED, [self.canid >>8, self.canid & 0xff, ipx[0], ipx[1], ipx[2], ipx[3]])
-
         return True
 
     if payload == _CONFIG_INDENTIFY:
@@ -156,7 +168,7 @@ def handle_standard_config_command(self, payload):
         return True
 
     if payload == _CONFIG_WLAN_STOP:
-        net.stop()
+        net.stop_wlan()
         return True
 
     if payload == _CONFIG_WEBREPL_START:
