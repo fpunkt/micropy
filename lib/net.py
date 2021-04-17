@@ -2,6 +2,17 @@
 Start network and webrepl
 
 ampy -p /dev/ttyUSB0 run net.py
+
+When network is up you can use
+
+    webrepl_cli.py -p x file $ip:
+
+to copy files or you can point your web-browser to
+
+/home/frank/Projects/fpunkts/micropy/webrepl/webrepl.html
+
+to open a command terminal
+
 """
 
 # pylint: disable=import-error, missing-docstring, wrong-import-order
@@ -22,11 +33,11 @@ import board
 # x = ap.active(True)
 # print('network activated: ', x)
 
-def connect_to_wlan():
+def start_wlan():
     wlan = network.WLAN(network.STA_IF) # create station interface
     if wlan.isconnected():
         cfg = wlan.ifconfig()
-        print("Already connected to ", cfg)
+        #print("Already connected to ", cfg)
         return cfg
     # need some sleep, otherwise screen disconnects right away (gets reset??)
     wlan.active(True)       # activate the interface
@@ -44,6 +55,7 @@ def connect_to_wlan():
         print('ERROR: cannot connect to WLAN.')
         return None
     cfg = wlan.ifconfig()
+    board.LED.on()
     print("Connected to ", cfg)
     return cfg
 
@@ -54,26 +66,19 @@ def start_hotspot():
     ap.config(max_clients=3) # set how many clients can connect to the network
     ap.active(True)         # activate the interface
     time.sleep(1)
+    board.LED.on()
     return serial
 
-def wlan_stop():
+def stop_wlan():
     try:
         webrepl.stop()
     except: # pylint: disable=bare-except
         pass
     network.WLAN().disconnect()
+    board.LED.off()
 
-def start_repl():
-    webrepl.start(password='x')
+def start_repl(password='x'):
+    webrepl.start(password=password)
 
 def stop_repl():
     webrepl.stop()
-
-def start():
-    connect_to_wlan()
-    board.LED.on()
-    start_repl()
-
-def stop():
-    webrepl.stop()
-    board.LED.off()
