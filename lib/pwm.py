@@ -1,7 +1,11 @@
 """
 pwm.py
 
-Uses Timer(1)
+Uses Timer(1) for dimming.
+
+All general purpose input output pins can be used to generate PWM except digital input
+pins from GPIO pins 34-39. Because these pins cannot be used as digital output pins.
+PWM signals are digital output signals. The maximum frequency of these PWM pins is 80 MHz.
 
 """
 
@@ -14,7 +18,8 @@ import micropython
 import cancommon
 import utime
 
-dimdelay_ms = 8
+dimdelay_ms = 20
+pwm_freq = 1000
 
 class _DimList:
     def __init__(self):
@@ -60,9 +65,11 @@ class _DimList:
             # try smooth dimming
             # avoid floating point (and malloc)
             # ds, _ = divmod(device.ival, 10)
-            ds = device.ival >> 1
+            ds = device.ival
+            ds, _ = divmod(device.ival, 4)
+            #ds = device.ival >> 2
             # ds = int(device.ival / 10)
-            ds = min(100, max(1, ds))
+            ds = min(50, max(5, ds))
             remaining_counts = device.dimtovalue - device.ival
             if abs(remaining_counts) <= ds:
                 device.seti_no_can_message(device.dimtovalue)
@@ -109,10 +116,13 @@ def _i16_to_raw(v):
 class PWM:
     """Wrapper for system PWM, using numbers from 0..1 and provide dimming"""
     def __init__(self, id, pin):
-        sensors.register(id, self)
-        self.pwm = machine.PWM(machine.Pin(pin))
-        self.ival = 0
         self.id = id
+        self.ival = 0
+        sensors.register(id, self)
+        if pin is None:
+            return
+        self.pwm = machine.PWM(machine.Pin(pin))
+        self.pwm.freq(pwm_freq)
         self.seti_no_can_message(0) # power off
         self.dimtovalue = 0
 
@@ -170,3 +180,22 @@ class PWM:
 
     def dimf(self, value):
         self.dimi(_float_to_raw(value))
+
+
+class PWMList(PWM):
+    def __init__(self, id, *args):
+        super().__init__(id, None)
+        self.pwms = list(args)
+
+    def append(self, pwm):
+        self.pwms.append(pwm)
+
+    def seti_no_can_message(self, ival):
+        self.ival = ival
+        for p in self.pwms:
+            p.seti_no_can_message(ival)
+
+
+    def send_status_to_can(self):
+        for p in self.pwms:
+            p.send_status_to_can()
