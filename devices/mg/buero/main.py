@@ -8,7 +8,10 @@ Function main is executed after standard inits
 
 # start CAN first, otherwise bus is in undefined state
 
-import time; print('Loading main, giving time to abort ....'); time.sleep(2)
+# import time; print('Loading boot, giving time to abort (initializing network) ....'); time.sleep(2)
+# import net; net.start_wlan(); net.start_repl()
+
+# import time; print('Loading main, giving time to abort ....'); time.sleep(2)
 
 import can
 c = can.CAN(0x100)

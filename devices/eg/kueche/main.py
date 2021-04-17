@@ -9,7 +9,10 @@ This file is loaded after boot.py
 """
 
 # pylint: disable=multiple-statements
-import time; print('Loading main, giving time to abort ....'); time.sleep(2)
+#import time; print('Loading main, giving time to abort ....'); time.sleep(2)
+
+# import time; print('Loading boot, giving time to abort (initializing network) ....'); time.sleep(2)
+# import net; net.start_wlan(); net.start_repl()
 
 # pylint: disable=import-error, missing-docstring, redefined-builtin, multiple-statements, no-member
 # pylint: disable=wrong-import-order
@@ -24,6 +27,7 @@ import pwm
 import sensors
 # import utime
 import memstat
+import board
 
 #
 p1 = pwm.PWM(0, 4)
@@ -32,6 +36,22 @@ p2 = pwm.PWM(1, 16)
 temperature = sensors.DHT(16, 27, poll_intervall_in_ms=5000)
 
 sensors.start()
+
+message_counter = 0
+
+def callback(msg):
+    # pylint: disable=global-statement
+    global message_counter
+    message_counter += 1
+    print("GOT CAN message #{:4d}: {}".format(message_counter, msg))
+    if len(msg.payload) > 3 and msg.payload[0] == 0x11:
+        count = 100*(msg.payload[1]<<8 + msg.payload[2])
+        print("DOING SOME STUPID LOOPING", count)
+        while count > 0:
+            count -= 1
+        print("DONE with stupid looping")
+
+# board.CAN.subscribe(True, callback)
 
 def dd(a, b):
     p1.dimi(a)

@@ -21,5 +21,7 @@ class Led:
 LED = Led(2)
 """LED on the PCB"""
 
-# Global CAN device. Value is set by can.py
+# Global CAN device. Use board.CAN to access the CAN bus from everywhere.
+# The actual value is set when can.py is loaded/initialized
+# (we need this here to avoid circular dependencies in cancommon.py / can.py)
 CAN = None

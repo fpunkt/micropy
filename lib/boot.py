@@ -16,7 +16,7 @@ import machine
 
 
 # import time; print('Loading boot, giving time to abort (initializing network) ....'); time.sleep(2)
-import net
-net.start()
+# import net; net.start_wlan(); net.start_repl()
+
 
 # main is loaded automatically after boot
