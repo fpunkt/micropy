@@ -20,6 +20,8 @@ class CAN:
         self._cbrunner = self._run_callback
         self.canid = canid
         cancommon.register(self)
+        # subscribe to standard commands so we can still switch on/off WLAN in case booting fails for whatever reason
+        self.can.callback(self._cbrunner)
 
     def subscribe(self, canid, callback):
         self._subscribed_to = canid
