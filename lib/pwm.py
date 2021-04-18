@@ -12,8 +12,8 @@ PWM signals are digital output signals. The maximum frequency of these PWM pins 
 # pylint: disable=import-error, missing-docstring, redefined-builtin, too-many-arguments
 # pylint: disable=too-many-instance-attributes, global-statement
 
+import board
 import machine
-import sensors
 import micropython
 import cancommon
 import utime
@@ -120,7 +120,7 @@ class PWM:
     def __init__(self, id, pin):
         self.id = id
         self.ival = 0
-        sensors.register(id, self)
+        board.register(id, self)
         if pin is None:
             return
         self.pwm = machine.PWM(machine.Pin(pin))

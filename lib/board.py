@@ -5,6 +5,7 @@ Basic Hardware available to all boards
 # pylint: disable=import-error, too-few-public-methods, missing-function-docstring
 
 import machine
+import utime
 
 class Led:
     """On/Off LED"""
@@ -35,6 +36,12 @@ registered_sensors = _RegisteredSensorIDs()
 
 def register(sensorid, value):
     registered_sensors.register(sensorid, value)
+
+last_boot_s = utime.time()
+
+def uptime_s():
+    """Return time since last (soft) boot in seconds"""
+    return utime.time() - last_boot_s
 
 # Location of the board, overwritten by main.py
 LOCATION = "unknown"

@@ -63,8 +63,9 @@ temperature = sensors.DHT(16, 21, poll_intervall_in_ms=sensors.poll_1_minute)
 
 b = sensors.Brightness(17, 39, poll_intervall_in_ms=5000)
 
+ping = sensors.PingDevice()
+
 sensors.proclaim()
-sensors.start()
 
 message_counter = 0
 

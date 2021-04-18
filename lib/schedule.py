@@ -18,6 +18,7 @@ This file uses timer 2
 import micropython
 import utime
 import machine
+import pwm
 
 if 0 == 1:
     # make pylint think that it knows about 'const' variable
@@ -28,18 +29,26 @@ if 0 == 1:
 # schedule_5_minutes = const(5 * 60 * 1000)
 
 class ScheduledItem:
+    def __init__(self):
+        self.next_run_ticks = 0
+        self.repeat_ms = 0
+
+    def __repr__(self):
+        return '<{} poll interval={} ms, next in {} ms>'.format(
+            self.__class__.__name__,
+            self.repeat_ms,
+            utime.ticks_diff(self.next_run_ticks, utime.ticks_ms()))
+
     def run(self):
         pass
 
     def cancel(self):
         """dont run again"""
-        # TODO:
-        # scan schedule list and set my entry to None
+        schedule_list.remove(self)
 
-class ScheduledItemWithCallback:
+class ScheduledItemWithCallback(ScheduledItem):
     def __init__(self, callback):
-        self.next_run_ticks = 0
-        self.repeat_ms = 0
+        super().__init__()
         self.callback = callback
 
     def run(self):
@@ -88,6 +97,11 @@ class ScheduleList:
         # print('running schedule outside ISR with {} items, seconds: {}'.format(self.last, utime.time()))
         if self.stopped:
             return
+
+        # don't block dimming, doesn't look nice ...
+        if pwm.dimlist.isdimming:
+            self.timer.init(period=200, mode=machine.Timer.ONE_SHOT, callback=self._irq_ref)
+
         i = 0
         not_none = 0 # used to compress list on the fly
 
@@ -131,8 +145,6 @@ class ScheduleList:
                 next_run = item.next_run_ticks
                 # print('set next run to', next_run)
 
-
-
         # here we have run all overdue entries. Cleanup list if needed
 
         # print('All callbacks done, nn={}'.format(not_none))
@@ -141,6 +153,16 @@ class ScheduleList:
         # schedule next run
         next_in = utime.ticks_diff(next_run, now)
         self.timer.init(period=next_in, mode=machine.Timer.ONE_SHOT, callback=self._irq_ref)
+
+    def remove(self, item):
+        i = 0
+        nn = 0
+        while i < self.last:
+            if self.items[i] is not None and self.items[i] != item:
+                self.items[nn] = self.items[i]
+                nn += 1
+            i += 1
+        self.last = nn
 
     def _irq_handler(self, _):
         try:
