@@ -47,6 +47,7 @@ class PolledDeviceList:
         self.devices.append(device)
 
     def _next_poll(self, _):
+        """Poll device. This code is run outside IRQ context (so save to malloc and floating point)"""
         if pwm.dimlist.isdimming:
             # don't block dimming, doesn't look nice ...
             self.timer.init(period=200, mode=machine.Timer.ONE_SHOT, callback=self._irq_ref)
@@ -186,12 +187,19 @@ class DHT(PolledDevice):
 
     def measure_and_send(self):
         # self.msg.setsender(self.sensorid)
+        # if board.CAN is None and board.MQTT is None:
+        #     return
         self.dht.measure()
         t = int(10*self.dht.temperature()+0.5)
         h = int(10*self.dht.humidity()+0.5)
-        payload = self.msg.payload
-        payload[3] = h >> 8
-        payload[4] = h & 0xff
-        payload[5] = t >> 8
-        payload[6] = t & 0xff
-        self.msg.send()
+        if board.CAN is not None:
+            payload = self.msg.payload
+            payload[3] = h >> 8
+            payload[4] = h & 0xff
+            payload[5] = t >> 8
+            payload[6] = t & 0xff
+            self.msg.send()
+
+        if board.MQTT is not None:
+            board.MQTT.publish_sensor_state("TempHum", self.sensorid,
+                '"{{temperature": {:.1f}, "humidity": {:.1f}}}'.format(t/10.0, h/10.0))
