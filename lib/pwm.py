@@ -18,7 +18,7 @@ import micropython
 import cancommon
 import utime
 
-dimdelay_ms = 20
+dimdelay_ms = 5
 pwm_freq = 1000
 
 class _DimList:

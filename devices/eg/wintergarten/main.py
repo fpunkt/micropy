@@ -31,6 +31,7 @@ import sensors
 import memstat
 import umqttsimple
 import fsmqtt
+import schedule
 
 board.MQTT = fsmqtt.MQTTClient().connect()
 
@@ -101,3 +102,9 @@ def ddloop():
         pwm.dimlist.wait()
         m2 = gc.mem_free()
         print('Mem Used: {}'.format(m1-m2))
+
+def alloff():
+    pwm.ALL.dimi(0)
+
+def alloff_in(seconds):
+    schedule.run_in_ms(1000*seconds, alloff)
