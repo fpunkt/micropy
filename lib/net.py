@@ -45,7 +45,7 @@ def start_wlan():
     wlan.scan()             # scan for access points
     time.sleep(1)
     # pylint: disable=no-member
-    wlan.connect(secrets.network, secrets.password) # connect to an AP
+    wlan.connect(secrets.wlan_ssid, secrets.wlan_password) # connect to an AP
     for i in range(30):
         if wlan.isconnected():
             break      # check if the station is connected to an AP

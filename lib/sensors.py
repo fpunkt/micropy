@@ -15,23 +15,17 @@ import cancommon
 import micropython
 import pwm
 
+if 0 == 1:
+    # make pylint think that it knows about 'const' variable
+    # pylint: disable=used-before-assignment, undefined-variable, self-assigning-variable
+    const = const
+
+poll_1_minute = const(1 * 60 * 1000)
+poll_5_minutes = const(5 * 60 * 1000)
+
+default_poll_time = const(poll_5_minutes)
+
 # external functions (like dimming) can temporarily disable sensor accquisition (looks nicer)
-
-class _RegisteredSensorIDs:
-    def __init__(self):
-        self.r = dict()
-    def register(self, id, value):
-        if id in self.r:
-            raise RuntimeError("sensorid #{} is already registered as {}".format(id, self.r[id]))
-        self.r[id] = value
-    def dump(self):
-        for i, v in self.r:
-            print("ID {:2d} = {}".format(i, v))
-
-registered_sensors = _RegisteredSensorIDs()
-
-def register(id, value):
-    registered_sensors.register(id, value)
 
 class PolledDeviceList:
     def __init__(self):
@@ -45,6 +39,10 @@ class PolledDeviceList:
 
     def append(self, device):
         self.devices.append(device)
+
+    def proclaim(self):
+        for d in self.devices:
+            d.proclaim()
 
     def _next_poll(self, _):
         """Poll device. This code is run outside IRQ context (so save to malloc and floating point)"""
@@ -120,6 +118,9 @@ polled_devices = PolledDeviceList()
 def start():
     polled_devices.start()
 
+def proclaim():
+    polled_devices.proclaim()
+
 def stop():
     polled_devices.stop()
 
@@ -127,7 +128,9 @@ class PolledDevice:
     def __init__(self, packetid, sensorid, poll_intervall_in_ms):
         self.packetid = packetid
         self.sensorid = sensorid
-        registered_sensors.register(sensorid, self)
+        # if poll_intervall_in_ms is None:
+        #     poll_intervall_in_ms = default_poll_time
+        board.register(sensorid, self)
         if poll_intervall_in_ms < 1000:
             poll_intervall_in_ms = 1000
         self.poll_intervall_in_ms = poll_intervall_in_ms
@@ -139,6 +142,9 @@ class PolledDevice:
             self.__class__.__name__,
             self.poll_intervall_in_ms,
             utime.ticks_diff(self.next_call, utime.ticks_ms()))
+
+    def proclaim(self):
+        """tell others that we are online"""
 
     # def send(self, payload):
     #     if board.CAN is None:
@@ -155,7 +161,7 @@ class PolledDevice:
 
 class PingDevice(PolledDevice):
     """Send ping messages"""
-    def __init__(self, poll_intervall_in_ms=300*1000):
+    def __init__(self, poll_intervall_in_ms=poll_5_minutes):
         super().__init__(0, 0, poll_intervall_in_ms)
 
     def measure_and_send(self):
@@ -179,11 +185,15 @@ class WDT(PolledDevice):
 
 class DHT(PolledDevice):
     """Temperature sensor"""
-    def __init__(self, sensorid, pin, poll_intervall_in_ms=60000):
+    def __init__(self, sensorid, pin, poll_intervall_in_ms=poll_5_minutes):
         super().__init__(cancommon.CANID_DATALOGGER_AM2302, sensorid, poll_intervall_in_ms)
         self.dht = dht.DHT22(machine.Pin(pin))
         self.msg = cancommon.makemessage(cancommon.CANID_DATALOGGER_AM2302, 7)
         self.msg.setsender(self.sensorid)
+
+    def proclaim(self):
+        if board.MQTT is not None:
+            board.MQTT.publish_sensor_status("TempHum", self.sensorid, "ON")
 
     def measure_and_send(self):
         # self.msg.setsender(self.sensorid)
@@ -202,4 +212,27 @@ class DHT(PolledDevice):
 
         if board.MQTT is not None:
             board.MQTT.publish_sensor_state("TempHum", self.sensorid,
-                '"{{temperature": {:.1f}, "humidity": {:.1f}}}'.format(t/10.0, h/10.0))
+                '{{"temperature": {:.1f}, "humidity": {:.1f}}}'.format(t/10.0, h/10.0))
+
+
+class Brightness(PolledDevice):
+    """Analog brighness sensors, 0 is dark, 0xff is maximum brightness"""
+    def __init__(self, sensorid, pin, poll_intervall_in_ms=poll_5_minutes):
+        super().__init__(cancommon.CANID_DATALOGGER_BRIGHTNESS_SENSOR_8, sensorid, poll_intervall_in_ms)
+        self.adc = machine.ADC(machine.Pin(pin))
+        self.adc.width(machine.ADC.WIDTH_9BIT)
+        self.last_read = 0
+        self.last_read_pwm_off = 0
+
+    def read(self):
+        self.last_read = 0xff - (self.adc.read() >> 1) # 8 bit
+
+        if pwm.ALL.maxi() == 0:
+            self.last_read_pwm_off = self.last_read
+        return self.last_read
+
+    def measure_and_send(self):
+        self.read()
+        if board.MQTT is not None:
+            board.MQTT.publish_sensor_state("bright", self.sensorid,
+                '{{"brightess": {}, "dark": {}}}'.format(self.last_read, self.last_read_pwm_off))

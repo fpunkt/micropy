@@ -10,7 +10,7 @@ PWM signals are digital output signals. The maximum frequency of these PWM pins 
 """
 
 # pylint: disable=import-error, missing-docstring, redefined-builtin, too-many-arguments
-# pylint: disable=too-many-instance-attributes
+# pylint: disable=too-many-instance-attributes, global-statement
 
 import machine
 import sensors
@@ -113,6 +113,8 @@ def _tofloat(value):
 def _i16_to_raw(v):
     return v >> 6
 
+ALL = None
+
 class PWM:
     """Wrapper for system PWM, using numbers from 0..1 and provide dimming"""
     def __init__(self, id, pin):
@@ -122,13 +124,20 @@ class PWM:
         if pin is None:
             return
         self.pwm = machine.PWM(machine.Pin(pin))
-        self.pwm.freq(pwm_freq)
+        # global pwm_freq
+        if pwm_freq > 0:
+            self.pwm.freq(pwm_freq)
+            # pwm_freq = 0
+            utime.sleep_ms(5) # for some strange reason after setting pwm_freq ..
+        # print('setting duty for {}/{} to 0'.format(id, pin))
+        # self.pwm.duty(0)
         self.seti_no_can_message(0) # power off
         self.dimtovalue = 0
 
         # allocate message once to avoid garbage collection
         self.msg = cancommon.Message(cancommon.CANID_PWM_VALUE, [0, 0, 0, 0, 0, 0, 0])
         self.msg.setsender(self.id)
+        ALL.append(self)
 
     def seti_no_can_message(self, ival):
         self.pwm.duty(ival)
@@ -195,7 +204,12 @@ class PWMList(PWM):
         for p in self.pwms:
             p.seti_no_can_message(ival)
 
-
     def send_status_to_can(self):
         for p in self.pwms:
             p.send_status_to_can()
+
+    def maxi(self):
+        """get max value of all PWMs"""
+        return max([p.ival for p in self.pwms])
+
+ALL = PWMList(-1)

@@ -1,7 +1,5 @@
 """
-Kueche main.py
-
-This file is loaded after boot.py
+wintergarten main.py
 
 3 buttons
 7 PWM
@@ -21,13 +19,21 @@ import net; net.start_wlan(); net.start_repl()
 # import can
 # can.CAN(0x200)
 
+import board
+
+board.LOCATION = 'eg_wintergarten'
+
 
 import gc
 import pwm
 import sensors
 # import utime
 import memstat
-import board
+import umqttsimple
+import fsmqtt
+
+board.MQTT = fsmqtt.MQTTClient().connect()
+
 
 #
 p1 = pwm.PWM(1, 18)
@@ -40,8 +46,11 @@ p7 = pwm.PWM(7, 5)
 
 p14 = pwm.PWMList(10, p1, p2, p3, p4)
 p57 = pwm.PWMList(11, p5, p6, p7)
+all = pwm.PWMList(99, p1, p2, p3, p4, p5, p6, p7)
 
 pa = pwm.PWMList(12, p1, p3)
+
+# t1 =
 
 def a(v=.01):
     p14.dimf(v)
@@ -50,8 +59,11 @@ def b():
 
 pall = pwm.PWMList(13, p1, p2, p3, p4, p5, p6, p7)
 #
-temperature = sensors.DHT(16, 27, poll_intervall_in_ms=5000)
+temperature = sensors.DHT(16, 21, poll_intervall_in_ms=sensors.poll_1_minute)
 
+b = sensors.Brightness(17, 39, poll_intervall_in_ms=5000)
+
+sensors.proclaim()
 sensors.start()
 
 message_counter = 0
