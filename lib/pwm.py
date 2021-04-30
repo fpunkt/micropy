@@ -7,6 +7,16 @@ All general purpose input output pins can be used to generate PWM except digital
 pins from GPIO pins 34-39. Because these pins cannot be used as digital output pins.
 PWM signals are digital output signals. The maximum frequency of these PWM pins is 80 MHz.
 
+Functions are
+
+  seti()
+
+Use like
+
+p = pwm.PWM(1, 14)
+
+p
+
 """
 
 # pylint: disable=import-error, missing-docstring, redefined-builtin, too-many-arguments
@@ -19,7 +29,9 @@ import cancommon
 import utime
 
 dimdelay_ms = 5
-pwm_freq = 1000
+
+# PWM freq defines the overall frequency of the device in Hz. 100 Hz is a good number
+pwm_freq = 100
 
 class _DimList:
     def __init__(self):

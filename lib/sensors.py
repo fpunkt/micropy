@@ -1,7 +1,15 @@
 """
 Misc Sensors
 
-This file uses virtual timers (-1)
+Sensors are polled in the background using the schedule module.
+
+Add sensors simply by defining them. Accquisition starts automatically.
+
+Example:
+
+  temperature = sensors.DHT(16, 21, poll_intervall_in_ms=sensors.poll_1_minute)
+  sensors.proclaim()
+
 """
 
 # pylint: disable=import-error, missing-docstring, redefined-builtin, too-many-arguments
