@@ -12,7 +12,7 @@ This file is loaded after boot.py
 #import time; print('Loading main, giving time to abort ....'); time.sleep(2)
 
 # import time; print('Loading boot, giving time to abort (initializing network) ....'); time.sleep(2)
-# import net; net.start_wlan(); net.start_repl()
+import net; net.start_wlan(); net.start_repl()
 
 # pylint: disable=import-error, missing-docstring, redefined-builtin, multiple-statements, no-member
 # pylint: disable=wrong-import-order
@@ -35,7 +35,7 @@ p2 = pwm.PWM(1, 16)
 #
 temperature = sensors.DHT(16, 27, poll_intervall_in_ms=5000)
 
-sensors.start()
+sensors.proclaim()
 
 message_counter = 0
 

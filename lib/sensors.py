@@ -18,7 +18,8 @@ Example:
 import machine
 import dht
 import board
-import cancommon
+import can
+import cancodes
 import schedule
 import pwm
 
@@ -57,7 +58,7 @@ class PolledDevice(schedule.ScheduledItem):
         """tell others that we are online"""
 
     def run(self):
-        cancommon.Badmessage.send()
+        can.Badmessage.send()
 
 class PingDevice(PolledDevice):
     """Send ping messages"""
@@ -66,7 +67,7 @@ class PingDevice(PolledDevice):
 
     def run(self):
         if board.CAN is not None:
-            cancommon.send_ping(board.CAN)
+            board.CAN.send_ping()
         if board.MQTT is not None:
             board.MQTT.publish('info/uptime/{}'.format(board.LOCATION), str(board.uptime_s()))
 
@@ -86,9 +87,9 @@ class WDT(PolledDevice):
 class DHT(PolledDevice):
     """Temperature sensor"""
     def __init__(self, sensorid, pin, poll_intervall_in_ms=poll_5_minutes):
-        super().__init__(cancommon.CANID_DATALOGGER_AM2302, sensorid, poll_intervall_in_ms)
+        super().__init__(cancodes.CANID_DATALOGGER_AM2302, sensorid, poll_intervall_in_ms)
         self.dht = dht.DHT22(machine.Pin(pin))
-        self.msg = cancommon.makemessage(cancommon.CANID_DATALOGGER_AM2302, 7)
+        self.msg = can.makemessage(cancodes.CANID_DATALOGGER_AM2302, 7)
         self.msg.setsender(self.sensorid)
 
     def proclaim(self):
@@ -118,7 +119,7 @@ class DHT(PolledDevice):
 class Brightness(PolledDevice):
     """Analog brighness sensors, 0 is dark, 0xff is maximum brightness"""
     def __init__(self, sensorid, pin, poll_intervall_in_ms=poll_5_minutes):
-        super().__init__(cancommon.CANID_DATALOGGER_BRIGHTNESS_SENSOR_8, sensorid, poll_intervall_in_ms)
+        super().__init__(cancodes.CANID_DATALOGGER_BRIGHTNESS_SENSOR_8, sensorid, poll_intervall_in_ms)
         self.adc = machine.ADC(machine.Pin(pin))
         self.adc.width(machine.ADC.WIDTH_9BIT)
         self.last_read = 0

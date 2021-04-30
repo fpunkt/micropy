@@ -25,7 +25,8 @@ p
 import board
 import machine
 import micropython
-import cancommon
+import can
+import cancodes
 import utime
 
 dimdelay_ms = 5
@@ -147,7 +148,7 @@ class PWM:
         self.dimtovalue = 0
 
         # allocate message once to avoid garbage collection
-        self.msg = cancommon.Message(cancommon.CANID_PWM_VALUE, [0, 0, 0, 0, 0, 0, 0])
+        self.msg = can.Message(cancodes.CANID_PWM_VALUE, [0, 0, 0, 0, 0, 0, 0])
         self.msg.setsender(self.id)
         ALL.append(self)
 
