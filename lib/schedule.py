@@ -188,7 +188,7 @@ def reschedule(self):
     run()
 
 def run_in_ms(ms, callback, data=_no_data, repeat_ms=0):
-    if callback.__class__ == ScheduledItem:
+    if isinstance(callback, ScheduledItem):
         item = callback
     elif data == _no_data:
         item = ScheduledItemWithCallback(callback)
