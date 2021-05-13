@@ -33,7 +33,7 @@ class OutOfIRQRunnerClass:
         self._run_ref = self._runlist
 
     def _runlist(self, _):
-        print('Running {}'.format(self.stack))
+        # print('Running {}'.format(self.stack))
         i = 0
         l = []
         irq_state = machine.disable_irq()
@@ -213,11 +213,7 @@ class ScheduleList:
         self.last = nn
 
     def _irq_handler(self, _):
-        try:
-            micropython.schedule(self._run_ref, 1)
-        except: # pylint: disable=bare-except
-            # schedule queue is full, try again later
-            self.timer.init(period=100, mode=machine.Timer.ONE_SHOT, callback=self._irq_ref)
+        outside_irq.run_outside_irq(self._run_ref)
 
 
 schedule_list = ScheduleList()
