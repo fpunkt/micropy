@@ -52,7 +52,7 @@ class Button:
 
     def _pressed(self):
         self.state = not self.state
-        print('{} pressed'.format(self))
+        # print('{} pressed'.format(self))
         if self.pwm is not None:
             if self.state:
                 self.pwm.on()
