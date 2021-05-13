@@ -28,12 +28,23 @@ import sensors
 # import utime
 import memstat
 import board
+import button
 
 #
 p1 = pwm.PWM(0, 4)
 p2 = pwm.PWM(1, 16)
+b1 = button.Button(10, 13)
+b2 = button.Button(11, 12)
+
+b1.pwm = p1
+b2.pwm = p2
+
+p1.lastintensity = 100
+p2.lastintensity = 15
 #
 temperature = sensors.DHT(16, 27, poll_intervall_in_ms=5000)
+
+wd = sensors.WDT()
 
 sensors.proclaim()
 
@@ -53,9 +64,9 @@ def callback(msg):
 
 # board.CAN.subscribe(True, callback)
 
-def dd(a, b):
-    p1.dimi(a)
-    p2.dimi(b)
+def dd(a1, a2):
+    p1.dimi(a1)
+    p2.dimi(a2)
 
 def d1(): dd(0, 1000)
 def d2(): dd(1000, 0)

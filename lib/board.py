@@ -6,6 +6,7 @@ Basic Hardware available to all boards
 
 import machine
 import utime
+import cancodes
 
 class Led:
     """On/Off LED"""
@@ -57,3 +58,10 @@ CAN = None
 
 # MQTT connection, set by main.py if applicable
 MQTT = None
+
+
+def error(payload, mqttstring):
+    if CAN is not None:
+        CAN.send(cancodes.CANID_ERROR, payload)
+    if MQTT is not None:
+        pass

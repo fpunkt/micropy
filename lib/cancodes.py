@@ -20,6 +20,10 @@ CANID_PING = const(0x7e0)
 CANID_WLAN_CONNECTED = const(0x3c6)
 CANID_PWM_VALUE = const(0x03c8)
 CANID_DATALOGGER_BRIGHTNESS_SENSOR_8 = const(0x6f6) #
+CANID_BUTTON_PRESSED = const(0x380)
+CANID_ERROR = const(0x760)
+
+CANERROR_TOO_MANY_PWMS = const(0xf1)
 
 # CAN commands and configuration handled by each device
 # All general config commands must be >= 0xe8
