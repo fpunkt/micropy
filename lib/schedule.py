@@ -25,6 +25,54 @@ if 0 == 1:
     # pylint: disable=used-before-assignment, undefined-variable, self-assigning-variable
     const = const
 
+
+class OutOfIRQRunnerClass:
+    def __init__(self):
+        self.stack = [None, None, None, None, None]
+        self.scheduled = False
+        self._run_ref = self._runlist
+
+    def _runlist(self, _):
+        print('Running {}'.format(self.stack))
+        i = 0
+        l = []
+        irq_state = machine.disable_irq()
+
+        # keep blocked IRQ as short as possible
+        while i < len(self.stack):
+            cb = self.stack[i]
+            if cb is not None:
+                l.append(self.stack[i])
+                self.stack[i] = None
+            i += 1
+        self.scheduled = False
+        machine.enable_irq(irq_state)
+
+        while l:
+            cb = l.pop(0)
+            try:
+                # pylint: disable=not-callable
+                cb(None)
+            except: # pylint: disable=bare-except
+                pass
+
+    def run_outside_irq(self, callback):
+        i = 0
+        irq_state = machine.disable_irq()
+        while i < len(self.stack):
+            if self.stack[i] is None:
+                self.stack[i] = callback
+                break
+            i += 1
+        if not self.scheduled:
+            self.scheduled = True
+            micropython.schedule(self._run_ref, None)
+        machine.enable_irq(irq_state)
+
+
+outside_irq = OutOfIRQRunnerClass()
+
+
 # schedule_1_minute = const(1 * 60 * 1000)
 # schedule_5_minutes = const(5 * 60 * 1000)
 

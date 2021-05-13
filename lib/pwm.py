@@ -22,12 +22,13 @@ p
 # pylint: disable=import-error, missing-docstring, redefined-builtin, too-many-arguments
 # pylint: disable=too-many-instance-attributes, global-statement
 
+import gc
 import board
 import machine
-import micropython
 import can
 import cancodes
 import utime
+import schedule
 
 dimdelay_ms = 5
 
@@ -51,11 +52,16 @@ class _DimList:
         i = 0
         while i < self._ndevices:
             device = self._devices[i]
-            if device is not None:
-                i += 1
-                if device.ival == device.dimtovalue:
-                    device.send_status_to_can()
-                    self._devices[i] = None
+            if device is None:
+                continue
+
+            i += 1
+
+            if device.ival == device.dimtovalue:
+                # sometimes the last set-pwm in ISR doesn't get through .. no plan why though.
+                device.forcei_no_can_message(device.ival)
+                device.seti(device.ival)
+                self._devices[i] = None
         # update _ndevices to avoid looping
         i = self._ndevices-1
         while i >= 0:
@@ -65,11 +71,13 @@ class _DimList:
         self._ndevices = i
         if self._ndevices == 0:
             self.isdimming = False
+            gc.collect()
 
     def _next_step_isr(self, _):
         if not self.isdimming:
             return
         i = 0
+        queue_last = False
         while i < self._ndevices:
             device = self._devices[i]
             i += 1
@@ -78,19 +86,20 @@ class _DimList:
             # try smooth dimming
             # avoid floating point (and malloc)
             # ds, _ = divmod(device.ival, 10)
-            ds = device.ival
             ds, _ = divmod(device.ival, 4)
-            #ds = device.ival >> 2
-            # ds = int(device.ival / 10)
             ds = min(50, max(5, ds))
             remaining_counts = device.dimtovalue - device.ival
             if abs(remaining_counts) <= ds:
                 device.seti_no_can_message(device.dimtovalue)
-                micropython.schedule(self._lastdimstep_ref, device)
+                queue_last = True
             elif remaining_counts > 0:
                 device.seti_no_can_message(device.ival + ds)
             else:
                 device.seti_no_can_message(device.ival - ds)
+
+        if queue_last:
+            schedule.outside_irq.run_outside_irq(self._lastdimstep_ref)
+
         self._timer.init(period=dimdelay_ms, mode=machine.Timer.ONE_SHOT, callback=self._nextstep_ref)
 
     def append(self, pwm):
@@ -100,6 +109,7 @@ class _DimList:
             if self._devices[i] == pwm:
                 return # keep on running ...
         if self._ndevices >= len(self._devices)-1:
+            board.error([cancodes.CANERROR_TOO_MANY_PWMS], 'Too many PWMs')
             raise RuntimeError('Too many PWMs')
         irq_state = machine.disable_irq()
         self._devices[self._ndevices] = pwm
@@ -133,6 +143,7 @@ class PWM:
     def __init__(self, id, pin):
         self.id = id
         self.ival = 0
+        self.lastintensity = 100
         board.register(id, self)
         if pin is None:
             return
@@ -146,6 +157,7 @@ class PWM:
         # self.pwm.duty(0)
         self.seti_no_can_message(0) # power off
         self.dimtovalue = 0
+        self.button = None
 
         # allocate message once to avoid garbage collection
         self.msg = can.Message(cancodes.CANID_PWM_VALUE, [0, 0, 0, 0, 0, 0, 0])
@@ -156,9 +168,17 @@ class PWM:
         self.pwm.duty(ival)
         self.ival = ival
 
+    def forcei_no_can_message(self, ival):
+        # for some strange reason sometimes the value is not taken
+        while self.pwm.duty() != ival:
+            self.pwm.duty(ival)
+        self.ival = ival
+
     def seti(self, ival):
         """Set raw integer duty from 0 .. 1023 and send status to CAN"""
         self.seti_no_can_message(ival)
+        if ival != 0:
+            self.lastintensity = ival
         self.send_status_to_can()
 
     def seti16(self, i16):
@@ -202,6 +222,20 @@ class PWM:
 
     def dimf(self, value):
         self.dimi(_float_to_raw(value))
+
+    def on(self):
+        if self.ival == self.lastintensity:
+            return
+        self.dimi(self.lastintensity)
+
+    def off(self):
+        self.dimi(0)
+
+    def toggle(self):
+        if self.ival == 0:
+            self.on()
+        else:
+            self.off()
 
 
 class PWMList(PWM):
