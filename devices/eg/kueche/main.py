@@ -29,6 +29,8 @@ import sensors
 import memstat
 import board
 import button
+import uasyncio as asyncio
+import schedule
 
 #
 p1 = pwm.PWM(0, 4)
@@ -43,14 +45,23 @@ p1.lastintensity = 100
 p2.lastintensity = 15
 #
 temperature = sensors.DHT(16, 27, poll_intervall_in_ms=5000)
+ping = sensors.PingDevice(1500)
 
-wd = sensors.WDT()
+#wd = sensors.WDT()
 
 sensors.proclaim()
 
 message_counter = 0
 
-def callback(msg):
+async def _async_runner():
+    asyncio.create_task(schedule.schedule_list.astart())
+    await asyncio.sleep(0)
+    while True:
+        await asyncio.sleep(60)
+
+
+
+def can_callback(msg):
     # pylint: disable=global-statement
     global message_counter
     message_counter += 1
@@ -65,7 +76,15 @@ def callback(msg):
             count -= 1
         print("DONE with stupid looping")
 
-board.CAN.subscribe(False, callback)
+
+async def acallback(msg):
+    can_callback(msg)
+    await asyncio.sleep(0)
+
+def cbrunner(msg):
+    asyncio.run(acallback(msg))
+
+board.CAN.subscribe(False, can_callback)
 
 def dd(a1, a2):
     p1.dimi(a1)
@@ -85,3 +104,8 @@ def ddloop():
         pwm.dimlist.wait()
         m2 = gc.mem_free()
         print('Mem Used: {}'.format(m1-m2))
+
+
+
+def main():
+    schedule.run()

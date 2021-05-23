@@ -9,6 +9,7 @@ import canid
 import cancommon
 import board
 import utime
+import uasyncio as asyncio
 
 
 # def _payloadstring(payload):
@@ -84,8 +85,7 @@ class CAN:
         else:
             self.can.callback(self._cbrunner)
 
-    def _run_callback(self, candev):
-        # print('this is __callback', self, candev)
+    async def _async_callback(self):
         if not self.can.any():
             print("ERROR: CAN callback triggered from IRQ but no packet available")
             return
@@ -96,6 +96,12 @@ class CAN:
             return
         if self._subscribed_to is True or self._subscribed_to == cid:
             self._callback(Message(cid, payload))
+        await asyncio.sleep(0)
+
+
+    def _run_callback(self, _):
+        asyncio.run(self._async_callback())
+        # print('this is __callback', self, candev)
 
     def any(self):
         return self.can.any()

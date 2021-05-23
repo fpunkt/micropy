@@ -19,6 +19,7 @@ import micropython
 import utime
 import machine
 import pwm
+import uasyncio as asyncio
 
 if 0 == 1:
     # make pylint think that it knows about 'const' variable
@@ -37,9 +38,9 @@ class OutOfIRQRunnerClass:
         # print('Running {}'.format(self.stack))
         i = 0
         l = []
-        irq_state = machine.disable_irq()
 
         # keep blocked IRQ as short as possible
+        irq_state = machine.disable_irq()
         while i < len(self.stack):
             cb = self.stack[i]
             if cb is not None:
@@ -81,26 +82,39 @@ outside_irq = OutOfIRQRunnerClass()
 # schedule_5_minutes = const(5 * 60 * 1000)
 
 class ScheduledItem:
-    def __init__(self):
-        self.next_run_ticks = 0
+    def __init__(self, label=None):
+        if label is None:
+            label = 'undefined task'
+        self.label = label
+        self.sleep_before_ms = 0
         self.repeat_ms = 0
+        self.active = True
+
+    async def run_in_background(self):
+        await asyncio.sleep_ms(self.sleep_before_ms)
+        self.run()
+        while self.active and self.repeat_ms > 0:
+            await asyncio.sleep_ms(self.repeat_ms)
+            self.run()
+        self.active = False
 
     def __repr__(self):
-        return '<{} poll interval={} ms, next in {} ms>'.format(
-            self.__class__.__name__,
+        return '<{}:{} poll interval={} ms, next in {} ms>'.format(
+            self.__class__.__name__, self.label,
             self.repeat_ms,
-            utime.ticks_diff(self.next_run_ticks, utime.ticks_ms()))
+            utime.ticks_diff(self.sleep_before_ms, utime.ticks_ms()))
 
     def run(self):
         pass
 
     def cancel(self):
         """dont run again"""
+        self.active = False
         schedule_list.remove(self)
 
 class ScheduledItemWithCallback(ScheduledItem):
-    def __init__(self, callback):
-        super().__init__()
+    def __init__(self, label, callback):
+        super().__init__(label)
         self.callback = callback
 
     def run(self):
@@ -112,25 +126,22 @@ class ScheduledItemWithCallback(ScheduledItem):
         self.callback = None
 
 class ScheduledItemWithData(ScheduledItemWithCallback):
-    def __init__(self, callback, data):
-        super().__init__(callback)
+    def __init__(self, label, callback, data):
+        super().__init__(label, callback)
         self.data = data
 
     def run(self):
         if self.callback is not None:
             self.callback(self.data)
 
+
 class ScheduleList:
     """A list of all scheduled items"""
     def __init__(self):
         # use a pre-alloced list to avoid GC
         self.items = [None, None, None, None, None, None, None, None, None, None]
+        self.running = []
         self.last = 0
-        # self.next_run_ticks = 0
-        self._irq_ref = self._irq_handler
-        self._run_ref = self.run_outside_isr
-        self.timer = machine.Timer(2)
-        self.stopped = False
 
     def append(self, item):
         if self.last >= len(self.items):
@@ -139,72 +150,20 @@ class ScheduleList:
             self.items[self.last] = item
         self.last += 1
 
-        # print('Added item {}, last={} -> {}'.format(item, self.last, self.items))
+    async def astart(self):
+        count = 0
+        for item in self.items:
+            if item is not None:
+                count += 1
+                task = asyncio.create_task(item.run_in_background())
+                self.running.append(task)
+        print('   .. done, fired {} tasks'.format(count))
+        await asyncio.sleep(0)
+        # print('done waiting 0')
+        # await asyncio.sleep(10)
+        # print('done waiting 10')
 
-        #if utime.tiks_diff(self.next_run_ticks, item.next_run_ticks) < 0:
-            # start now
-        self.run_outside_isr(None)
 
-    def run_outside_isr(self, _):
-        # print('running schedule outside ISR with {} items, seconds: {}'.format(self.last, utime.time()))
-        if self.stopped:
-            return
-
-        # don't block dimming, doesn't look nice ...
-        if pwm.dimlist.isdimming:
-            self.timer.init(period=200, mode=machine.Timer.ONE_SHOT, callback=self._irq_ref)
-
-        i = 0
-        not_none = 0 # used to compress list on the fly
-
-        now = utime.ticks_ms()
-        next_run = utime.ticks_add(now, 25000) # if there is nothing else to do ...
-
-        while i < self.last:
-            item = self.items[i]
-            # print('checking item {}: {}'.format(i, item))
-            i += 1
-
-            if item is None:
-                print('huh? item is None')
-                continue
-
-            # pylint: disable=line-too-long
-            #print('now={}, next={}, diff={}'.format(now, item.next_run_ticks, utime.ticks_diff(item.next_run_ticks, now)))
-            #print('i={}, lasti={}, last_none={}, item={}'.format(i, lasti, last_none, item))
-            # we leave some margin here not to fiere the timer again immediately
-            if utime.ticks_diff(item.next_run_ticks, now) < 5:
-                try:
-                    # print('going to run callback')
-                    item.run()
-                except: # pylint: disable=bare-except
-                    pass
-
-                if item.repeat_ms == 0:
-                    # run and done
-                    continue
-
-                # schedule next run
-                # we could use item.next_run_ticks -> overall error remains smaller, jitter is larger
-                # or use 'now'
-                # reference_time = item.next_run_ticks
-                item.next_run_ticks = utime.ticks_add(now, item.repeat_ms)
-
-            self.items[not_none] = item
-            not_none += 1
-
-            if utime.ticks_diff(item.next_run_ticks, next_run) < 0:
-                next_run = item.next_run_ticks
-                # print('set next run to', next_run)
-
-        # here we have run all overdue entries. Cleanup list if needed
-
-        # print('All callbacks done, nn={}'.format(not_none))
-        self.last = not_none
-
-        # schedule next run
-        next_in = utime.ticks_diff(next_run, now)
-        self.timer.init(period=next_in, mode=machine.Timer.ONE_SHOT, callback=self._irq_ref)
 
     def remove(self, item):
         i = 0
@@ -215,11 +174,7 @@ class ScheduleList:
                 nn += 1
             i += 1
         self.last = nn
-
-    def _irq_handler(self, _):
-        irq_state = machine.disable_irq()
-        outside_irq.run_outside_irq_disable_irq_around_me(self._run_ref)
-        machine.enable_irq(irq_state)
+        item.active = False
 
 
 schedule_list = ScheduleList()
@@ -227,26 +182,28 @@ schedule_list = ScheduleList()
 _no_data = "const(0xaffedead)"
 
 def stop():
-    schedule_list.stopped = True
+    pass
+
+async def arun():
+    """Run forever"""
+    asyncio.create_task(schedule_list.astart())
+    await asyncio.sleep(0)
+    while True:
+        await asyncio.sleep(60)
 
 def run():
-    schedule_list.stopped = False
-    schedule_list.run_outside_isr(None)
+    """Run forever"""
+    asyncio.run(arun())
 
-def reschedule(self):
-    """Run if something in the to-be-run list changed"""
-    run()
-
-def run_in_ms(ms, callback, data=_no_data, repeat_ms=0):
+def run_in_ms(ms, label, callback, data=_no_data, repeat_ms=0):
     if isinstance(callback, ScheduledItem):
         item = callback
     elif data == _no_data:
-        item = ScheduledItemWithCallback(callback)
+        item = ScheduledItemWithCallback(label, callback)
     else:
-        item = ScheduledItemWithData(callback, data)
+        item = ScheduledItemWithData(label, callback, data)
     if repeat_ms is not None and repeat_ms > 0:
         item.repeat_ms = repeat_ms
-    item.next_run_ticks = utime.ticks_add(utime.ticks_ms(), ms)
-    # print('new item callback scheduled for', item.next_run_ticks)
+    item.sleep_before_ms = ms
     schedule_list.append(item)
     return item

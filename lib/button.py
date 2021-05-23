@@ -12,7 +12,8 @@ import can
 import canid
 import utime
 import schedule
-
+import micropython
+import math
 
 
 class Button:
@@ -33,6 +34,8 @@ class Button:
         self.autorepeat_speed_ms = 200
         self.autorepeat_direction = True
         self.autorepeat_state = None
+        self._irq_pending = False
+        self._mpscheduled = None
 
     def __repr__(self):
         return '<Button #{} Pin {}, state={}>'.format(self.sensorid, self.pin, self.state)
@@ -70,6 +73,11 @@ class Button:
         pass
 
     def run_outside_irq(self, _):
+        print('Running {} after schedule'.format(utime.ticks_diff(utime.ticks_ms(), self._mpscheduled)))
+        irq_state = machine.disable_irq()
+        self._irq_pending = False
+        machine.enable_irq(irq_state)
+
         if self.pin.value() == 1:
             self._released()
             return
@@ -83,12 +91,16 @@ class Button:
         self._callback = callback
 
     def _irq_handler(self, _):
+        irq_state = machine.disable_irq()
         # check for extreme short press (e.g. glitch, spike, ...)
         now = utime.ticks_ms()
         if utime.ticks_diff(now, self.lastcall) < self.debounce_ms:
+            machine.enable_irq(irq_state)
             return
-        irq_state = machine.disable_irq()
+        self._mpscheduled = now
         schedule.outside_irq.run_outside_irq_disable_irq_around_me(self._run_ref)
         machine.enable_irq(irq_state)
-
+        #self.run_outside_irq(None)
+        # micropython.schedule(self._run_ref, None)
+        # print(math.sin(123))
         self.lastcall = now

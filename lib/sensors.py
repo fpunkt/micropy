@@ -42,8 +42,8 @@ def proclaim():
         sensor.proclaim()
 
 class PolledDevice(schedule.ScheduledItem):
-    def __init__(self, packetid, sensorid, poll_intervall_in_ms):
-        super().__init__()
+    def __init__(self, label, packetid, sensorid, poll_intervall_in_ms):
+        super().__init__(label)
         self.packetid = packetid
         self.sensorid = sensorid
         # if poll_intervall_in_ms is None:
@@ -52,7 +52,7 @@ class PolledDevice(schedule.ScheduledItem):
         if poll_intervall_in_ms < 1000:
             poll_intervall_in_ms = 1000
         sensors.append(self)
-        schedule.run_in_ms(100, self, repeat_ms=poll_intervall_in_ms)
+        schedule.run_in_ms(100, label, self, repeat_ms=poll_intervall_in_ms)
 
     def proclaim(self):
         """tell others that we are online"""
@@ -63,7 +63,7 @@ class PolledDevice(schedule.ScheduledItem):
 class PingDevice(PolledDevice):
     """Send ping messages"""
     def __init__(self, poll_intervall_in_ms=poll_5_minutes):
-        super().__init__(0, 0, poll_intervall_in_ms)
+        super().__init__('ping', 0xfe, 1, poll_intervall_in_ms)
 
     def run(self):
         if board.CAN is not None:
@@ -75,7 +75,7 @@ class WDT(PolledDevice):
     """Triggers the watchdog. Does not send any message, is simply sharing
     the timer with other polled devices"""
     def __init__(self, poll_intervall_in_ms=4000):
-        super().__init__(0xfe, 0xfe, poll_intervall_in_ms)
+        super().__init__('watchdog', 0xfe, 2, poll_intervall_in_ms)
         self.wdt = machine.WDT(timeout=2*poll_intervall_in_ms)
 
     def run(self):
@@ -84,10 +84,13 @@ class WDT(PolledDevice):
     def trigger(self):
         self.wdt.feed()
 
+def _name(name, sensorid, pin):
+    return '{}:{}.{}'.format(name, sensorid, pin)
+
 class DHT(PolledDevice):
     """Temperature sensor"""
     def __init__(self, sensorid, pin, poll_intervall_in_ms=poll_5_minutes):
-        super().__init__(canid.DATALOGGER_AM2302, sensorid, poll_intervall_in_ms)
+        super().__init__(_name('DHT', sensorid, pin), canid.DATALOGGER_AM2302, sensorid, poll_intervall_in_ms)
         self.dht = dht.DHT22(machine.Pin(pin))
         self.msg = can.makemessage(canid.DATALOGGER_AM2302, 7)
         self.msg.setsender(self.sensorid)
@@ -119,7 +122,7 @@ class DHT(PolledDevice):
 class Brightness(PolledDevice):
     """Analog brighness sensors, 0 is dark, 0xff is maximum brightness"""
     def __init__(self, sensorid, pin, poll_intervall_in_ms=poll_5_minutes):
-        super().__init__(canid.DATALOGGER_BRIGHTNESS_SENSOR_8, sensorid, poll_intervall_in_ms)
+        super().__init__(_name('Brightness', sensorid, pin), canid.DATALOGGER_BRIGHTNESS_SENSOR_8, sensorid, poll_intervall_in_ms)
         self.adc = machine.ADC(machine.Pin(pin))
         self.adc.width(machine.ADC.WIDTH_9BIT)
         self.last_read = 0
