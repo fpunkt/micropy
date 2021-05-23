@@ -30,6 +30,7 @@ import canid
 import canerror
 import utime
 import schedule
+import pwmcode
 
 dimdelay_ms = 5
 
@@ -240,7 +241,6 @@ class PWM:
         else:
             self.off()
 
-
 class PWMList(PWM):
     def __init__(self, id, *args):
         super().__init__(id, None)
@@ -263,3 +263,34 @@ class PWMList(PWM):
         return max([p.ival for p in self.pwms])
 
 ALL = PWMList(-1)
+
+
+def _findpwm(id):
+    return board.registered_sensors.find(id, (PWM, PWMList))
+
+_pwmcommands = {
+    pwmcode.ON: (2, lambda p, _: p.on()),
+    pwmcode.OFF: (2, lambda p, _: p.off())
+}
+
+def handle(msg):
+    """Handle CAN message. Return True if handled"""
+    l = len(msg.payload)
+    if l < 1:
+        return False
+    command = msg.payload[0]
+
+    cmd = _pwmcommands.get(command, None)
+    if cmd is None:
+        return False
+
+    if l != cmd[0]:
+        print('Bad number of args {}, expected {}'.format(l, cmd[0]))
+        return True
+
+    p = board.registered_sensors.find(msg.payload[1], (PWM, PWMList))
+    if p is None:
+        return True
+
+    cmd[1](p, msg.payload)
+    return True

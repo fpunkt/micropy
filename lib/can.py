@@ -71,6 +71,12 @@ class CAN:
         self.can.callback(self._cbrunner)
 
     def subscribe(self, cid, callback):
+        """Subscribe to packages on the CAN bus.
+        cid==True subscribes to all messages
+        cid==None subscribes to the own CAN ID
+        cid==id subscribes to messages with the given ID"""
+        if cid is None or cid is False:
+            cid = self.canid
         self._subscribed_to = cid
         self._callback = callback
         if callback is None:

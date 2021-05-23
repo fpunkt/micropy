@@ -33,6 +33,18 @@ class _RegisteredSensorIDs:
         for i, v in self.r:
             print("ID {:2d} = {}".format(i, v))
 
+    def find(self, sensorid, withclass):
+        d = self.r.get(sensorid, None)
+        if d is None:
+            print('Device #{} not found'.format(sensorid))
+            return None
+        if withclass is None:
+            return d
+        if not isinstance(d, withclass):
+            print('Found ID #{} but wrong class {} (expected {})'.format(sensorid, d.__class__, withclass))
+            return None
+        return d
+
 registered_sensors = _RegisteredSensorIDs()
 
 def register(sensorid, value):
