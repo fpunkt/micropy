@@ -87,5 +87,8 @@ class Button:
         now = utime.ticks_ms()
         if utime.ticks_diff(now, self.lastcall) < self.debounce_ms:
             return
-        schedule.outside_irq.run_outside_irq(self._run_ref)
+        irq_state = machine.disable_irq()
+        schedule.outside_irq.run_outside_irq_disable_irq_around_me(self._run_ref)
+        machine.enable_irq(irq_state)
+
         self.lastcall = now

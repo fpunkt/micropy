@@ -99,7 +99,9 @@ class _DimList:
                 device.seti_no_can_message(device.ival - ds)
 
         if queue_last:
-            schedule.outside_irq.run_outside_irq(self._lastdimstep_ref)
+            irq_state = machine.disable_irq()
+            schedule.outside_irq.run_outside_irq_disable_irq_around_me(self._lastdimstep_ref)
+            machine.enable_irq(irq_state)
 
         self._timer.init(period=dimdelay_ms, mode=machine.Timer.ONE_SHOT, callback=self._nextstep_ref)
 

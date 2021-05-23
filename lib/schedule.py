@@ -25,6 +25,7 @@ if 0 == 1:
     # pylint: disable=used-before-assignment, undefined-variable, self-assigning-variable
     const = const
 
+micropython.alloc_emergency_exception_buf(100)
 
 class OutOfIRQRunnerClass:
     def __init__(self):
@@ -56,19 +57,22 @@ class OutOfIRQRunnerClass:
             except: # pylint: disable=bare-except
                 pass
 
-    def run_outside_irq(self, callback):
+    def run_outside_irq_disable_irq_around_me(self, callback):
         i = 0
-        irq_state = machine.disable_irq()
         while i < len(self.stack):
             if self.stack[i] is None:
                 self.stack[i] = callback
                 break
             i += 1
+        # silently ignore if no slot is free
         if not self.scheduled:
             self.scheduled = True
             micropython.schedule(self._run_ref, None)
-        machine.enable_irq(irq_state)
 
+    def xxrun_outside_irq(self, callback):
+        irq_state = machine.disable_irq()
+        self.run_outside_irq_disable_irq_around_me(callback)
+        machine.enable_irq(irq_state)
 
 outside_irq = OutOfIRQRunnerClass()
 
@@ -213,7 +217,9 @@ class ScheduleList:
         self.last = nn
 
     def _irq_handler(self, _):
-        outside_irq.run_outside_irq(self._run_ref)
+        irq_state = machine.disable_irq()
+        outside_irq.run_outside_irq_disable_irq_around_me(self._run_ref)
+        machine.enable_irq(irq_state)
 
 
 schedule_list = ScheduleList()
