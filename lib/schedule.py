@@ -18,8 +18,9 @@ This file uses timer 2
 import micropython
 import utime
 import machine
-import pwm
+# import pwm
 import uasyncio as asyncio
+import sys
 
 if 0 == 1:
     # make pylint think that it knows about 'const' variable
@@ -157,13 +158,8 @@ class ScheduleList:
                 count += 1
                 task = asyncio.create_task(item.run_in_background())
                 self.running.append(task)
-        print('   .. done, fired {} tasks'.format(count))
+        #print('   .. done, fired {} tasks'.format(count))
         await asyncio.sleep(0)
-        # print('done waiting 0')
-        # await asyncio.sleep(10)
-        # print('done waiting 10')
-
-
 
     def remove(self, item):
         i = 0
@@ -184,16 +180,6 @@ _no_data = "const(0xaffedead)"
 def stop():
     pass
 
-async def arun():
-    """Run forever"""
-    asyncio.create_task(schedule_list.astart())
-    await asyncio.sleep(0)
-    while True:
-        await asyncio.sleep(60)
-
-def run():
-    """Run forever"""
-    asyncio.run(arun())
 
 def run_in_ms(ms, label, callback, data=_no_data, repeat_ms=0):
     if isinstance(callback, ScheduledItem):
@@ -207,3 +193,34 @@ def run_in_ms(ms, label, callback, data=_no_data, repeat_ms=0):
     item.sleep_before_ms = ms
     schedule_list.append(item)
     return item
+
+
+
+def _set_global_exception():
+    def handle_exception(loop, context):
+        sys.print_exception(context["exception"])
+        sys.exit()
+    loop = asyncio.get_event_loop()
+    loop.set_exception_handler(handle_exception)
+
+async def arun():
+    """Run forever"""
+    _set_global_exception()  # Debug aid
+    if len(schedule_list.running) == 0:
+        # don't re-fire tasks after interrupt
+        asyncio.create_task(schedule_list.astart())
+    await asyncio.sleep(0)
+    while True:
+        await asyncio.sleep(60)
+
+
+
+def run():
+    """Run forever"""
+    try:
+        asyncio.run(arun())
+    finally:
+        asyncio.new_event_loop()  # Clear retained state
+
+def xrun(): # simple version
+    asyncio.run(arun())

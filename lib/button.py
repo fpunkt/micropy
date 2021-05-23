@@ -14,6 +14,7 @@ import utime
 import schedule
 import micropython
 import math
+import uasyncio as asyncio
 
 
 class Button:
@@ -21,12 +22,14 @@ class Button:
         self.sensorid = sensorid
         self.pin = machine.Pin(pinid, machine.Pin.IN, machine.Pin.PULL_UP)
         self._callback = None
+        self._schedule_async_runner_ref = self._schedule_async_runner
         self._run_ref = self.run_outside_irq
         self._irq_ref = self._irq_handler
         self.msg = can.makemessage(canid.BUTTON_PRESSED, 5)
         self.msg.setsender(self.sensorid)
         self.state = False
-        self.lastcall = utime.ticks_ms()
+        self.last_irq = utime.ticks_ms()
+        self.last_run = self.last_irq
         self.pin.irq(trigger=machine.Pin.IRQ_RISING | machine.Pin.IRQ_FALLING, handler=self._irq_ref)
         self.debounce_ms = 200
         self.pwm = None
@@ -35,7 +38,6 @@ class Button:
         self.autorepeat_direction = True
         self.autorepeat_state = None
         self._irq_pending = False
-        self._mpscheduled = None
 
     def __repr__(self):
         return '<Button #{} Pin {}, state={}>'.format(self.sensorid, self.pin, self.state)
@@ -73,10 +75,12 @@ class Button:
         pass
 
     def run_outside_irq(self, _):
-        print('Running {} after schedule'.format(utime.ticks_diff(utime.ticks_ms(), self._mpscheduled)))
+        print('Running {} after schedule'.format(utime.ticks_diff(utime.ticks_ms(), self.last_irq)))
         irq_state = machine.disable_irq()
         self._irq_pending = False
         machine.enable_irq(irq_state)
+
+        #self.last_run = utime.ti
 
         if self.pin.value() == 1:
             self._released()
@@ -86,21 +90,30 @@ class Button:
             self._pressed()
             return
 
+    async def _async_runner(self):
+        self.run_outside_irq(None)
+        await asyncio.sleep(0)
+
+    def _schedule_async_runner(self):
+        micropython.schedule(self._run_ref, None)
 
     def set_callback(self, callback):
         self._callback = callback
+
 
     def _irq_handler(self, _):
         irq_state = machine.disable_irq()
         # check for extreme short press (e.g. glitch, spike, ...)
         now = utime.ticks_ms()
-        if utime.ticks_diff(now, self.lastcall) < self.debounce_ms:
+        if utime.ticks_diff(now, self.last_irq) < self.debounce_ms:
             machine.enable_irq(irq_state)
             return
-        self._mpscheduled = now
-        schedule.outside_irq.run_outside_irq_disable_irq_around_me(self._run_ref)
+        self.last_irq = now
+        asyncio.run(self._async_runner())
+        # micropython.schedule(self._schedule_async_runner_ref, None)
         machine.enable_irq(irq_state)
+        # schedule.outside_irq.run_outside_irq_disable_irq_around_me(self._run_ref)
+        # machine.enable_irq(irq_state)
         #self.run_outside_irq(None)
-        # micropython.schedule(self._run_ref, None)
+        # micropython.schedule(self._schedule_async_runner_ref, None)
         # print(math.sin(123))
-        self.lastcall = now
