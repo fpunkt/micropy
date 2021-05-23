@@ -31,105 +31,12 @@ import canerror
 import utime
 import schedule
 import pwmcode
+import uasyncio as asyncio
 
-dimdelay_ms = 5
+dimdelay_ms = 10
 
 # PWM freq defines the overall frequency of the device in Hz. 100 Hz is a good number
 pwm_freq = 100
-
-class _DimList:
-    def __init__(self):
-        self._ndevices = 0
-        self._devices = [None] * 8
-        self._lastdimstep_ref = self._lastdimstep
-        self._nextstep_ref = self._next_step_isr
-        self.isdimming = False
-        self._timer = machine.Timer(1)
-
-    def __repr__(self):
-        return '<DimList {} entries, dimming={}>'.format(len(self._devices), self.isdimming)
-
-    def _lastdimstep(self, _):
-        # this is called outside the ISR
-        i = 0
-        while i < self._ndevices:
-            device = self._devices[i]
-            if device is None:
-                continue
-
-            i += 1
-
-            if device.ival == device.dimtovalue:
-                # sometimes the last set-pwm in ISR doesn't get through .. no plan why though.
-                device.forcei_no_can_message(device.ival)
-                device.seti(device.ival)
-                self._devices[i] = None
-        # update _ndevices to avoid looping
-        i = self._ndevices-1
-        while i >= 0:
-            if self._devices[i] is not None:
-                break
-            i += 1
-        self._ndevices = i
-        if self._ndevices == 0:
-            self.isdimming = False
-            gc.collect()
-
-    def _next_step_isr(self, _):
-        if not self.isdimming:
-            return
-        i = 0
-        queue_last = False
-        while i < self._ndevices:
-            device = self._devices[i]
-            i += 1
-            if device is None:
-                continue
-            # try smooth dimming
-            # avoid floating point (and malloc)
-            # ds, _ = divmod(device.ival, 10)
-            ds, _ = divmod(device.ival, 4)
-            ds = min(50, max(5, ds))
-            remaining_counts = device.dimtovalue - device.ival
-            if abs(remaining_counts) <= ds:
-                device.seti_no_can_message(device.dimtovalue)
-                queue_last = True
-            elif remaining_counts > 0:
-                device.seti_no_can_message(device.ival + ds)
-            else:
-                device.seti_no_can_message(device.ival - ds)
-
-        if queue_last:
-            irq_state = machine.disable_irq()
-            schedule.outside_irq.run_outside_irq_disable_irq_around_me(self._lastdimstep_ref)
-            machine.enable_irq(irq_state)
-
-        self._timer.init(period=dimdelay_ms, mode=machine.Timer.ONE_SHOT, callback=self._nextstep_ref)
-
-    def append(self, pwm):
-        # check if entry is already in list
-        i = 0
-        while i < self._ndevices:
-            if self._devices[i] == pwm:
-                return # keep on running ...
-        if self._ndevices >= len(self._devices)-1:
-            board.error([canerror.TOO_MANY_PWMS], 'Too many PWMs')
-            raise RuntimeError('Too many PWMs')
-        irq_state = machine.disable_irq()
-        self._devices[self._ndevices] = pwm
-        self._ndevices += 1
-        if not self.isdimming:
-            self.isdimming = True
-            self._nextstep_ref(None)
-        machine.enable_irq(irq_state)
-
-    def wait(self):
-        """Wait till all dimming is done"""
-        while self.isdimming:
-            utime.sleep_ms(50)
-
-dimlist = _DimList()
-
 
 def _float_to_raw(value):
     return max(0, min(1023, int(value*1023)))
@@ -212,13 +119,31 @@ class PWM:
         """Return current value 0..1"""
         return _tofloat(self.ival)
 
+    async def _dimmer(self):
+        # try smooth dimming
+        # avoid floating point (and malloc)
+        # ds, _ = divmod(device.ival, 10)
+        while True:
+            ds, _ = divmod(self.ival, 4)
+            ds = min(50, max(5, ds))
+            remaining_counts = self.dimtovalue - self.ival
+            if abs(remaining_counts) <= ds:
+                self.forcei_no_can_message(self.dimtovalue)
+                self.seti(self.dimtovalue)
+                return
+            if remaining_counts > 0:
+                self.seti_no_can_message(self.ival + ds)
+            else:
+                self.seti_no_can_message(self.ival - ds)
+            await asyncio.sleep_ms(dimdelay_ms)
+
     def dimi(self, value):
         """dim in raw units"""
         if abs(self.ival-value) < 5:
             self.seti(value)
             return
         self.dimtovalue = value
-        dimlist.append(self)
+        asyncio.run(self._dimmer())
 
     def dimi16(self, value):
         """dim to values from 0..0xffff"""
