@@ -11,9 +11,7 @@ import board
 import can
 import canid
 import utime
-import schedule
 import micropython
-import math
 import uasyncio as asyncio
 
 
@@ -100,7 +98,6 @@ class Button:
     def set_callback(self, callback):
         self._callback = callback
 
-
     def _irq_handler(self, _):
         irq_state = machine.disable_irq()
         # check for extreme short press (e.g. glitch, spike, ...)
@@ -112,8 +109,3 @@ class Button:
         asyncio.run(self._async_runner())
         # micropython.schedule(self._schedule_async_runner_ref, None)
         machine.enable_irq(irq_state)
-        # schedule.outside_irq.run_outside_irq_disable_irq_around_me(self._run_ref)
-        # machine.enable_irq(irq_state)
-        #self.run_outside_irq(None)
-        # micropython.schedule(self._schedule_async_runner_ref, None)
-        # print(math.sin(123))

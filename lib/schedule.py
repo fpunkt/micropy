@@ -15,12 +15,12 @@ This file uses timer 2
 # pylint: disable=import-error, missing-docstring, redefined-builtin, too-many-arguments
 # pylint: disable=too-few-public-methods
 
+import sys
 import micropython
 import utime
 import machine
 # import pwm
 import uasyncio as asyncio
-import sys
 
 if 0 == 1:
     # make pylint think that it knows about 'const' variable
@@ -198,6 +198,7 @@ def run_in_ms(ms, label, callback, data=_no_data, repeat_ms=0):
 
 def _set_global_exception():
     def handle_exception(loop, context):
+        # pylint: disable=no-member
         sys.print_exception(context["exception"])
         sys.exit()
     loop = asyncio.get_event_loop()

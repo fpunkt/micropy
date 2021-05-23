@@ -122,7 +122,8 @@ class DHT(PolledDevice):
 class Brightness(PolledDevice):
     """Analog brighness sensors, 0 is dark, 0xff is maximum brightness"""
     def __init__(self, sensorid, pin, poll_intervall_in_ms=poll_5_minutes):
-        super().__init__(_name('Brightness', sensorid, pin), canid.DATALOGGER_BRIGHTNESS_SENSOR_8, sensorid, poll_intervall_in_ms)
+        super().__init__(_name('Brightness', sensorid, pin),
+            canid.DATALOGGER_BRIGHTNESS_SENSOR_8, sensorid, poll_intervall_in_ms)
         self.adc = machine.ADC(machine.Pin(pin))
         self.adc.width(machine.ADC.WIDTH_9BIT)
         self.last_read = 0

@@ -22,14 +22,11 @@ p
 # pylint: disable=import-error, missing-docstring, redefined-builtin, too-many-arguments
 # pylint: disable=too-many-instance-attributes, global-statement
 
-import gc
 import board
 import machine
 import can
 import canid
-import canerror
 import utime
-import schedule
 import pwmcode
 import uasyncio as asyncio
 
