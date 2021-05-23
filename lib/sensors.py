@@ -75,7 +75,7 @@ class WDT(PolledDevice):
     """Triggers the watchdog. Does not send any message, is simply sharing
     the timer with other polled devices"""
     def __init__(self, poll_intervall_in_ms=4000):
-        super().__init__(0, 0, poll_intervall_in_ms)
+        super().__init__(0xfe, 0xfe, poll_intervall_in_ms)
         self.wdt = machine.WDT(timeout=2*poll_intervall_in_ms)
 
     def run(self):
