@@ -5,7 +5,7 @@ CAN version using a callback that is called when a can packet is received
 # pylint: disable=import-error, missing-docstring, redefined-builtin, too-many-arguments
 
 import machine
-import cancodes
+import canid
 import cancommon
 import board
 import utime
@@ -17,8 +17,8 @@ import utime
 class Message:
     """A CAN message"""
     # pylint: disable=too-few-public-methods
-    def __init__(self, canid, payload):
-        self.canid = canid
+    def __init__(self, cid, payload):
+        self.canid = cid
         self.payload = payload
 
     def payloadstring(self):
@@ -42,8 +42,8 @@ class Message:
             return
         board.CAN.can.send(self.payload, self.canid)
 
-def makemessage(canid, size):
-    return Message(canid, [0]*size)
+def makemessage(cid, size):
+    return Message(cid, [0]*size)
 
 Badmessage = Message(0x777, [1, 2, 3, 4])
 
@@ -55,7 +55,7 @@ def read(self):
 
 class CAN:
     """Wrapper for machine.CAN, providing (some kind of) interrupt and callback"""
-    def __init__(self, canid=None, rx=33, tx=32, baudrate=125, mode=machine.CAN.NORMAL):
+    def __init__(self, cid=None, rx=33, tx=32, baudrate=125, mode=machine.CAN.NORMAL):
         # self, canid=None, rx=35, tx=34, baudrate=125, mode=machine.CAN.NORMAL
         # self, canid=None, rx=13, tx=12, baudrate=125, mode=machine.CAN.NORMAL
         # bus = CAN(0, mode=CAN.NORMAL, baudrate=125, rx_io=13, tx_io=12)
@@ -64,14 +64,14 @@ class CAN:
         self._callback = None
         self._subscribed_to = None
         self._cbrunner = self._run_callback
-        self.canid = canid
+        self.canid = cid
         board.CAN = self
         self.send_poweron()
         # subscribe to standard commands so we can still switch on/off WLAN in case booting fails for whatever reason
         self.can.callback(self._cbrunner)
 
-    def subscribe(self, canid, callback):
-        self._subscribed_to = canid
+    def subscribe(self, cid, callback):
+        self._subscribed_to = cid
         self._callback = callback
         if callback is None:
             self.can.callback(None)
@@ -84,12 +84,12 @@ class CAN:
             print("ERROR: CAN callback triggered from IRQ but no packet available")
             return
         packet = self.can.recv()
-        canid = packet[0]
+        cid = packet[0]
         payload = packet[3]
         if cancommon.handle_standard_config_command(self, payload):
             return
-        if self._subscribed_to is True or self._subscribed_to == canid:
-            self._callback(Message(canid, payload))
+        if self._subscribed_to is True or self._subscribed_to == cid:
+            self._callback(Message(cid, payload))
 
     def any(self):
         return self.can.any()
@@ -103,20 +103,20 @@ class CAN:
         """Write message to bus"""
         self.can.send(msg.payload, msg.canid)
 
-    def send(self, canid, payload):
+    def send(self, cid, payload):
         """Send packet"""
-        self.can.send(payload, canid)
+        self.can.send(payload, cid)
 
     def send_poweron(self):
         """Send a power-on message to the bus"""
-        self._identify(cancodes.CANID_POWER_ON)
+        self._identify(canid.POWER_ON)
 
     def identify(self):
-        self._identify(cancodes.CANID_IDENTIFY)
+        self._identify(canid.IDENTIFY)
 
     def send_wlan_connected(self, ip):
         """Send a WLAN connected packet with IP."""
-        self.send(cancodes.CANID_WLAN_CONNECTED, [self.canid >>8, self.canid & 0xff, ip[0], ip[1], ip[2], ip[3]])
+        self.send(canid.WLAN_CONNECTED, [self.canid >>8, self.canid & 0xff, ip[0], ip[1], ip[2], ip[3]])
 
     def send_ping(self):
         """Send a ping message"""
@@ -144,5 +144,5 @@ class CAN:
                 packetid)
 
 # allocate once
-_pingmessage = Message(cancodes.CANID_PING, [0, 0, 0, 0, 0, 0])
+_pingmessage = Message(canid.PING_MESSAGE, [0, 0, 0, 0, 0, 0])
 Badmessage = Message(0x777, [1, 2, 3, 4])

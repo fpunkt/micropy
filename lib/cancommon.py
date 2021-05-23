@@ -20,7 +20,7 @@ cansend 200#fd # START WLAN and repl
 import net
 import machine
 import board
-import cancodes
+import canconf
 
 # if 0 == 1:
 #     # make pylint think that it knows about 'const' variable
@@ -139,21 +139,21 @@ import cancodes
 
 # Compile once to save mallocs with every CAN package
 
-_CONFIG_HARD_RESET = bytearray([cancodes.CONFIG_HARD_RESET])
-_CONFIG_SOFT_RESET = bytearray([cancodes.CONFIG_SOFT_RESET])
-_CONFIG_SEND_PING = bytearray([cancodes.CONFIG_SEND_PING])
-_CONFIG_WLAN_CONNECT = bytearray([cancodes.CONFIG_WLAN_CONNECT])
-_CONFIG_WLAN_HOTSPOT = bytearray([cancodes.CONFIG_WLAN_HOTSPOT])
-_CONFIG_WLAN_STOP = bytearray([cancodes.CONFIG_WLAN_STOP])
-_CONFIG_WEBREPL_START = bytearray([cancodes.CONFIG_WEBREPL_START])
-_CONFIG_WEBREPL_STOP = bytearray([cancodes.CONFIG_WEBREPL_STOP])
-_CONFIG_INDENTIFY = bytearray([cancodes.CONFIG_INDENTIFY])
+_CONFIG_SOFT_RESET = bytearray([canconf.SOFT_RESET])
+_CONFIG_HARD_RESET = bytearray([canconf.HARD_RESET])
+_CONFIG_SEND_PING = bytearray([canconf.SEND_PING])
+_CONFIG_WLAN_CONNECT = bytearray([canconf.WLAN_CONNECT])
+_CONFIG_WLAN_HOTSPOT = bytearray([canconf.WLAN_HOTSPOT])
+_CONFIG_WLAN_STOP = bytearray([canconf.WLAN_STOP])
+_CONFIG_WEBREPL_START = bytearray([canconf.WEBREPL_START])
+_CONFIG_WEBREPL_STOP = bytearray([canconf.WEBREPL_STOP])
+_CONFIG_INDENTIFY = bytearray([canconf.INDENTIFY])
 
 def handle_standard_config_command(self, payload):
     """Return True if standard CAN command has been found and processed"""
     # Hack ... this should be a member of class CAN, we treat self like this
     # pylint: disable=too-many-return-statements
-    if len(payload) < 1 or payload[0] < cancodes.CONFIG_BEGIN:
+    if len(payload) < 1 or payload[0] < canconf.CONFIG_BEGIN:
         return False
 
     if payload in (_CONFIG_WLAN_CONNECT, _CONFIG_WLAN_HOTSPOT):

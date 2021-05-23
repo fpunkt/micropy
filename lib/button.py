@@ -9,7 +9,7 @@ import gc
 import machine
 import board
 import can
-import cancodes
+import canid
 import utime
 import schedule
 
@@ -22,7 +22,7 @@ class Button:
         self._callback = None
         self._run_ref = self.run_outside_irq
         self._irq_ref = self._irq_handler
-        self.msg = can.makemessage(cancodes.CANID_BUTTON_PRESSED, 5)
+        self.msg = can.makemessage(canid.BUTTON_PRESSED, 5)
         self.msg.setsender(self.sensorid)
         self.state = False
         self.lastcall = utime.ticks_ms()

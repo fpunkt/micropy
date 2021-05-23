@@ -26,7 +26,8 @@ import gc
 import board
 import machine
 import can
-import cancodes
+import canid
+import canerror
 import utime
 import schedule
 
@@ -109,7 +110,7 @@ class _DimList:
             if self._devices[i] == pwm:
                 return # keep on running ...
         if self._ndevices >= len(self._devices)-1:
-            board.error([cancodes.CANERROR_TOO_MANY_PWMS], 'Too many PWMs')
+            board.error([canerror.TOO_MANY_PWMS], 'Too many PWMs')
             raise RuntimeError('Too many PWMs')
         irq_state = machine.disable_irq()
         self._devices[self._ndevices] = pwm
@@ -160,7 +161,7 @@ class PWM:
         self.button = None
 
         # allocate message once to avoid garbage collection
-        self.msg = can.Message(cancodes.CANID_PWM_VALUE, [0, 0, 0, 0, 0, 0, 0])
+        self.msg = can.Message(canid.PWM_VALUE, [0, 0, 0, 0, 0, 0, 0])
         self.msg.setsender(self.id)
         ALL.append(self)
 

@@ -19,7 +19,7 @@ import machine
 import dht
 import board
 import can
-import cancodes
+import canid
 import schedule
 import pwm
 
@@ -87,9 +87,9 @@ class WDT(PolledDevice):
 class DHT(PolledDevice):
     """Temperature sensor"""
     def __init__(self, sensorid, pin, poll_intervall_in_ms=poll_5_minutes):
-        super().__init__(cancodes.CANID_DATALOGGER_AM2302, sensorid, poll_intervall_in_ms)
+        super().__init__(canid.DATALOGGER_AM2302, sensorid, poll_intervall_in_ms)
         self.dht = dht.DHT22(machine.Pin(pin))
-        self.msg = can.makemessage(cancodes.CANID_DATALOGGER_AM2302, 7)
+        self.msg = can.makemessage(canid.DATALOGGER_AM2302, 7)
         self.msg.setsender(self.sensorid)
 
     def proclaim(self):
@@ -119,7 +119,7 @@ class DHT(PolledDevice):
 class Brightness(PolledDevice):
     """Analog brighness sensors, 0 is dark, 0xff is maximum brightness"""
     def __init__(self, sensorid, pin, poll_intervall_in_ms=poll_5_minutes):
-        super().__init__(cancodes.CANID_DATALOGGER_BRIGHTNESS_SENSOR_8, sensorid, poll_intervall_in_ms)
+        super().__init__(canid.DATALOGGER_BRIGHTNESS_SENSOR_8, sensorid, poll_intervall_in_ms)
         self.adc = machine.ADC(machine.Pin(pin))
         self.adc.width(machine.ADC.WIDTH_9BIT)
         self.last_read = 0
