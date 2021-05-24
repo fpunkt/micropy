@@ -43,6 +43,9 @@ class Message:
             return
         board.CAN.can.send(self.payload, self.canid)
 
+    def u16(self, pos):
+        return (self.payload[pos] << 8) + self.payload[pos+1]
+
 def makemessage(cid, size):
     return Message(cid, [0]*size)
 
