@@ -63,7 +63,7 @@ class PolledDevice(schedule.ScheduledItem):
 class PingDevice(PolledDevice):
     """Send ping messages"""
     def __init__(self, poll_intervall_in_ms=poll_5_minutes):
-        super().__init__('ping', 0xfe, 1, poll_intervall_in_ms)
+        super().__init__('ping', 0, 0xf0, poll_intervall_in_ms)
 
     def run(self):
         if board.CAN is not None:
@@ -75,7 +75,8 @@ class WDT(PolledDevice):
     """Triggers the watchdog. Does not send any message, is simply sharing
     the timer with other polled devices"""
     def __init__(self, poll_intervall_in_ms=4000):
-        super().__init__('watchdog', 0xfe, 2, poll_intervall_in_ms)
+        super().__init__('watchdog', 0, 0xf1, poll_intervall_in_ms)
+        print('\033[38;5;226mStaring watchdog, {:.1f} seconds\033[0m'.format(poll_intervall_in_ms/1000.0))
         self.wdt = machine.WDT(timeout=2*poll_intervall_in_ms)
 
     def run(self):
