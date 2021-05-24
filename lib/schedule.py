@@ -29,6 +29,43 @@ if 0 == 1:
 
 micropython.alloc_emergency_exception_buf(100)
 
+
+class BackgroundJob:
+    def __init__(self):
+        background_jobs.append(self)
+
+    async def run_forever(self):
+        while True:
+            asyncio.sleep(10)
+
+
+background_jobs = []
+active_tasks = []
+
+def stop():
+    for t in active_tasks:
+        t.cancel()
+    active_tasks.clear()
+
+async def start_background():
+    for t in background_jobs:
+        active_tasks.append(asyncio.create_task(t.run_forever()))
+
+    # tasks.append(barking(21))
+    # tasks.append(asyncio.wait_for(foo(10), 7))
+    # asyncio.create_task(do_cancel(tasks[0]))
+    res = None
+    try:
+        res = await asyncio.gather(*active_tasks, return_exceptions=True)
+    except asyncio.TimeoutError:  # These only happen if return_exceptions is False
+        print('Timeout')  # With the default times, cancellation occurs first
+    except asyncio.CancelledError:
+        print('Cancelled')
+    print('Result: ', res)
+
+def start():
+    asyncio.run(start_background())
+
 class OutOfIRQRunnerClass:
     def __init__(self):
         self.stack = [None, None, None, None, None]
@@ -82,8 +119,9 @@ outside_irq = OutOfIRQRunnerClass()
 # schedule_1_minute = const(1 * 60 * 1000)
 # schedule_5_minutes = const(5 * 60 * 1000)
 
-class ScheduledItem:
+class ScheduledItem(BackgroundJob):
     def __init__(self, label=None):
+        super().__init__()
         if label is None:
             label = 'undefined task'
         self.label = label
@@ -91,13 +129,17 @@ class ScheduledItem:
         self.repeat_ms = 0
         self.active = True
 
-    async def run_in_background(self):
+    async def run_forever(self):
         await asyncio.sleep_ms(self.sleep_before_ms)
         self.run()
-        while self.active and self.repeat_ms > 0:
+        while self.active and self.repeat_ms is not None and self.repeat_ms > 0:
+            # print('{} sleep ..'.format(self.label))
             await asyncio.sleep_ms(self.repeat_ms)
+            # print('{} woke up ..'.format(self.label))
             self.run()
+            await asyncio.sleep(0)
         self.active = False
+        await asyncio.sleep(0)
 
     def __repr__(self):
         return '<{}:{} poll interval={} ms, next in {} ms>'.format(
@@ -156,6 +198,8 @@ class ScheduleList:
         for item in self.items:
             if item is not None:
                 count += 1
+                #asyncio.run(item.run_in_background())
+                #task = item
                 task = asyncio.create_task(item.run_in_background())
                 self.running.append(task)
         #print('   .. done, fired {} tasks'.format(count))
@@ -177,9 +221,6 @@ schedule_list = ScheduleList()
 
 _no_data = "const(0xaffedead)"
 
-def stop():
-    pass
-
 
 def run_in_ms(ms, label, callback, data=_no_data, repeat_ms=0):
     if isinstance(callback, ScheduledItem):
@@ -188,8 +229,7 @@ def run_in_ms(ms, label, callback, data=_no_data, repeat_ms=0):
         item = ScheduledItemWithCallback(label, callback)
     else:
         item = ScheduledItemWithData(label, callback, data)
-    if repeat_ms is not None and repeat_ms > 0:
-        item.repeat_ms = repeat_ms
+    item.repeat_ms = repeat_ms
     item.sleep_before_ms = ms
     schedule_list.append(item)
     return item
@@ -204,9 +244,7 @@ def _set_global_exception():
     loop = asyncio.get_event_loop()
     loop.set_exception_handler(handle_exception)
 
-async def arun():
-    """Run forever"""
-    _set_global_exception()  # Debug aid
+async def _run_forever_in_background():
     if len(schedule_list.running) == 0:
         # don't re-fire tasks after interrupt
         asyncio.create_task(schedule_list.astart())
@@ -214,14 +252,26 @@ async def arun():
     while True:
         await asyncio.sleep(60)
 
+async def _run_forever_in_background_with_catched_exceptions():
+    """Run forever"""
+    _set_global_exception()  # Debug aid
+    await _run_forever_in_background()
+
+async def _start_scheduler_soon():
+    await asyncio.sleep_ms(100)
+    asyncio.create_task(_run_forever_in_background())
+    await asyncio.sleep_ms(10)
 
 
-def run():
+def yrun():
     """Run forever"""
     try:
-        asyncio.run(arun())
+        asyncio.run(_run_forever_in_background())
     finally:
         asyncio.new_event_loop()  # Clear retained state
 
 def xrun(): # simple version
-    asyncio.run(arun())
+    asyncio.run(_start_scheduler_soon())
+
+def run():
+    asyncio.run(_run_forever_in_background())

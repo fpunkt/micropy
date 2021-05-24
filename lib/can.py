@@ -73,6 +73,7 @@ class CAN:
         self.send_poweron()
         # subscribe to standard commands so we can still switch on/off WLAN in case booting fails for whatever reason
         self.can.callback(self._cbrunner)
+        self.event = asyncio.Event()
 
     def subscribe(self, cid, callback):
         """Subscribe to packages on the CAN bus.

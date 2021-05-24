@@ -31,6 +31,7 @@ import pwmcode
 import uasyncio as asyncio
 
 dimdelay_ms = 10
+dimdelay_ms = 5
 
 # PWM freq defines the overall frequency of the device in Hz. 100 Hz is a good number
 pwm_freq = 100
@@ -121,7 +122,8 @@ class PWM:
         # avoid floating point (and malloc)
         # ds, _ = divmod(device.ival, 10)
         while True:
-            ds, _ = divmod(self.ival, 4)
+            #ds, _ = divmod(self.ival, 4)
+            ds, _ = divmod(self.ival, 3)
             ds = min(50, max(5, ds))
             remaining_counts = self.dimtovalue - self.ival
             if abs(remaining_counts) <= ds:

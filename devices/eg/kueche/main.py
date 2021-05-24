@@ -47,7 +47,7 @@ p2.lastintensity = 15
 temperature = sensors.DHT(16, 27, poll_intervall_in_ms=5000)
 ping = sensors.PingDevice(1500)
 
-#wd = sensors.WDT()
+wd = sensors.WDT(5000, enable=False)
 
 sensors.proclaim()
 
@@ -106,6 +106,12 @@ def ddloop():
         print('Mem Used: {}'.format(m1-m2))
 
 
+def s():
+    schedule.start()
 
 def main():
-    schedule.run()
+    wd.enable()
+    schedule.start()
+
+def arun():
+    asyncio.run(schedule.start_background())
