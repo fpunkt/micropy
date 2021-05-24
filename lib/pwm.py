@@ -192,7 +192,8 @@ def _findpwm(id):
 
 _pwmcommands = {
     pwmcode.ON: (2, lambda p, _: p.on()),
-    pwmcode.OFF: (2, lambda p, _: p.off())
+    pwmcode.OFF: (2, lambda p, _: p.off()),
+    pwmcode.SET_INTENSITY: (4, lambda p, msg: p.dimi16(msg.u16(2)))
 }
 
 def handle(msg):
@@ -214,5 +215,5 @@ def handle(msg):
     if p is None:
         return True
 
-    cmd[1](p, msg.payload)
+    cmd[1](p, msg)
     return True
