@@ -1,0 +1,4 @@
+#! /bin/sh
+
+# exec screen /dev/ttyUSB0 115200
+tio --baudrate 115200  /dev/ttyUSB0
