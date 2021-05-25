@@ -147,8 +147,9 @@ class Brightness(PolledDevice):
 class RegisteredSensorIDs:
     def __init__(self):
         self.r = dict()
+
     def register(self, sensorid, sensor):
-        if id in self.r:
+        if self.get_sensor(sensorid):
             raise RuntimeError("id #{} is already registered as {} ({})".format(sensorid, self.r[sensorid], sensor))
         self.r[sensorid] = sensor
 
@@ -156,10 +157,16 @@ class RegisteredSensorIDs:
         for i, v in self.r:
             print("ID {:2d} = {}".format(i, v))
 
-    def has_sensor(self, sensorid):
+    def get_sensor(self, sensorid):
         return self.r.get(sensorid, None)
 
     def find(self, msg, withclass, sensortype=0xfe):
+        """Find a registered sensor ID that is provided as 2nd value in the CAN payload.
+        The sensor should have one of the classes in withclass (or None if you don't care).
+        If the sensor is not found the function returns and raises an error on
+        CAN/mqtt bus.
+        The optional sensortype is used in the errormessage.
+        """
         p = msg.payload
         sensorid = 0xff
         if len(p) > 1:

@@ -63,6 +63,8 @@ class PWM:
         # print('setting duty for {}/{} to 0'.format(id, pin))
         # self.pwm.duty(0)
         self.seti_no_can_message(0) # power off
+        self.seti_no_can_message(0) # power off
+        self.seti_no_can_message(0) # power off
         self.dimtovalue = 0
         self.button = None
 

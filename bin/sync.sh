@@ -1,6 +1,16 @@
 #! /bin/bash
 
-ip=`cat .espip`
+# sync files via the webrepl interface
+
+ipfile=".espip"
+
+if [ ! -f "$ipfile" ]; then
+    echo "ERROR: You don't have a '$ipfile' file."
+    echo "Create one containing     192.168.178.XX    as single line and try again"
+    exit 1
+fi
+
+ip=`cat "$ipfile"`
 if [ $? -ne 0 ]; then
     ip="192.168.179.15"
 fi
