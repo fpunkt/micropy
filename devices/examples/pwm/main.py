@@ -24,8 +24,6 @@ import sensors
 import button
 import schedule
 
-import setup
-
 board.DEBUG = True
 
 # PMWs on the right side of the board
@@ -40,7 +38,9 @@ p6 = pwm.PWM(6, 19)
 p7 = pwm.PWM(7, 21)
 # PIN3 is used for the USB UART
 # PIN1 is used for the USB UART
-p8 = pwm.PWM(8, 22)
+
+# Adding a 9th PWM raises ValueError: out of PWM channels
+# p8 = pwm.PWM(8, 22)
 
 def can_callback(msg):
     """Note: callback is only processed when the evenloop is started"""
@@ -51,7 +51,7 @@ def can_callback(msg):
     msg.unknown_command()
 
 
-board.CAN.subscribe(False, can_callback)
+can.subscribe(can_callback)
 
 # Uncomment line below to enable the watchdog
 # wd = sensors.WDT()

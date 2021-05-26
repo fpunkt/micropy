@@ -87,11 +87,6 @@ def makemessage(cid, size):
 Badmessage = Message(0x777, [1, 2, 3, 4])
 
 
-def read(self):
-    """Read a CAN message"""
-    packet = self.can.recv()
-    return Message(packet[0], packet[3])
-
 class CAN:
     """Wrapper for machine.CAN, providing (some kind of) interrupt and callback"""
     def __init__(self, cid=None, rx=33, tx=32, baudrate=125, mode=machine.CAN.NORMAL):
@@ -125,7 +120,7 @@ class CAN:
             self._callback(Message(cid, payload))
         return True
 
-    def subscribe(self, cid, callback):
+    def subscribe(self, callback, cid=None):
         """Subscribe to packages on the CAN bus.
         cid==True subscribes to all messages
         cid==None subscribes to the own CAN ID
@@ -199,3 +194,15 @@ def errormessage(payload):
         return
     _errormessage.payload = board.CAN.canid_bytes + payload
     _errormessage.send()
+
+
+# Provide convenient access to global CAN instance (stored in board.CAN)
+
+def subscribe(callback, cid=None):
+    board.CAN.subscribe(callback, cid)
+
+def read():
+    return board.CAN.read()
+
+def any():
+    return board.CAN.any()

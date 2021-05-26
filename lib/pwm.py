@@ -205,6 +205,8 @@ async def _next_dim_step_task():
 
 schedule.add_task(_next_dim_step_task)
 
+board.PWMs = PWMList(0xff) # ALL PWMs
+
 _pwmcommands = {
     pwmcode.ON: (2, lambda p, _: p.on()),
     pwmcode.OFF: (2, lambda p, _: p.off()),
