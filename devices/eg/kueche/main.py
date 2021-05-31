@@ -19,7 +19,7 @@ import net; net.start_wlan(); net.start_repl()
 # pylint: disable=unused-import
 
 import can
-can.CAN(0x200)
+can.CAN(0x100, rx=35, tx=32)
 
 
 import pwm
@@ -29,24 +29,24 @@ import board
 import button
 import schedule
 
-import setup
-
 board.DEBUG = True
 
 #board.SENSORSs = sensors.RegisteredSensorIDs()
 #board.PWMs = pwm.PWMList(-1)
 
 
-p3 = pwm.PWM(0, 14)
-p2 = pwm.PWM(1, 12)
-p1 = pwm.PWM(2, 13)
-p6 = pwm.PWM(3, 17)
-p5 = pwm.PWM(4, 26)
-p4 = pwm.PWM(5, 25)
-#p7 = pwm.PWM(6, 5)
+p0 = pwm.PWM(0, 15)
+# PIN 2 is the on-PCB LED
+p1 = pwm.PWM(1, 4)
+p2 = pwm.PWM(2, 16)
+p3 = pwm.PWM(3, 17)
+p4 = pwm.PWM(4, 5)
+p5 = pwm.PWM(5, 18)
+p6 = pwm.PWM(6, 19)
+p7 = pwm.PWM(7, 21)
 
-b1 = button.Button(10, 18)
-b2 = button.Button(11, 19)
+#b1 = button.Button(10, 18)
+#b2 = button.Button(11, 19)
 
 # def cb(but):
 #     print('got event from button {}'.format(but))
@@ -54,13 +54,13 @@ b2 = button.Button(11, 19)
 # b1.callback = cb
 # b2.callback = cb
 
-b1.pwm = p1
-b2.pwm = p2
+#b1.pwm = p1
+#b2.pwm = p2
 
 p1.lastintensity = 100
 p2.lastintensity = 15
 #
-temperature = sensors.DHT(16, 16, poll_intervall_in_ms=5000)
+# temperature = sensors.DHT(16, 16, poll_intervall_in_ms=5000)
 
 ping = sensors.PingDevice(1500)
 
@@ -85,7 +85,7 @@ def can_callback(msg):
     msg.unknown_command()
 
 
-board.CAN.subscribe(False, can_callback)
+can.subscribe(can_callback)
 
 # Uncomment line below to enable the watchdog
 # wd = sensors.WDT()
