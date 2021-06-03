@@ -66,7 +66,7 @@ class PWM:
         self.seti_no_can_message(0) # power off
         self.seti_no_can_message(0) # power off
         self.dimtovalue = 0
-        self.button = None
+        # self.button = None
 
         # allocate message once to avoid garbage collection
         self.msg = can.Message(canid.PWM_VALUE, [0, 0, 0, 0, 0, 0, 0])
