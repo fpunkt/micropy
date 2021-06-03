@@ -4,7 +4,7 @@ Kueche main.py
 This file is loaded after boot.py
 
 3 buttons
-7 PWM
+8 PWM
 1 temp sensor
 """
 
