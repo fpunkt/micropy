@@ -74,6 +74,9 @@ class PWM:
         board.PWMs.append(self)
         #schedule.add_poller(self.poll)
 
+    def __repr__(self):
+        return '<PWM {}.{}>'.format(self.id, self.pwm)
+
     def poll(self):
         if self.ival == self.dimtovalue:
             return False
@@ -175,10 +178,13 @@ class PWM:
         self.off()
         return False
 
-class PWMList(PWM):
+class List(PWM):
     def __init__(self, id, *args):
         super().__init__(id, None)
         self.pwms = list(args)
+
+    def __repr__(self):
+        return '<pwm.List with {} entries>'.format(len(self.pwms))
 
     def append(self, pwm):
         self.pwms.append(pwm)
@@ -196,6 +202,28 @@ class PWMList(PWM):
         """get max value of all PWMs"""
         return max([p.ival for p in self.pwms])
 
+    def dimi(self, value):
+        for p in self.pwms:
+            p.dimi(value)
+
+    def on(self):
+        # print('pwm.List #{self.id} on')
+        for p in self.pwms:
+            p.on()
+
+    def off(self):
+        # print('pwm.List #{self.id} off')
+        for p in self.pwms:
+            p.off()
+
+    def toggle(self):
+        # print('pwm.List #{self.id} toggle')
+        if self.maxi() > 0:
+            self.off()
+            return False
+        self.on()
+        return True
+        # print('pwm.List #{self.id} toggle done')
 
 async def _next_dim_step_task():
     while True:
@@ -205,11 +233,12 @@ async def _next_dim_step_task():
 
 schedule.add_task(_next_dim_step_task)
 
-board.PWMs = PWMList(0xff) # ALL PWMs
+board.PWMs = List(0xff) # ALL PWMs
 
 _pwmcommands = {
     pwmcode.ON: (2, lambda p, _: p.on()),
     pwmcode.OFF: (2, lambda p, _: p.off()),
+    pwmcode.TOGGLE: (2, lambda p, _: p.toggle()),
     pwmcode.SET_INTENSITY: (4, lambda p, msg: p.dimi16(msg.u16(2)))
 }
 
@@ -250,7 +279,7 @@ def handle(msg):
             # print('    looping {:2x} -> {}'.format(bm, bm & 1))
             if bm & 1 != 0:
                 b[1] = i
-                p = board.SENSORSs.find(msg, (PWM, PWMList), 0xa0)
+                p = board.SENSORSs.find(msg, (PWM, List), 0xa0)
                 if p:
                     callback(p, msg)
             i += 1
@@ -258,7 +287,7 @@ def handle(msg):
         return True
 
     # print('========== single PWM command')
-    p = board.SENSORSs.find(msg, (PWM, PWMList), 0xa0)
+    p = board.SENSORSs.find(msg, (PWM, List), 0xa0)
     if p is None:
         return True
     callback(p, msg)
