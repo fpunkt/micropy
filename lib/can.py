@@ -8,7 +8,6 @@ import machine
 import canid
 import cancommon
 import board
-import utime
 import schedule
 import canerror
 
@@ -160,15 +159,15 @@ class CAN:
     def send_ping(self):
         """Send a ping message"""
         # Hack ... this should be a member of class CAN, we treat self like this
-        now = utime.time()
+        uptime = board.uptime_s()
         # use pre-allocated message to avoid garbage collection
         b = _pingmessage.payload
         b[0] = self.canid >> 8
         b[1] = self.canid & 0xff
-        b[2] = (now >> 24) & 0xff
-        b[3] = (now >> 16) & 0xff
-        b[4] = (now >>  8) & 0xff
-        b[5] = (now >>  0) & 0xff
+        b[2] = (uptime >> 24) & 0xff
+        b[3] = (uptime >> 16) & 0xff
+        b[4] = (uptime >>  8) & 0xff
+        b[5] = (uptime >>  0) & 0xff
         _pingmessage.send()
 
     def _identify(self, packetid):
