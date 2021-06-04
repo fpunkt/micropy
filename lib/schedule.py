@@ -147,6 +147,7 @@ class ScheduleList:
     async def run_pollers(self):
         active_pollers = False
         while True:
+            active_pollers = False
             for p in self.pollers:
                 try:
                     active_pollers |= p()
@@ -157,7 +158,7 @@ class ScheduleList:
             next_poll_in = 5
             #await asyncio.sleep(0)
             # pylint: disable=no-member
-            if gc.mem_free() < 10000:
+            if not active_pollers and gc.mem_free() < 6000:
                 # print('running GC')
                 gc.collect()
                 next_poll_in = 0
