@@ -45,22 +45,25 @@ p5 = pwm.PWM(5, 18)
 p6 = pwm.PWM(6, 19)
 p7 = pwm.PWM(7, 21)
 
-#b1 = button.Button(10, 18)
-#b2 = button.Button(11, 19)
+b1 = button.Button(10, 13)
+b2 = button.Button(11, 12)
+b3 = button.Button(12, 14)
 
-# def cb(but):
-#     print('got event from button {}'.format(but))
-#
-# b1.callback = cb
-# b2.callback = cb
+def cb(but):
+    print('got event from button {}'.format(but))
+b1.callback = cb
+b2.callback = cb
 
-#b1.pwm = p1
-#b2.pwm = p2
+pl1 = pwm.List(0x10, p0, p1, p4)
+
+b1.pwm = p1
+b2.pwm = p4
+b3.pwm = pl1
 
 p1.lastintensity = 100
 p2.lastintensity = 15
 #
-# temperature = sensors.DHT(16, 16, poll_intervall_in_ms=5000)
+temperature = sensors.DHT(0x20, 33, poll_intervall_in_ms=5000)
 
 ping = sensors.PingDevice(1500)
 

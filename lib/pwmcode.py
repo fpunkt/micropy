@@ -12,6 +12,7 @@ ON                                                 =    22 # 0x0016
 
 # Turn off PWM
 OFF                                                =    23 # 0x0017
+TOGGLE = 24 # 0x18
 
 # Set PWM to given intensity
 SET_INTENSITY                                      =    26 # 0x001a
