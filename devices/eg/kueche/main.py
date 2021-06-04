@@ -55,6 +55,7 @@ b1.callback = cb
 b2.callback = cb
 
 pl1 = pwm.List(0x10, p0, p1, p4)
+pl1.toggle_mode = 1
 
 b1.pwm = p1
 b2.pwm = p4
@@ -63,9 +64,9 @@ b3.pwm = pl1
 p1.lastintensity = 100
 p2.lastintensity = 15
 #
-temperature = sensors.DHT(0x20, 33, poll_intervall_in_ms=5000)
+temperature = sensors.DHT(0x20, 33, poll_intervall_in_ms=5*60*1000)
 
-ping = sensors.PingDevice(1500)
+ping = sensors.PingDevice(2*60*1000)
 
 message_counter = 0
 

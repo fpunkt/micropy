@@ -92,6 +92,9 @@ class PWM:
             self.pwm.duty(ival)
         self.ival = ival
 
+    def maxi(self):
+        return self.ival
+
     def seti(self, ival):
         """Set raw integer duty from 0 .. 1023 and send status to CAN"""
         self.seti_no_can_message(ival)
@@ -182,6 +185,7 @@ class List(PWM):
     def __init__(self, id, *args):
         super().__init__(id, None)
         self.pwms = list(args)
+        self.toggle_mode = 0
 
     def __repr__(self):
         return '<pwm.List with {} entries>'.format(len(self.pwms))
@@ -210,20 +214,34 @@ class List(PWM):
         # print('pwm.List #{self.id} on')
         for p in self.pwms:
             p.on()
+        return True
 
     def off(self):
         # print('pwm.List #{self.id} off')
         for p in self.pwms:
             p.off()
+        return False
 
-    def toggle(self):
+    def toggle_off(self):
+        # turn off if at least one is on
         # print('pwm.List #{self.id} toggle')
         if self.maxi() > 0:
-            self.off()
-            return False
-        self.on()
-        return True
+            return self.off()
+        return self.on()
         # print('pwm.List #{self.id} toggle done')
+
+    def toggle_on(self):
+        # turn on if at least one is off
+        for p in self.pwms:
+            if p.maxi() == 0:
+                return self.on()
+        return self.off()
+
+    def toggle(self):
+        if self.toggle_mode:
+            return self.toggle_on()
+        return self.toggle_off()
+
 
 async def _next_dim_step_task():
     while True:
