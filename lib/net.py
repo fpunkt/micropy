@@ -80,6 +80,7 @@ def stop_wlan():
     except: # pylint: disable=bare-except
         pass
     network.WLAN().disconnect()
+    network.WLAN().active(False)
     board.LED.off()
 
 def start_repl(password='x'):
