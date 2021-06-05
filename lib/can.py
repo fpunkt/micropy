@@ -80,8 +80,11 @@ class Message:
         errormessage([canerror.CAN_UNKNOWN_COMMAND, c])
 
 
-def makemessage(cid, size):
-    return Message(cid, [0]*size)
+def makemessage(cid, size, sensorid=None):
+    m = Message(cid, [0]*size)
+    if sensorid is not None:
+        m.setsender(sensorid)
+    return m
 
 Badmessage = Message(0x777, [1, 2, 3, 4])
 

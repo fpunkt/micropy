@@ -12,7 +12,7 @@ This file is loaded after boot.py
 #import time; print('Loading main, giving time to abort ....'); time.sleep(2)
 
 # import time; print('Loading boot, giving time to abort (initializing network) ....'); time.sleep(2)
-import net; net.start_wlan(); net.start_repl()
+# import net; net.start_wlan(); net.start_repl()
 
 # pylint: disable=import-error, missing-docstring, redefined-builtin, multiple-statements, no-member
 # pylint: disable=wrong-import-order
@@ -28,6 +28,7 @@ import sensors
 import board
 import button
 import schedule
+import motionsensor
 
 board.DEBUG = True
 
@@ -45,17 +46,26 @@ p5 = pwm.PWM(5, 18)
 p6 = pwm.PWM(6, 19)
 p7 = pwm.PWM(7, 21)
 
+
+# PINs on left side (buttons, thermometer and motionsensors)
+# 13, 12, 14, 27, 26, 25, 33
 b1 = button.Button(10, 13)
 b2 = button.Button(11, 12)
 b3 = button.Button(12, 14)
+
+m1 = motionsensor.Motionsensor(15, 25)
+m1.callback = lambda x: print('Motion detected on {}'.format(x))
+
+m2 = motionsensor.Motionsensor(16, 26)
+m2.callback = lambda x: print('Motion detected on {}'.format(x))
 
 def cb(but):
     print('got event from button {}'.format(but))
 b1.callback = cb
 b2.callback = cb
 
-pl1 = pwm.List(0x10, p0, p1, p4)
-pl1.toggle_mode = 1
+pl1 = pwm.List(0x20, p0, p1, p4)
+# pl1.toggle_mode = 1
 
 b1.pwm = p1
 b2.pwm = p4
@@ -64,7 +74,7 @@ b3.pwm = pl1
 p1.lastintensity = 100
 p2.lastintensity = 15
 #
-temperature = sensors.DHT(0x20, 33, poll_intervall_in_ms=5*60*1000)
+temperature = sensors.DHT(0x30, 33, poll_intervall_in_ms=5*60*1000)
 
 ping = sensors.PingDevice(2*60*1000)
 
