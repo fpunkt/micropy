@@ -21,6 +21,8 @@ import utime
 import board
 import uasyncio as asyncio
 
+poller_delay_ms = 5
+
 if 0 == 1:
     # make pylint think that it knows about 'const' variable
     # pylint: disable=used-before-assignment, undefined-variable, self-assigning-variable
@@ -155,7 +157,7 @@ class ScheduleList:
                     if board.DEBUG:
                         print("Error running poller: {}".format(e))
 
-            next_poll_in = 5
+            next_poll_in = poller_delay_ms
             #await asyncio.sleep(0)
             # pylint: disable=no-member
             if not active_pollers and gc.mem_free() < 6000:
