@@ -104,6 +104,10 @@ can.subscribe(can_callback)
 # Uncomment line below to enable the watchdog
 wd = sensors.WDT(poll_intervall_in_ms=30000)
 
+def w():
+    "trigger watchdog in about a second"
+    sensors.WDT(poll_intervall_in_ms=1000)
+
 def r():
     schedule.run()
 
