@@ -102,7 +102,7 @@ def can_callback(msg):
 can.subscribe(can_callback)
 
 # Uncomment line below to enable the watchdog
-# wd = sensors.WDT()
+wd = sensors.WDT(poll_intervall_in_ms=30000)
 
 def r():
     schedule.run()
