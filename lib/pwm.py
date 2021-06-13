@@ -22,16 +22,17 @@ p
 # pylint: disable=import-error, missing-docstring, redefined-builtin, too-many-arguments
 # pylint: disable=too-many-instance-attributes, global-statement
 
-import board
 import machine
+import utime
+import uasyncio as asyncio
+import board
 import can
 import canid
-import utime
 import pwmcode
-import uasyncio as asyncio
 import schedule
 
 dimdelay_ms = 5
+dimdelay_ms = 10
 
 # PWM freq defines the overall frequency of the device in Hz. 100 Hz is a good number
 pwm_freq = 100
@@ -85,12 +86,7 @@ class PWM:
     def seti_no_can_message(self, ival):
         self.pwm.duty(ival)
         self.ival = ival
-
-    def forcei_no_can_message(self, ival):
-        # for some strange reason sometimes the value is not taken
-        while self.pwm.duty() != ival:
-            self.pwm.duty(ival)
-        self.ival = ival
+        self.ival = self.pwm.duty()
 
     def maxi(self):
         return self.ival
@@ -139,13 +135,23 @@ class PWM:
         # try smooth dimming
         # avoid floating point (and malloc)
         # ds, _ = divmod(device.ival, 10)
+        self.ival = self.pwm.duty()
+        # ds, _ = divmod(self.ival, 4)
+        # ds, _ = divmod(self.ival, 3)
         ds, _ = divmod(self.ival, 4)
-        ds = min(50, max(5, ds))
+        #ds, _ = divmod(self.ival, 8)
+        #ds = min(50, max(5, ds))
+        ds = min(200, max(30, ds))
         remaining_counts = self.dimtovalue - self.ival
         if abs(remaining_counts) <= ds:
-            self.forcei_no_can_message(self.dimtovalue)
-            self.seti(self.dimtovalue)
-            return False
+            self.seti_no_can_message(self.dimtovalue)
+            #if board.DEBUG:
+            #    print('{} last step {} is {}'.format(self, self.dimtovalue, self.ival))
+            if self.ival == self.dimtovalue:
+                # accept value and send message to CAN
+                self.seti(self.dimtovalue)
+                return False
+            return True
         if remaining_counts > 0:
             self.seti_no_can_message(self.ival + ds)
         else:
@@ -245,9 +251,11 @@ class List(PWM):
 
 async def _next_dim_step_task():
     while True:
+        delay = dimdelay_ms
         for p in board.PWMs.pwms:
-            p.poll()
-        await asyncio.sleep_ms(dimdelay_ms)
+            if p.poll():
+                delay = 1
+        await asyncio.sleep_ms(delay)
 
 schedule.add_task(_next_dim_step_task)
 
@@ -260,7 +268,7 @@ _pwmcommands = {
     pwmcode.SET_INTENSITY: (4, lambda p, msg: p.dimi16(msg.u16(2)))
 }
 
-def handle(msg):
+def handle_can_message(msg):
     """Handle CAN message. Return True if handled"""
     # print('CAN handle {}'.format(msg))
     l = len(msg.payload)
