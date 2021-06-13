@@ -17,6 +17,8 @@ SEND_PING                                          =   242 # 0x00f2
 
 INDENTIFY                                          =   243 # 0x00f3
 
+ENABLE_WATCHDOG = 244 # 0xf4
+
 WLAN_CONNECT                                       =   250 # 0x00fa
 
 WLAN_HOTSPOT                                       =   251 # 0x00fb

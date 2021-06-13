@@ -34,6 +34,7 @@ _CONFIG_WLAN_STOP = bytearray([canconf.WLAN_STOP])
 _CONFIG_WEBREPL_START = bytearray([canconf.WEBREPL_START])
 _CONFIG_WEBREPL_STOP = bytearray([canconf.WEBREPL_STOP])
 _CONFIG_INDENTIFY = bytearray([canconf.INDENTIFY])
+_CONFIG_ENABLE_WATCHDOG = bytearray([canconf.ENABLE_WATCHDOG])
 
 def handle_standard_config_command(self, payload):
     """Return True if standard CAN command has been found and processed"""
@@ -79,5 +80,9 @@ def handle_standard_config_command(self, payload):
 
     if payload == _CONFIG_HARD_RESET:
         machine.reset()
+
+    if payload == _CONFIG_ENABLE_WATCHDOG:
+        board.WD.enable()
+        return True
 
     return False

@@ -9,6 +9,11 @@ import utime
 
 DEBUG = False
 
+def PRINT(formatstring, *args):
+    if not DEBUG:
+        return
+    print(formatstring.format(*args))
+
 class Led:
     """On/Off LED"""
     def __init__(self, pin):
@@ -101,3 +106,6 @@ CAN = None
 
 # MQTT connection, set by main.py if applicable
 MQTT = None
+
+# the global watchdog
+WD = None

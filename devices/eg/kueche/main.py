@@ -12,15 +12,14 @@ This file is loaded after boot.py
 #import time; print('Loading main, giving time to abort ....'); time.sleep(2)
 
 # import time; print('Loading boot, giving time to abort (initializing network) ....'); time.sleep(2)
-# import net; net.start_wlan(); net.start_repl()
+import net; net.start_wlan(); net.start_repl()
 
 # pylint: disable=import-error, missing-docstring, redefined-builtin, multiple-statements, no-member
 # pylint: disable=wrong-import-order
 # pylint: disable=unused-import
 
 import can
-can.CAN(0x100, rx=35, tx=32)
-
+can.CAN(0x350, rx=35, tx=32)
 
 import pwm
 import sensors
@@ -30,22 +29,36 @@ import button
 import schedule
 import motionsensor
 
-board.DEBUG = True
+board.DEBUG = False
 
 #board.SENSORSs = sensors.RegisteredSensorIDs()
 #board.PWMs = pwm.PWMList(-1)
 
+_defi1 = 800
+_defi2 = 1000
+p0 = pwm.PWM(0, 15) # Dunsthaube warm
+p0.lastintensity = _defi1
 
-p0 = pwm.PWM(0, 15)
 # PIN 2 is the on-PCB LED
-p1 = pwm.PWM(1, 4)
-p2 = pwm.PWM(2, 16)
-p3 = pwm.PWM(3, 17)
-p4 = pwm.PWM(4, 5)
-p5 = pwm.PWM(5, 18)
-p6 = pwm.PWM(6, 19)
-p7 = pwm.PWM(7, 21)
+p1 = pwm.PWM(1, 4) # Fenster
+p1.lastintensity = _defi1
 
+p2 = pwm.PWM(2, 16) # Arbeitsplatte warm
+p2.lastintensity = _defi1
+
+p3 = pwm.PWM(3, 17) # Arbeitsplatte kalt
+p3.lastintensity = _defi2
+
+p4 = pwm.PWM(4, 5) # Dunstabzug kalt
+p4.lastintensity = _defi2
+
+p5 = pwm.PWM(5, 18) # Brotdose
+p5.lastintensity = _defi1
+
+p6 = pwm.PWM(6, 19) # NC
+
+p7 = pwm.PWM(7, 21) # Spüle
+p7.lastintensity = _defi1
 
 # PINs on left side (buttons, thermometer and motionsensors)
 # 13, 12, 14, 27, 26, 25, 33
@@ -53,26 +66,31 @@ b1 = button.Button(10, 13)
 b2 = button.Button(11, 12)
 b3 = button.Button(12, 14)
 
+def _motion_callback(x):
+    if board.DEBUG:
+        print('Motion detected on {}'.format(x))
+
 m1 = motionsensor.Motionsensor(15, 25)
-m1.callback = lambda x: print('Motion detected on {}'.format(x))
+m1.callback = _motion_callback
 
 m2 = motionsensor.Motionsensor(16, 26)
-m2.callback = lambda x: print('Motion detected on {}'.format(x))
+m2.callback = _motion_callback
 
 def cb(but):
-    print('got event from button {}'.format(but))
+    PRINT('got event from button {}', but)
+
 b1.callback = cb
 b2.callback = cb
 
 pl1 = pwm.List(0x20, p0, p1, p4)
+pl2 = pwm.List(0x21, p0, p1, p2, p3, p4, p5)
+pl3 = pwm.List(0x22, p0, p1, p2, p3, p4, p5, p7)
 # pl1.toggle_mode = 1
 
-b1.pwm = p1
-b2.pwm = p4
-b3.pwm = pl1
+b1.pwm = pl1
+b2.pwm = pl3
+b3.pwm = pl2
 
-p1.lastintensity = 100
-p2.lastintensity = 15
 #
 temperature = sensors.DHT(0x30, 33, poll_intervall_in_ms=5*60*1000)
 
@@ -86,7 +104,7 @@ def can_callback(msg):
     global message_counter
     message_counter += 1
     # print("GOT CAN message #{:4d}: {}".format(message_counter, msg))
-    if pwm.handle(msg):
+    if pwm.handle_can_message(msg):
         # print('Message handled by PWM')
         return
     if len(msg.payload) > 3 and msg.payload[0] == 0x11:
@@ -100,13 +118,6 @@ def can_callback(msg):
 
 
 can.subscribe(can_callback)
-
-# Uncomment line below to enable the watchdog
-wd = sensors.WDT(poll_intervall_in_ms=30000)
-
-def w():
-    "trigger watchdog in about a second"
-    sensors.WDT(poll_intervall_in_ms=1000)
 
 def r():
     schedule.run()

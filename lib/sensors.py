@@ -73,16 +73,25 @@ class PingDevice(PolledDevice):
 class WDT(PolledDevice):
     """Triggers the watchdog. Does not send any message, is simply sharing
     the timer with other polled devices"""
-    def __init__(self, poll_intervall_in_ms=4000):
+    def __init__(self, poll_intervall_in_ms=1000):
         super().__init__('watchdog', 0, 0xf1, poll_intervall_in_ms)
-        print('\033[38;5;226mStaring watchdog, {:.1f} seconds\033[0m'.format(poll_intervall_in_ms/1000.0))
-        self.wdt = machine.WDT(timeout=2*poll_intervall_in_ms)
+        self.wdt = None
+        board.WD = self
+
+    def enable(self):
+        print('\033[38;5;226mStaring watchdog, {:.1f} seconds\033[0m'.format(self.repeat_ms/1000.0))
+        self.wdt = machine.WDT(timeout=2*self.repeat_ms)
 
     def run(self):
-        self.wdt.feed()
+        if self.wdt:
+            self.wdt.feed()
 
     def trigger(self):
-        self.wdt.feed()
+        if self.wdt:
+            self.wdt.feed()
+
+board.WD = WDT()
+
 
 def _name(name, sensorid, pin):
     return '{}:{}.{}'.format(name, sensorid, pin)
