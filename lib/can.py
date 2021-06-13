@@ -38,7 +38,8 @@ class Message:
         """Send message"""
         if board.CAN is None:
             return
-        board.CAN.can.send(self.payload, self.canid)
+        # board.CAN.can.send(self.payload, self.canid)
+        board.CAN.send(self.canid, self.payload)
 
     def u16(self, pos):
         return (self.payload[pos] << 8) + self.payload[pos+1]
@@ -72,7 +73,6 @@ class Message:
     def bad_sensor_type(self, expected):
         self.bad_parameter_value(1, 0xff, 0)
 
-
     def unknown_command(self):
         c = 0
         if len(self.payload) > 0:
@@ -96,7 +96,7 @@ class CAN:
         # self, canid=None, rx=13, tx=12, baudrate=125, mode=machine.CAN.NORMAL
         # bus = CAN(0, mode=CAN.NORMAL, baudrate=125, rx_io=13, tx_io=12)
         # c = machine.CAN(0, mode=machine.CAN.NORMAL, baudrate=125, rx_io=13, tx_io=12)
-        self.can = machine.CAN(0, mode=mode, baudrate=baudrate, rx_io=rx, tx_io=tx, rx_queue=10, tx_queue=8)
+        self._can = machine.CAN(0, mode=mode, baudrate=baudrate, rx_io=rx, tx_io=tx, rx_queue=10, tx_queue=8)
         self._callback = None
         self._subscribed_to = None
         #self._cbrunner = self._run_callback
@@ -109,15 +109,15 @@ class CAN:
         schedule.add_poller(self.poll)
 
     def poll(self):
-        if not self.can.any():
+        if not self._can.any():
             return False
-        packet = self.can.recv()
-        if self._callback is None:
-            return False
+        packet = self._can.recv()
         cid = packet[0]
         payload = packet[3]
-        if cancommon.handle_standard_config_command(self, payload):
+        if cid == self.canid and cancommon.handle_standard_config_command(self, payload):
             return True
+        if self._callback is None:
+            return False
         if self._subscribed_to is True or self._subscribed_to == cid:
             self._callback(Message(cid, payload))
         return True
@@ -133,20 +133,35 @@ class CAN:
         self._callback = callback
 
     def any(self):
-        return self.can.any()
+        return self._can.any()
 
     def read(self):
         """Read next message from the bus"""
-        packet = self.can.recv()
+        packet = self._can.recv()
         return Message(packet[0], packet[3])
 
     def write(self, msg):
         """Write message to bus"""
-        self.can.send(msg.payload, msg.canid)
+        self.send(msg.canid, msg.payload)
+
+    def _send(self, cid, payload):
+        """Send packet"""
+        try:
+            self._can.send(payload, cid, timeout=1)
+            return True
+
+        except Exception as e: # pylint: disable=bare-except, broad-except
+            if board.DEBUG:
+                print("Cannot send CAN message: ", e)
+            # somehow this seems to be needed to allow going on
+            self._can.clear_tx_queue()
+            return False
 
     def send(self, cid, payload):
-        """Send packet"""
-        self.can.send(payload, cid)
+        tryagain = 3
+        while tryagain > 0:
+            if self._send(cid, payload):
+                return
 
     def send_poweron(self):
         """Send a power-on message to the bus"""
@@ -176,13 +191,12 @@ class CAN:
     def _identify(self, packetid):
         if self.canid is not None:
             serial = machine.unique_id()
-            self.can.send([self.canid >>8, self.canid & 0xff,
+            self.send(packetid, [self.canid >>8, self.canid & 0xff,
                     machine.reset_cause(), # startup reason
                     2, # HClib Version
                     12, # HW Type -- make this 12 for ESP32 ..
                     0xa0, # Application type and Version - make this the library version
-                    serial[-2], serial[-1]], # CPU serial
-                packetid)
+                    serial[-2], serial[-1]]) # CPU serial
 
 # allocate once
 _pingmessage = Message(canid.PING_MESSAGE, [0, 0, 0, 0, 0, 0])
