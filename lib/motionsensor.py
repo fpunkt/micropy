@@ -27,5 +27,5 @@ class Motionsensor(irqio.IRQIO):
             self.msg.payload[3] = self.state
             self.msg.payload[4] = 1
             self.msg.send()
-        self.event.clear()
+        # self.event.clear()
         return True
