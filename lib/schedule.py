@@ -160,10 +160,10 @@ class ScheduleList:
             next_poll_in = poller_delay_ms
             #await asyncio.sleep(0)
             # pylint: disable=no-member
-            if not active_pollers and gc.mem_free() < 6000:
+            if not active_pollers and gc.mem_free() < 5000:
                 # print('running GC')
                 gc.collect()
-                next_poll_in = 0
+                next_poll_in = 5
 
             # give some time for WLAN stuff and friends
             await asyncio.sleep_ms(next_poll_in)
