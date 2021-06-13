@@ -28,6 +28,14 @@ echo "# syncing $nfiles files to $ip"
 # echo $files
 
 for f in $files; do
+    if [ "$f" = "./secrets.py" ]; then
+        echo "# ignoring secrets"
+        continue
+    fi
+    if [ "$f" = "secrets.py" ]; then
+        echo "# ignoring secrets"
+        continue
+    fi
     echo "# $f"
     webrepl_cli.py -p x $f $ip: >/dev/null
     if [ $? -ne 0 ]; then
