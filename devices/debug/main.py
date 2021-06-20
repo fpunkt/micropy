@@ -29,7 +29,7 @@ import button
 import schedule
 import motionsensor
 
-board.DEBUG = False
+board.DEBUG = True
 
 #board.SENSORSs = sensors.RegisteredSensorIDs()
 #board.PWMs = pwm.PWMList(-1)
@@ -60,20 +60,25 @@ p6 = pwm.PWM(6, 19) # NC
 p7 = pwm.PWM(7, 21) # Spüle
 p7.lastintensity = _defi1
 
+pl1 = pwm.List(0x10, p0, p1, p4)
+pl2 = pwm.List(0x11, p0, p1, p2, p3, p4, p5)
+pl3 = pwm.List(0x12, p0, p1, p2, p3, p4, p5, p7)
+
+
 # PINs on left side (buttons, thermometer and motionsensors)
 # 13, 12, 14, 27, 26, 25, 33
-b1 = button.Button(10, 13)
-b2 = button.Button(11, 12)
-b3 = button.Button(12, 14)
+b1 = button.Button(0x20, 13)
+b2 = button.Button(0x21, 12)
+b3 = button.Button(0x22, 14)
 
 def _motion_callback(x):
     if board.DEBUG:
         print('Motion detected on {}'.format(x))
 
-m1 = motionsensor.Motionsensor(15, 25)
+m1 = motionsensor.Motionsensor(0x30, 25)
 m1.callback = _motion_callback
 
-m2 = motionsensor.Motionsensor(16, 26)
+m2 = motionsensor.Motionsensor(0x31, 26)
 m2.callback = _motion_callback
 
 def cb(but):
@@ -82,9 +87,6 @@ def cb(but):
 b1.callback = cb
 b2.callback = cb
 
-pl1 = pwm.List(0x20, p0, p1, p4)
-pl2 = pwm.List(0x21, p0, p1, p2, p3, p4, p5)
-pl3 = pwm.List(0x22, p0, p1, p2, p3, p4, p5, p7)
 # pl1.toggle_mode = 1
 
 b1.pwm = pl1
@@ -92,7 +94,8 @@ b2.pwm = pl3
 b3.pwm = pl2
 
 #
-temperature = sensors.DHT(0x30, 33, poll_intervall_in_ms=5*60*1000)
+# temperature = sensors.DHT(0x30, 33, poll_intervall_in_ms=5*60*1000)
+temperature = sensors.DHT(0x30, 33, poll_intervall_in_ms=1*30*1000)
 
 ping = sensors.PingDevice(2*60*1000)
 

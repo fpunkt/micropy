@@ -59,6 +59,7 @@ class PolledDevice(schedule.ScheduledItem):
     def run(self):
         can.Badmessage.send()
 
+
 class PingDevice(PolledDevice):
     """Send ping messages"""
     def __init__(self, poll_intervall_in_ms=poll_5_minutes):
@@ -69,6 +70,7 @@ class PingDevice(PolledDevice):
             board.CAN.send_ping()
         if board.MQTT is not None:
             board.MQTT.publish('info/uptime/{}'.format(board.LOCATION), str(board.uptime_s()))
+
 
 class WDT(PolledDevice):
     """Triggers the watchdog. Does not send any message, is simply sharing
@@ -94,7 +96,7 @@ board.WD = WDT()
 
 
 def _name(name, sensorid, pin):
-    return '{}:{}.{}'.format(name, sensorid, pin)
+    return '{}:0x{:02x}.{}'.format(name, sensorid, pin)
 
 class DHT(PolledDevice):
     """Temperature sensor"""
