@@ -7,7 +7,6 @@ Motionsensor use IRQ for debouncing and async polling for event processing.
 # pylint: disable=import-error, missing-docstring, redefined-builtin, too-many-arguments
 # pylint: disable=too-few-public-methods, too-many-instance-attributes
 
-import machine
 import irqio
 import board
 import can
