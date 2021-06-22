@@ -15,7 +15,7 @@ import canid
 
 class Motionsensor(irqio.IRQIO):
     def __init__(self, sensorid, pinid, pullup=None):
-        super().__init__(sensorid, pinid, trigger=machine.Pin.IRQ_RISING, pullup=pullup)
+        super().__init__(sensorid, pinid, pullup=pullup)
         self.msg = can.makemessage(canid.SENSOR_MOTION, 5, sensorid=sensorid)
 
     def __repr__(self):
