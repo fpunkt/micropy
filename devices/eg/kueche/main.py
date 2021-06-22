@@ -29,7 +29,9 @@ import button
 import schedule
 import motionsensor
 
-board.DEBUG = False
+board.DEBUG = True
+print('Hi, debug = {}'.format(board.DEBUG))
+
 
 #board.SENSORSs = sensors.RegisteredSensorIDs()
 #board.PWMs = pwm.PWMList(-1)
@@ -70,10 +72,10 @@ def _motion_callback(x):
     if board.DEBUG:
         print('Motion detected on {}'.format(x))
 
-m1 = motionsensor.Motionsensor(15, 25)
+m1 = motionsensor.Motionsensor(15, 25, pullup=None)
 m1.callback = _motion_callback
 
-m2 = motionsensor.Motionsensor(16, 26)
+m2 = motionsensor.Motionsensor(16, 26, pullup=None)
 m2.callback = _motion_callback
 
 def cb(but):

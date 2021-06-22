@@ -7,14 +7,15 @@ Motionsensor use IRQ for debouncing and async polling for event processing.
 # pylint: disable=import-error, missing-docstring, redefined-builtin, too-many-arguments
 # pylint: disable=too-few-public-methods, too-many-instance-attributes
 
+import machine
 import irqio
 import board
 import can
 import canid
 
 class Motionsensor(irqio.IRQIO):
-    def __init__(self, sensorid, pinid):
-        super().__init__(sensorid, pinid)
+    def __init__(self, sensorid, pinid, pullup=None):
+        super().__init__(sensorid, pinid, trigger=machine.Pin.IRQ_RISING, pullup=pullup)
         self.msg = can.makemessage(canid.SENSOR_MOTION, 5, sensorid=sensorid)
 
     def __repr__(self):
