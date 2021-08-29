@@ -1,4 +1,12 @@
 {
     "restructuredtext.confPath": "",
-    "restructuredtext.languageServer.disabled": true
+    "restructuredtext.languageServer.disabled": true,
+    "python.analysis.extraPaths": [
+        //"${project}/mupystubs",
+        "${workspaceFolder}/mupystubs"
+//        "mypystubs/*"
+    ],
+    //"python.analysis.diagnosticSeverityOverrides": {
+    //    "reportMissingImports": "none"
+    //}
 }
