@@ -84,8 +84,10 @@ class PWM:
         return self.run_next_dimstep()
 
     def seti_no_can_message(self, ival):
+        ival = min(1023, max(ival, 0))
         self.pwm.duty(ival)
         self.ival = ival
+        # a direct reading might not return the actual value
         self.ival = self.pwm.duty()
 
     def maxi(self):
@@ -126,6 +128,7 @@ class PWM:
         return _tofloat(self.ival)
 
     def next_dimstep_if_needed(self):
+        self.ival = self.pwm.duty()
         if self.ival == self.dimtovalue:
             return False
         return self.run_next_dimstep()
