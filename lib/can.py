@@ -162,6 +162,7 @@ class CAN:
         while tryagain > 0:
             if self._send(cid, payload):
                 return
+            tryagain -= 1
 
     def send_poweron(self):
         """Send a power-on message to the bus"""
