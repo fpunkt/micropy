@@ -14,34 +14,44 @@ import net; net.start_wlan(); net.start_repl()
 # import time; print('Loading main, giving time to abort ....'); time.sleep(2)
 
 import can
-c = can.CAN(0x100)
-
+import bconf
+c = bconf.CAN(0x100)
 
 import board
 
 board.LOCATION = 'test'
+board.DEBUG = True
 
 import machine
 import sensors
 import pwm
+import schedule
 
-p = pwm.PWM(1, 14)
+p = pwm.PWM(1, bconf.AUX1_YELLOW)
+p2 = pwm.PWM(2, bconf.AUX2_YELLOW)
+p3 = pwm.PWM(3, bconf.AUX2_WHITE)
 
 message_counter = 0
 
-def callback(msg):
+def can_callback(msg):
     # pylint: disable=global-statement
     global message_counter
     message_counter += 1
     print("GOT CAN message #{:4d}: {}".format(message_counter, msg))
+    if pwm.handle_can_message(msg):
+        print('Message handled by PWM')
+        return
     if len(msg.payload) > 3 and msg.payload[0] == 0x11:
         count = 100*(msg.payload[1]<<8 + msg.payload[2])
         print("DOING SOME STUPID LOOPING", count)
         while count > 0:
             count -= 1
         print("DONE with stupid looping")
+        return
+    msg.unknown_command()
 
-#c.subscribe(True, callback)
+
+can.subscribe(can_callback)
 
 print('CAN initialized, dummy callback installed')
 
@@ -58,3 +68,11 @@ def watchdog():
     global w
     w = sensors.WDT()
 
+def r():
+    schedule.run()
+
+s = schedule.schedule_list
+if 1 == 0:
+    r()
+else:
+    print('# run r() to start event handler')
