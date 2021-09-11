@@ -19,7 +19,7 @@ p
 
 """
 
-# pylint: disable=import-error, missing-docstring, redefined-builtin, too-many-arguments
+# pylint: disable=import-error, missing-docstring
 # pylint: disable=too-many-instance-attributes, global-statement
 
 import machine
@@ -48,11 +48,11 @@ def _i16_to_raw(v):
 
 class PWM:
     """Wrapper for system PWM, using numbers from 0..1 and provide dimming"""
-    def __init__(self, id, pin):
-        self.id = id
+    def __init__(self, pwmid, pin):
+        self.id = pwmid
         self.ival = 0
         self.lastintensity = 100
-        board.SENSORSs.register(id, self)
+        board.SENSORSs.register(pwmid, self)
         if pin is None:
             return
         self.pwm = machine.PWM(machine.Pin(pin))
@@ -61,7 +61,7 @@ class PWM:
             self.pwm.freq(pwm_freq)
             # pwm_freq = 0
             utime.sleep_ms(5) # for some strange reason after setting pwm_freq ..
-        # print('setting duty for {}/{} to 0'.format(id, pin))
+        # print('setting duty for {}/{} to 0'.format(pwmid, pin))
         # self.pwm.duty(0)
         self.seti_no_can_message(0) # power off
         self.seti_no_can_message(0) # power off
@@ -88,7 +88,12 @@ class PWM:
         self.pwm.duty(ival)
         self.ival = ival
         # a direct reading might not return the actual value
-        self.ival = self.pwm.duty()
+        # self.ival = self.pwm.duty()
+
+    def wait_until_set(self):
+        """Make sure PWM has taken the correct value (potential issue when changing PWM speed in short intervalls)"""
+        while self.pwm.duty() != self.ival:
+            self.seti_no_can_message(self.ival)
 
     def maxi(self):
         return self.ival
@@ -190,9 +195,10 @@ class PWM:
         self.off()
         return False
 
+
 class List(PWM):
-    def __init__(self, id, *args):
-        super().__init__(id, None)
+    def __init__(self, pwmid, *args):
+        super().__init__(pwmid, None)
         self.pwms = list(args)
         self.toggle_mode = 0
 
