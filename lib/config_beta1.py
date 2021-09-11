@@ -4,14 +4,18 @@ Sample board from EDAC (footprint not correct)
 
 # pylint: disable=import-error, missing-docstring, redefined-builtin, too-many-arguments
 
+if 0 == 1:
+    # make pylint think that it knows about 'const' variable
+    const = lambda x: x
+
 
 import can
 
-AUX1_YELLOW = 13
-AUX2_WHITE = 12
+AUX1_YELLOW = const(13)
+AUX1_WHITE = const(12)
 
-AUX2_YELLOW = 26
-AUX2_WHITE = 25
+AUX2_YELLOW = const(26)
+AUX2_WHITE = const(25)
 
 
 def CAN(canid):
