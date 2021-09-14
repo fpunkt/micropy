@@ -13,6 +13,8 @@ fi
 ip=`cat "$ipfile"`
 if [ $? -ne 0 ]; then
     ip="192.168.179.15"
+    echo "No IP file ($ipfile) found"
+    exit 1
 fi
 
 if [ -f .lastsync ]; then
@@ -20,6 +22,13 @@ if [ -f .lastsync ]; then
 else
     files=`ls -1 *.py`
 fi
+
+echo $# arguments
+if [ "$#" -ne 0 ]; then
+    files="$*"
+fi
+
+
 nfiles=`echo $files | wc -w`
 echo "# syncing $nfiles files to $ip"
 
