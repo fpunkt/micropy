@@ -3,7 +3,7 @@
     "restructuredtext.languageServer.disabled": true,
     "python.analysis.extraPaths": [
         "${workspaceFolder}/mupystubs"
-        //"./linuxlib"
+        //"./mupystubs",
     ],
     //"python.analysis.diagnosticSeverityOverrides": {
     //    "reportMissingImports": "none"

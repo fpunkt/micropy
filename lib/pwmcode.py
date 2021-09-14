@@ -5,7 +5,7 @@ Constant file generated from pwmcode.toml
 if 0 == 1:
     # make pylint think that it knows about 'const' variable
     # pylint: disable=used-before-assignment, undefined-variable, self-assigning-variable
-    const = const
+    const = lambda x: x
 
 # Turn on PWM with last intensity
 ON                                                 =    22 # 0x0016

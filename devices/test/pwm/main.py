@@ -1,9 +1,7 @@
 """
-Main Module.
-
-Function main is executed after standard inits
+Test module for 2 PWM connected AUX-1 4P on beta board
 """
-# pylint: disable=import-error, missing-docstring, redefined-builtin, too-many-arguments
+# pylint: disable=missing-docstring
 # pylint: disable=unused-import, multiple-statements
 
 # start CAN first, otherwise bus is in undefined state
@@ -27,9 +25,10 @@ import sensors
 import pwm
 import schedule
 
-p = pwm.PWM(1, bconf.AUX1_YELLOW)
-p2 = pwm.PWM(2, bconf.AUX2_YELLOW)
-p3 = pwm.PWM(3, bconf.AUX2_WHITE)
+p1 = pwm.PWM(1, bconf.AUX1_YELLOW)
+p2 = pwm.PWM(2, bconf.AUX1_WHITE)
+
+p = p1
 
 message_counter = 0
 
