@@ -17,6 +17,15 @@ AUX1_WHITE = const(12)
 AUX2_YELLOW = const(26)
 AUX2_WHITE = const(25)
 
+ML10_PWM_1 = const(15)
+ML10_PWM_2 = const(4)
+ML10_PWM_3 = const(16)
+ML10_PWM_4 = const(17)
+ML10_PWM_5 = const(5)
+ML10_PWM_6 = const(18)
+ML10_PWM_7 = const(19)
+ML10_PWM_8 = const(21)
+
 
 def CAN(canid):
     return can.CAN(canid, rx=35, tx=32)

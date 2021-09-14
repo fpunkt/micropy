@@ -24,8 +24,7 @@ import schedule
 
 if 0 == 1:
     # make pylint think that it knows about 'const' variable
-    # pylint: disable=used-before-assignment, undefined-variable, self-assigning-variable
-    const = const
+    const = lambda x: x
 
 poll_1_minute = const(1 * 60 * 1000)
 poll_5_minutes = const(5 * 60 * 1000)

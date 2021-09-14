@@ -28,40 +28,17 @@ import sensors
 import pwm
 import schedule
 import motor
+import relais
 import uasyncio as asyncio
 import utime
 
-m = motor.Motor(10, bconf.AUX2_YELLOW, bconf.AUX2_WHITE)
 
+power = relais.Relais(None, bconf.ML10_PWM_8)
 
-"""
-200 <PWM 10.PWM(26, freq=100, duty=400)>
- 100 <PWM 10.PWM(26, freq=100, duty=200)>
-   0 <PWM 10.PWM(26, freq=100, duty=100)>
->>> ets Jun  8 2016 00:22:57
+m1 = motor.Motor(10, bconf.ML10_PWM_3, bconf.ML10_PWM_4)
+m2 = motor.Motor(12, bconf.ML10_PWM_1, bconf.ML10_PWM_2)
 
-rst:0x1 (POWERON_RESET),boot:0x13 (SPI_FAST_FLASH_BOOT)
-configsip: 0, SPIWP:0xee
-clk_drv:0x00,q_drv:0x00,d_drv:0x00,cs0_drv:0x00,hd_drv:0x00,wp_drv:0x00
-mode:DIO, clock div:2
-load:0x3fff0030,len:5356
-ho 0 tail 12 room 4
-load:0x40078000,len:13732
-load:0x40080400,len:3404
-entry 0x40080634
-ets Jun  8 2016 00:22:57
-
-rst:0x1 (POWERON_RESET),boot:0x13 (SPI_FAST_FLASH_BOOT)
-configsip: 0, SPIWP:0xee
-clk_drv:0x00,q_drv:0x00,d_drv:0x00,cs0_drv:0x00,hd_drv:0x00,wp_drv:0x00
-mode:DIO, clock div:2
-load:0x3fff0030,len:5356
-ho 0 tail 12 room 4
-load:0x40078000,len:13732
-load:0x40080400,len:3404
-entry 0x40080634
-
-"""
+m = m1
 
 
 message_counter = 0

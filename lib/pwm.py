@@ -52,10 +52,13 @@ class PWM:
         self.id = pwmid
         self.ival = 0
         self.lastintensity = 100
+        self.pwm = None
+        if pin is not None:
+            self.pwm = machine.PWM(machine.Pin(pin))
         board.SENSORSs.register(pwmid, self)
         if pin is None:
             return
-        self.pwm = machine.PWM(machine.Pin(pin))
+
         # global pwm_freq
         if pwm_freq > 0:
             self.pwm.freq(pwm_freq)
