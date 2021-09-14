@@ -87,11 +87,17 @@ class PWM:
         return self.run_next_dimstep()
 
     def seti_no_can_message(self, ival):
+        """Set PWM value. NOTE: the actual value may not be the one that has been commanded.
+        Call wait_until_set() if you need the value to be correct.
+        (This is not the case for dimming, because dimming reads the value read back
+        from the H/W. Value might be different if commands are send too fast)"""
         ival = min(1023, max(ival, 0))
         self.pwm.duty(ival)
-        self.ival = ival
+        # self.ival = ival
         # a direct reading might not return the actual value
-        # self.ival = self.pwm.duty()
+        # we use the actual set/reported value to ensure that dimming works fine
+        # Call wait_until_set() if you want to ensure that the set value is correct
+        self.ival = self.pwm.duty()
 
     def wait_until_set(self):
         """Make sure PWM has taken the correct value (potential issue when changing PWM speed in short intervalls)"""
@@ -104,6 +110,7 @@ class PWM:
     def seti(self, ival):
         """Set raw integer duty from 0 .. 1023 and send status to CAN"""
         self.seti_no_can_message(ival)
+        self.wait_until_set()
         if ival != 0:
             self.lastintensity = ival
         self.send_status_to_can()
@@ -271,7 +278,7 @@ async def _next_dim_step_task():
 
 schedule.add_task(_next_dim_step_task)
 
-board.PWMs = List(0xff) # ALL PWMs
+board.PWMs = List(0xff) # Create a (dynamic) list that includes ALL PWMs
 
 _pwmcommands = {
     pwmcode.ON: (2, lambda p, _: p.on()),
