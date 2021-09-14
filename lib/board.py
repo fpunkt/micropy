@@ -1,5 +1,7 @@
 """
-Basic Hardware available to all boards
+Basic Hardware functionality of the board.
+
+Loaded modules and defined devices add to global variables in this module
 """
 
 # pylint: disable=import-error, too-few-public-methods, missing-function-docstring
@@ -32,6 +34,8 @@ class RegisteredSensorIDs:
         self.r = dict()
 
     def register(self, sensorid, sensor):
+        if sensorid is None:
+            return
         if self.get_sensor(sensorid):
             raise RuntimeError("id #{} is already registered as {} ({})".format(sensorid, self.r[sensorid], sensor))
         self.r[sensorid] = sensor
