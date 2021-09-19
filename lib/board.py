@@ -11,8 +11,11 @@ import machine
 import utime
 import uasyncio as asyncio
 
-# If DEBUG is set, additinoal messages will be printed
+# If DEBUG is set, additinoal messages will be printed. Set in main.py
 DEBUG = False
+
+# CANID of the application. Set in main.py
+CANID = None
 
 def PRINT(formatstring, *args):
     if not DEBUG:

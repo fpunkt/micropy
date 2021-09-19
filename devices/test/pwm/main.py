@@ -10,22 +10,19 @@ Test module for
 # pylint: disable=missing-docstring
 # pylint: disable=unused-import, multiple-statements
 
-# start CAN first, otherwise bus is in undefined state
-
-# import time; print('Loading boot, giving time to abort (initializing network) ....'); time.sleep(2)
-import net; net.start_wlan(); net.start_repl()
-
-# import time; print('Loading main, giving time to abort ....'); time.sleep(2)
-
-import can
-import bconf
-c = bconf.CAN(0x100)
-
 import board
-
 board.LOCATION = 'test'
 board.DEBUG = True
+board.CANID = 0x100
 
+
+if board.DEBUG is True:
+    import net
+    net.start_wlan()
+    net.start_repl()
+
+import bconf
+import can
 import machine
 import sensors
 import pwm

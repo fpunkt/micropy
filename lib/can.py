@@ -207,20 +207,6 @@ class CAN:
         """Send a WLAN connected packet with IP."""
         self.send(canid.WLAN_CONNECTED, [self.canid >>8, self.canid & 0xff, ip[0], ip[1], ip[2], ip[3]])
 
-    def send_ping(self):
-        """Send a ping message"""
-        # Hack ... this should be a member of class CAN, we treat self like this
-        uptime = board.uptime_s()
-        # use pre-allocated message to avoid garbage collection
-        b = _pingmessage.payload
-        b[0] = self.canid >> 8
-        b[1] = self.canid & 0xff
-        b[2] = (uptime >> 24) & 0xff
-        b[3] = (uptime >> 16) & 0xff
-        b[4] = (uptime >>  8) & 0xff
-        b[5] = (uptime >>  0) & 0xff
-        _pingmessage.send()
-
     def _identify(self, packetid):
         if self.canid is not None:
             serial = machine.unique_id()
@@ -232,7 +218,7 @@ class CAN:
                     serial[-2], serial[-1]]) # CPU serial
 
 # allocate once
-_pingmessage = Message(canid.PING_MESSAGE, [0, 0, 0, 0, 0, 0])
+_pingmessage = Message(canid.PING_MESSAGE, [board.CANID >> 8, board.CANID & 0xff, 0, 0, 0, 0])
 Badmessage = Message(0x777, [1, 2, 3, 4])
 
 # cache message, only update payload. OK since with asyncio the will be no raceing
@@ -257,22 +243,36 @@ async def _poll_CAN():
 
 board.BACKGROUND_RUNNERS.append(_poll_CAN())
 
+def _send_ping():
+    """Send a ping message"""
+    # Hack ... this should be a member of class CAN, we treat self like this
+    uptime = board.uptime_s()
+    # use pre-allocated message to avoid garbage collection
+    b = _pingmessage.payload
+    # b[0] = self.canid >> 8
+    # b[1] = self.canid & 0xff
+    b[2] = (uptime >> 24) & 0xff
+    b[3] = (uptime >> 16) & 0xff
+    b[4] = (uptime >>  8) & 0xff
+    b[5] = (uptime >>  0) & 0xff
+    _pingmessage.send()
+
 
 async def _ping_job():
     while True:
         if board.CAN is not None:
-            board.CAN.send_ping()
+            _send_ping()
         if board.MQTT is not None:
             board.MQTT.publish('info/uptime/{}'.format(board.LOCATION), str(board.uptime_s()))
         await asyncio.sleep(2)
 
 board.BACKGROUND_RUNNERS.append(_ping_job())
 
-_memstat_message = Message(0x765, [0, 0, 0, 0])
+_memstat_message = Message(0x765, [board.CANID >> 8, board.CANID & 0xff, 0, 0])
 def _send_memstat():
     b = _memstat_message.payload
-    b[0] = _memstat_message.canid >> 8
-    b[1] = _memstat_message.canid & 0xff
+    # b[0] = _memstat_message.canid >> 8
+    # b[1] = _memstat_message.canid & 0xff
     free = gc.mem_free()     # pylint: disable=no-member
     b[2] = free >> 8
     b[3] = free & 0xff
@@ -306,7 +306,7 @@ def _connect(ip):
 register(canconf.WLAN_CONNECT, 1, 1, lambda _: _connect(net.start_wlan()))
 register(canconf.WLAN_HOTSPOT, 1, 1, lambda _: _connect(net.start_hotspot()))
 register(canconf.WLAN_STOP, 1, 1, lambda _: net.stop_wlan())
-register(canconf.SEND_PING, 1, 1, lambda _: board.CAN.send_ping())
+register(canconf.SEND_PING, 1, 1, lambda _: _send_ping())
 register(canconf.SOFT_RESET, 1, 1, lambda _: machine.soft_reset())
 register(canconf.HARD_RESET, 1, 1, lambda _: machine.reset())
 register(canconf.INDENTIFY, 1, 1, lambda _: board.CAN.identify())
