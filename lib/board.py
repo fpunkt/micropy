@@ -1,14 +1,23 @@
 """
-Basic Hardware available to all boards
+Basic Hardware functionality of the board.
+
+Loaded modules and defined devices add to global variables in this module
 """
 
 # pylint: disable=import-error, too-few-public-methods, missing-function-docstring
 
+import gc
 import machine
 import utime
-import canid
+import uasyncio as asyncio
 
+# If DEBUG is set, additinoal messages will be printed
 DEBUG = False
+
+def PRINT(formatstring, *args):
+    if not DEBUG:
+        return
+    print(formatstring.format(*args))
 
 class Led:
     """On/Off LED"""
@@ -21,16 +30,74 @@ class Led:
         """turn LED off"""
         self.led.value(0)
 
-# The LED on the PCB, if available
+
+class RegisteredSensorIDs:
+    """Keep record of registered sensors"""
+    def __init__(self):
+        self.r = dict()
+
+    def register(self, sensorid, sensor):
+        if sensorid is None:
+            return
+        if self.get_sensor(sensorid):
+            raise RuntimeError("id #{} is already registered as {} ({})".format(sensorid, self.r[sensorid], sensor))
+        self.r[sensorid] = sensor
+
+    def dump(self):
+        for i, v in self.r:
+            print("ID {:2d} = {}".format(i, v))
+
+    def get_sensor(self, sensorid):
+        return self.r.get(sensorid, None)
+
+    def find(self, msg, withclass, sensortype=0xfe):
+        """Find a registered sensor ID that is provided as 2nd value in the CAN payload.
+        The sensor should have one of the classes in withclass (or None if you don't care).
+        If the sensor is not found the function returns and raises an error on
+        CAN/mqtt bus.
+        The optional sensortype is used in the errormessage.
+        """
+        p = msg.payload
+        sensorid = 0xff
+        if len(p) > 1:
+            sensorid = p[1]
+        d = self.r.get(sensorid, None)
+        if d is None:
+            if DEBUG:
+                print('Device #{} not found'.format(sensorid))
+            msg.bad_sensor_id()
+            return None
+        if withclass is None:
+            return d
+        if not isinstance(d, withclass):
+            if DEBUG:
+                print('Found ID #{} but wrong class {} (expected {})'.format(sensorid, d.__class__, withclass))
+            msg.bad_sensor_type(sensortype)
+            return None
+        return d
+
+# ==================================================================================================
+# ==================================================================================================
+
+# Provide global variables that allow functions to access all devices when they have
+# included board.py
+# This allows e.g. sensors to use serve MQTT and CAN even if one of these backends
+# has not been initialized.
+
+# The on-chip LED
 LED = Led(2)
 
-
-# sensors will be set by sensors.py and will provide funtions
+# Sensors will be set by sensors.py and will provide funtions
 # register and find.
-# (this forward reference is needed to avoid circular imports)
-SENSORSs = None
+SENSORSs = RegisteredSensorIDs()
 
+# PWMs holds a list of all defined PWMs (initialized by loading pwm.py)
 PWMs = None
+
+# external functions (like dimming) can temporarily disable sensor accquisition (looks nicer)
+PWM_IS_DIMMING = False
+
+BACKGROUND_RUNNERS = []
 
 last_boot_s = utime.time()
 
@@ -38,12 +105,11 @@ def uptime_s():
     """Return time since last (soft) boot in seconds"""
     return utime.time() - last_boot_s
 
-# Location of the board, overwritten by main.py
+# Location of the board, overwritten by main.py. Used e.g. by MQTT to construct the message
 LOCATION = "unknown"
 
 # Global CAN device. Use board.CAN to access the CAN bus from everywhere.
 # The actual value is set when can.py is loaded/initialized
-# (we need this here to avoid circular dependencies in cancommon.py / can.py)
 CAN = None
 
 # class _dummyMqtt:
@@ -53,9 +119,34 @@ CAN = None
 # MQTT connection, set by main.py if applicable
 MQTT = None
 
+# the global watchdog
+WD = None
 
-def error(payload, mqttstring):
-    if CAN is not None:
-        CAN.send(canid.ERROR_MESSAGE, payload)
-    if MQTT is not None:
-        pass
+
+def good_time_for_gc():
+    # pylint: disable=no-member
+    free = gc.mem_free()
+    if free > 12000:
+        return
+    if not DEBUG:
+        gc.collect()
+
+    start = utime.ticks_ms()
+    gc.collect()
+    newfree = gc.mem_free()
+    print('GC collected {} bytes in {} ms, free={}'.format(
+        newfree-free, utime.ticks_diff(utime.ticks_ms(), start), newfree))
+
+# Run async processes
+
+async def arun():
+    try:
+        await asyncio.gather(*BACKGROUND_RUNNERS)
+    except asyncio.TimeoutError:
+        print('asyncIO timeout!')
+    except Exception as e: # pylint: disable=broad-except
+        print('**** ERROR in runner')
+        print(e)
+
+def run():
+    asyncio.run(arun())

@@ -5,7 +5,7 @@ Constant file generated from canconf.toml
 if 0 == 1:
     # make pylint think that it knows about 'const' variable
     # pylint: disable=used-before-assignment, undefined-variable, self-assigning-variable
-    const = const
+    const = lambda x: x
 
 CONFIG_BEGIN                                       =   240 # 0x00f0
 
@@ -16,6 +16,8 @@ SOFT_RESET                                         =   241 # 0x00f1
 SEND_PING                                          =   242 # 0x00f2
 
 INDENTIFY                                          =   243 # 0x00f3
+
+ENABLE_WATCHDOG = 244 # 0xf4
 
 WLAN_CONNECT                                       =   250 # 0x00fa
 

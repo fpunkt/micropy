@@ -13,6 +13,11 @@ to copy files or you can point your web-browser to
 
 to open a command terminal
 
+To get the MAC address of the chip run
+
+import network
+':'.join(map('{:02x}'.format, wlan.config('mac')))
+
 """
 
 # pylint: disable=import-error, missing-docstring, wrong-import-order
@@ -75,6 +80,7 @@ def stop_wlan():
     except: # pylint: disable=bare-except
         pass
     network.WLAN().disconnect()
+    network.WLAN().active(False)
     board.LED.off()
 
 def start_repl(password='x'):

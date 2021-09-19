@@ -3,3 +3,5 @@ run.py
 .lastsync
 .espip
 
+*.pyc
+__pycache__
