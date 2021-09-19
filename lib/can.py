@@ -268,14 +268,16 @@ async def _ping_job():
 
 board.BACKGROUND_RUNNERS.append(_ping_job())
 
-_memstat_message = Message(0x765, [board.CANID >> 8, board.CANID & 0xff, 0, 0])
+_memstat_message = Message(canid.MEMORY_STATUS, [board.CANID >> 8, board.CANID & 0xff, 0, 0, 0, 0])
 def _send_memstat():
     b = _memstat_message.payload
     # b[0] = _memstat_message.canid >> 8
     # b[1] = _memstat_message.canid & 0xff
     free = gc.mem_free()     # pylint: disable=no-member
-    b[2] = free >> 8
-    b[3] = free & 0xff
+    b[2] = (free >> 24) & 0xff
+    b[3] = (free >> 16) & 0xff
+    b[4] = (free >>  8) & 0xff
+    b[5] = free & 0xff
     _memstat_message.send()
 
 async def _memstat_jop():
@@ -312,6 +314,8 @@ register(canconf.HARD_RESET, 1, 1, lambda _: machine.reset())
 register(canconf.INDENTIFY, 1, 1, lambda _: board.CAN.identify())
 register(canconf.WEBREPL_START, 1, 1, lambda _: net.start_repl())
 register(canconf.WEBREPL_STOP, 1, 1, lambda _: net.stop_repl())
+register(canconf.SEND_FREEMEM, 1, 1, lambda _: _send_memstat())
+register(canconf.ENABLE_WATCHDOG, 1, 1, lambda _: board.WD.enable())
 
 ### Provide convenient access to global CAN instance (stored in board.CAN)
 
