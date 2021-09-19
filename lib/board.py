@@ -125,27 +125,12 @@ MQTT = None
 # the global watchdog
 WD = None
 
-send_memstat = None
+run_gc = None
 
 def good_time_for_gc():
     # pylint: disable=no-member
-    free = gc.mem_free()
-    if free > 12000:
-        return
-    if send_memstat:
-        send_memstat() # pylint: disable=not-callable
-
-    if not DEBUG:
-        gc.collect()
-    else:
-        start = utime.ticks_ms()
-        gc.collect()
-        newfree = gc.mem_free()
-        print('GC collected {} bytes in {} ms, free={}'.format(
-        newfree-free, utime.ticks_diff(utime.ticks_ms(), start), newfree))
-    if send_memstat:
-        send_memstat() # pylint: disable=not-callable
-
+    if run_gc and gc.mem_free() < 6000:
+        run_gc() # pylint: disable=not-callable
 
 # Run async processes
 

@@ -12,7 +12,7 @@ Test module for
 
 import board
 board.LOCATION = 'test'
-#board.DEBUG = True
+board.DEBUG = True
 board.CANID = 0x100
 
 

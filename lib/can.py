@@ -11,6 +11,7 @@ import canconf
 import board
 import canerror
 import net
+import utime
 import uasyncio as asyncio
 
 
@@ -270,19 +271,39 @@ async def _ping_job():
 
 board.BACKGROUND_RUNNERS.append(_ping_job())
 
-_memstat_message = Message(canid.MEMORY_STATUS, [board.CANID >> 8, board.CANID & 0xff, 0, 0, 0, 0])
+_memstat_message = Message(canid.MEMORY_STATUS, [board.CANID >> 8, board.CANID & 0xff, 0, 0, 0, 0, 0, 0])
+_gc_counter = 0
+
 def _send_memstat():
     b = _memstat_message.payload
     # b[0] = _memstat_message.canid >> 8
     # b[1] = _memstat_message.canid & 0xff
     free = gc.mem_free()     # pylint: disable=no-member
-    b[2] = (free >> 24) & 0xff
-    b[3] = (free >> 16) & 0xff
-    b[4] = (free >>  8) & 0xff
-    b[5] = free & 0xff
+    b[2] = (_gc_counter >>  8) & 0xff
+    b[3] = _gc_counter & 0xff
+    b[4] = (free >> 24) & 0xff
+    b[5] = (free >> 16) & 0xff
+    b[6] = (free >>  8) & 0xff
+    b[7] = free & 0xff
     _memstat_message.send()
 
-board.send_memstat = _send_memstat
+
+def run_gc():
+    global _gc_counter # pylint: disable=global-statement
+    _send_memstat()
+    _gc_counter += 1
+    if not board.DEBUG:
+        gc.collect()
+    else:
+        free = gc.mem_free() # pylint: disable=no-member
+        start = utime.ticks_ms()
+        gc.collect()
+        newfree = gc.mem_free() # pylint: disable=no-member
+        print('GC collected {} bytes in {} ms, free={}'.format(
+            newfree-free, utime.ticks_diff(utime.ticks_ms(), start), newfree))
+    _send_memstat()
+
+board.run_gc = run_gc
 
 async def _memstat_jop():
     while True:
