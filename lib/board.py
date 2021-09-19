@@ -6,9 +6,12 @@ Loaded modules and defined devices add to global variables in this module
 
 # pylint: disable=import-error, too-few-public-methods, missing-function-docstring
 
+import gc
 import machine
 import utime
+import uasyncio as asyncio
 
+# If DEBUG is set, additinoal messages will be printed
 DEBUG = False
 
 def PRINT(formatstring, *args):
@@ -91,6 +94,11 @@ SENSORSs = RegisteredSensorIDs()
 # PWMs holds a list of all defined PWMs (initialized by loading pwm.py)
 PWMs = None
 
+# external functions (like dimming) can temporarily disable sensor accquisition (looks nicer)
+PWM_IS_DIMMING = False
+
+BACKGROUND_RUNNERS = []
+
 last_boot_s = utime.time()
 
 def uptime_s():
@@ -113,3 +121,32 @@ MQTT = None
 
 # the global watchdog
 WD = None
+
+
+def good_time_for_gc():
+    # pylint: disable=no-member
+    free = gc.mem_free()
+    if free > 12000:
+        return
+    if not DEBUG:
+        gc.collect()
+
+    start = utime.ticks_ms()
+    gc.collect()
+    newfree = gc.mem_free()
+    print('GC collected {} bytes in {} ms, free={}'.format(
+        newfree-free, utime.ticks_diff(utime.ticks_ms(), start), newfree))
+
+# Run async processes
+
+async def arun():
+    try:
+        await asyncio.gather(*BACKGROUND_RUNNERS)
+    except asyncio.TimeoutError:
+        print('asyncIO timeout!')
+    except Exception as e: # pylint: disable=broad-except
+        print('**** ERROR in runner')
+        print(e)
+
+def run():
+    asyncio.run(arun())

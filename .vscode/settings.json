@@ -2,7 +2,8 @@
     "restructuredtext.confPath": "",
     "restructuredtext.languageServer.disabled": true,
     "python.analysis.extraPaths": [
-        "${workspaceFolder}/mupystubs"
+        "${workspaceFolder}/mupystubs",
+        //"./mupystubs",
         //"./mupystubs",
     ],
     //"python.analysis.diagnosticSeverityOverrides": {

@@ -2,7 +2,10 @@
 
 
 import pwm
+<<<<<<< HEAD
 # import schedule
+=======
+>>>>>>> master
 import utime
 
 if 0 == 1:

@@ -29,7 +29,6 @@ import board
 import can
 import canid
 import pwmcode
-import schedule
 
 dimdelay_ms = 5
 dimdelay_ms = 10
@@ -76,7 +75,6 @@ class PWM:
         self.msg = can.Message(canid.PWM_VALUE, [0, 0, 0, 0, 0, 0, 0])
         self.msg.setsender(self.id)
         board.PWMs.append(self)
-        #schedule.add_poller(self.poll)
 
     def __repr__(self):
         return '<PWM {}.{}>'.format(self.id, self.pwm)
@@ -151,13 +149,8 @@ class PWM:
     def run_next_dimstep(self):
         """Set next dimlevel. Return True when more steps are needed"""
         # try smooth dimming
-        # avoid floating point (and malloc)
-        # ds, _ = divmod(device.ival, 10)
         self.ival = self.pwm.duty()
-        # ds, _ = divmod(self.ival, 4)
-        # ds, _ = divmod(self.ival, 3)
-        ds, _ = divmod(self.ival, 4)
-        #ds, _ = divmod(self.ival, 8)
+        ds = self.ival // 4
         #ds = min(50, max(5, ds))
         ds = min(200, max(30, ds))
         remaining_counts = self.dimtovalue - self.ival
@@ -167,7 +160,9 @@ class PWM:
             #    print('{} last step {} is {}'.format(self, self.dimtovalue, self.ival))
             if self.ival == self.dimtovalue:
                 # accept value and send message to CAN
+                # print('dimming finished')
                 self.seti(self.dimtovalue)
+                board.good_time_for_gc()
                 return False
             return True
         if remaining_counts > 0:
@@ -271,69 +266,39 @@ class List(PWM):
 async def _next_dim_step_task():
     while True:
         delay = dimdelay_ms
+        isdimming = False
         for p in board.PWMs.pwms:
             if p.poll():
-                delay = 1
+                isdimming = True
+        # ask other async tasks to delay their execution to ensure smooth and uniterrupted dimming
+        board.PWM_IS_DIMMING = isdimming
         await asyncio.sleep_ms(delay)
 
-schedule.add_task(_next_dim_step_task)
+board.BACKGROUND_RUNNERS.append(_next_dim_step_task())
 
 board.PWMs = List(0xff) # Create a (dynamic) list that includes ALL PWMs
 
-_pwmcommands = {
-    pwmcode.ON: (2, lambda p, _: p.on()),
-    pwmcode.OFF: (2, lambda p, _: p.off()),
-    pwmcode.TOGGLE: (2, lambda p, _: p.toggle()),
-    pwmcode.SET_INTENSITY: (4, lambda p, msg: p.dimi16(msg.u16(2)))
-}
+### Handle PWM callbacks
 
-def handle_can_message(msg):
-    """Handle CAN message. Return True if handled"""
-    # print('CAN handle {}'.format(msg))
-    l = len(msg.payload)
-    if l < 1:
-        return False
-    command = msg.payload[0]
+# return a PWM for the sensorid.
+# If sensorid >0x7f a list of PWMs (which bit position is set in sensorid) will be returned
+def _getpwm(msg):
+    if msg.payload[1] & 0x80 == 0:
+        return board.SENSORSs.find(msg, (PWM, List), 0xa0)
+    # create a list of PWMs
+    pwms = List(None)
+    i = 0
+    bm = msg.payload[1] & 0x7f
+    while bm != 0:
+        if bm & 1 == 1:
+            p = board.SENSORSs.get_sensor(i)
+            if isinstance(p, (PWM, List)):
+                pwms.append(p)
+        bm >>= 1
+        i += 1
+    return pwms
 
-    nargs, callback = _pwmcommands.get(command, (1, None))
-    if callback is None:
-        return False
-
-    if l != nargs:
-        if board.DEBUG:
-            print('Bad number of args {}, expected {}'.format(l, nargs))
-        msg.bad_number_of_args(nargs)
-        return True
-
-    if msg.payload[1] & 0x80:
-        # loop over bitmask
-
-        # stupid copy loop, can't assign to byte array
-        i = 0
-        b = [0] * len(msg.payload)
-        for bb in msg.payload:
-            b[i] = bb
-            i += 1
-
-        msg.payload = b
-
-        i = 0
-        bm = msg.payload[1] & 0x7f
-        # print('Start looping {:2x}'.format(bm))
-        while bm != 0:
-            # print('    looping {:2x} -> {}'.format(bm, bm & 1))
-            if bm & 1 != 0:
-                b[1] = i
-                p = board.SENSORSs.find(msg, (PWM, List), 0xa0)
-                if p:
-                    callback(p, msg)
-            i += 1
-            bm >>= 1
-        return True
-
-    # print('========== single PWM command')
-    p = board.SENSORSs.find(msg, (PWM, List), 0xa0)
-    if p is None:
-        return True
-    callback(p, msg)
-    return True
+can.register(pwmcode.SET_INTENSITY, 4, 4, lambda msg: _getpwm(msg).dimi16(msg.u16(2)))
+can.register(pwmcode.ON, 2, 2, lambda msg: _getpwm(msg).on())
+can.register(pwmcode.OFF, 2, 2, lambda msg: _getpwm(msg).off())
+can.register(pwmcode.TOGGLE, 2, 2, lambda msg: _getpwm(msg).toggle())

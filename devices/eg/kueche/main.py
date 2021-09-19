@@ -29,7 +29,10 @@ import sensors
 # import utime
 import board
 import button
+<<<<<<< HEAD
 import schedule
+=======
+>>>>>>> master
 import motionsensor
 
 board.DEBUG = True
@@ -125,7 +128,6 @@ def can_callback(msg):
 can.subscribe(can_callback)
 
 def r():
-    schedule.run()
+    board.run()
 
-s = schedule.schedule_list
 r()

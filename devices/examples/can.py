@@ -29,7 +29,10 @@ import board
 import pwm
 import sensors
 import button
+<<<<<<< HEAD
 import schedule
+=======
+>>>>>>> master
 
 import setup
 
@@ -76,7 +79,16 @@ board.CAN.subscribe(False, can_callback)
 # wd = sensors.WDT()
 
 def r():
+<<<<<<< HEAD
     schedule.run()
 
 s = schedule.schedule_list
 # r()
+=======
+    board.run()
+
+if 1 == 1: # pylint: disable=comparison-with-itself
+    r()
+else:
+    print('# run r() to start event handler')
+>>>>>>> master

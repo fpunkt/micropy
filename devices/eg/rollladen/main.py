@@ -26,7 +26,10 @@ board.DEBUG = True
 import machine
 import sensors
 import pwm
+<<<<<<< HEAD
 import schedule
+=======
+>>>>>>> master
 import motor
 import relais
 import uasyncio as asyncio
@@ -48,9 +51,13 @@ def can_callback(msg):
     global message_counter
     message_counter += 1
     print("GOT CAN message #{:4d}: {}".format(message_counter, msg))
+<<<<<<< HEAD
     if pwm.handle_can_message(msg):
         print('Message handled by PWM')
         return
+=======
+
+>>>>>>> master
     if len(msg.payload) > 3 and msg.payload[0] == 0x11:
         count = 100*(msg.payload[1]<<8 + msg.payload[2])
         print("DOING SOME STUPID LOOPING", count)
@@ -65,7 +72,10 @@ can.subscribe(can_callback)
 
 print('CAN initialized, dummy callback installed')
 
+<<<<<<< HEAD
 ping = sensors.PingDevice(poll_intervall_in_ms=2500)
+=======
+>>>>>>> master
 # t1 = sensors.DHT(1, machine.Pin(4), poll_intervall_in_ms=5000)
 
 w = None
@@ -79,10 +89,16 @@ def watchdog():
     w = sensors.WDT()
 
 def r():
+<<<<<<< HEAD
     schedule.run()
 
 s = schedule.schedule_list
 if 1 == 0:
+=======
+    board.run()
+
+if 1 == 1: # pylint: disable=comparison-with-itself
+>>>>>>> master
     r()
 else:
     print('# run r() to start event handler')

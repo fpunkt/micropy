@@ -5,7 +5,7 @@ Constant file generated from canconf.toml
 if 0 == 1:
     # make pylint think that it knows about 'const' variable
     # pylint: disable=used-before-assignment, undefined-variable, self-assigning-variable
-    const = const
+    const = lambda x: x
 
 CONFIG_BEGIN                                       =   240 # 0x00f0
 

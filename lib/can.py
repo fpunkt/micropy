@@ -4,12 +4,14 @@ CAN version using constant polling from the even loop.
 
 # pylint: disable=import-error, missing-docstring, redefined-builtin, too-many-arguments
 
+import gc
 import machine
 import canid
-import cancommon
+import canconf
 import board
-import schedule
 import canerror
+import net
+import uasyncio as asyncio
 
 
 class Message:
@@ -89,6 +91,19 @@ def makemessage(cid, size, sensorid=None):
 Badmessage = Message(0x777, [1, 2, 3, 4])
 
 
+# dict of list(minargs, maxargs, callback)
+_handlers = dict()
+
+def register(commandbyte, minargs, maxargs, callback):
+    if _handlers.get(commandbyte, None) is not None:
+        raise RuntimeError('CAN callback for {} already defined'.format(commandbyte))
+
+    _handlers[commandbyte] = (minargs, maxargs, callback)
+
+
+# cached message to avoid mallocs
+_message = Message(0, [])
+
 class CAN:
     """Wrapper for machine.CAN, providing (some kind of) interrupt and callback"""
     def __init__(self, cid=None, rx=33, tx=32, baudrate=125, mode=machine.CAN.NORMAL):
@@ -106,7 +121,6 @@ class CAN:
         self.send_poweron()
         # subscribe to standard commands so we can still switch on/off WLAN in case booting fails for whatever reason
         # self.can.callback(self._cbrunner)
-        schedule.add_poller(self.poll)
 
     def poll(self):
         if not self._can.any():
@@ -114,8 +128,26 @@ class CAN:
         packet = self._can.recv()
         cid = packet[0]
         payload = packet[3]
-        if cid == self.canid and cancommon.handle_standard_config_command(self, payload):
-            return True
+        _message.canid = cid
+        _message.payload = payload
+
+        # check for installed handler for that message
+        if cid == self.canid and len(payload) > 0:
+            handler = _handlers.get(payload[0], None)
+            if handler is not None:
+                minargs, maxargs, callback = handler
+                if len(payload) < minargs or len(payload) > maxargs:
+                    if board.DEBUG:
+                        print('Bad number of args {}, expected {}..{}'.format(len(payload), minargs, maxargs))
+                    _message.bad_number_of_args(minargs, maxargs)
+                # run the callback
+                try:
+                    callback(_message)
+                except Exception as e: # pylint: disable=broad-except
+                    if board.DEBUG:
+                        print('Callback raised error: {}'.format(e))
+                return True
+
         if self._callback is None:
             return False
         if self._subscribed_to is True or self._subscribed_to == cid:
@@ -212,8 +244,76 @@ def errormessage(payload):
     _errormessage.payload = board.CAN.canid_bytes + payload
     _errormessage.send()
 
+# setup standard tasks
 
-# Provide convenient access to global CAN instance (stored in board.CAN)
+async def _poll_CAN():
+    # CAN initialized ?
+    while board.CAN is None:
+        await asyncio.sleep_ms(500)
+
+    while True:
+        board.CAN.poll()
+        await asyncio.sleep_ms(1)
+
+board.BACKGROUND_RUNNERS.append(_poll_CAN())
+
+
+async def _ping_job():
+    while True:
+        if board.CAN is not None:
+            board.CAN.send_ping()
+        if board.MQTT is not None:
+            board.MQTT.publish('info/uptime/{}'.format(board.LOCATION), str(board.uptime_s()))
+        await asyncio.sleep(2)
+
+board.BACKGROUND_RUNNERS.append(_ping_job())
+
+_memstat_message = Message(0x765, [0, 0, 0, 0])
+def _send_memstat():
+    b = _memstat_message.payload
+    b[0] = _memstat_message.canid >> 8
+    b[1] = _memstat_message.canid & 0xff
+    free = gc.mem_free()     # pylint: disable=no-member
+    b[2] = free >> 8
+    b[3] = free & 0xff
+    _memstat_message.send()
+
+async def _memstat_jop():
+    while True:
+        _send_memstat()
+        await asyncio.sleep(2)
+
+board.BACKGROUND_RUNNERS.append(_memstat_jop())
+
+
+### Common config commands
+
+# Basic configuration commands common to all applications are handled by this layer.
+#
+# Config commands (assuming CAN address 100)
+#
+# cansend 100#fd # START WLAN and repl
+# cansend 100#fe # STOP WLAN and repl
+#
+# cansend 200#fd # START WLAN and repl
+
+def _connect(ip):
+    board.LED.on()
+    ipx = list(map(int, ip[0].split('.')))
+    #print('ipx', ipx)
+    board.CAN.send_wlan_connected(ipx)
+
+register(canconf.WLAN_CONNECT, 1, 1, lambda _: _connect(net.start_wlan()))
+register(canconf.WLAN_HOTSPOT, 1, 1, lambda _: _connect(net.start_hotspot()))
+register(canconf.WLAN_STOP, 1, 1, lambda _: net.stop_wlan())
+register(canconf.SEND_PING, 1, 1, lambda _: board.CAN.send_ping())
+register(canconf.SOFT_RESET, 1, 1, lambda _: machine.soft_reset())
+register(canconf.HARD_RESET, 1, 1, lambda _: machine.reset())
+register(canconf.INDENTIFY, 1, 1, lambda _: board.CAN.identify())
+register(canconf.WEBREPL_START, 1, 1, lambda _: net.start_repl())
+register(canconf.WEBREPL_STOP, 1, 1, lambda _: net.stop_repl())
+
+### Provide convenient access to global CAN instance (stored in board.CAN)
 
 def subscribe(callback, cid=None):
     board.CAN.subscribe(callback, cid)

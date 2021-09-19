@@ -10,13 +10,20 @@ Use IRQ for debouncing and async polling for event processing.
 import machine
 import utime
 # import micropython
-import uasyncio as asyncio
-import schedule
+# import uasyncio as asyncio
+import sensors
 
-class IRQIO:
+class IRQIO(sensors.Sensor):
     def __init__(self, sensorid, pinid, trigger=None, pullup=True):
+        super().__init__(self, sensorid, pinid, poll_intervall_in_ms=10)
         if trigger is None:
             trigger = machine.Pin.IRQ_RISING | machine.Pin.IRQ_FALLING
+        elif trigger == 'rise':
+            trigger = machine.Pin.IRQ_RISING
+        elif trigger == 'fall':
+            trigger = machine.Pin.IRQ_FALLING
+        else:
+            raise ValueError('trigger needs to be one of None, rise or fall, found {}'.format(trigger))
         if pullup is True:
             pullupmode = machine.Pin.PULL_UP
         else:
@@ -25,31 +32,27 @@ class IRQIO:
         self.pin = machine.Pin(pinid, machine.Pin.IN, pullupmode)
         self._repr = '{} #{} {}'.format(self.__class__.__name__, self.sensorid, self.pin)
         self.callback = None
-        self.state = 0
+        self.pinvalue = self.pin.value()
         self.last_irq = utime.ticks_ms()
         self.last_run = self.last_irq
         self.last_value = 0
         self.pin.irq(trigger=trigger, handler=self._irq_handler)
         self.debounce_ms = 1
-        self.event = asyncio.Event()
-        schedule.add_poller(self.poll)
 
-    def __repr__(self):
-        return '<{}>'.format(self._repr)
-
-    def poll(self):
-        if not self.event.is_set():
+    def run(self):
+        now = utime.ticks_ms()
+        # print('time since last IRQ: {} ms'.format(utime.ticks_diff(now, self.last_irq)))
+        if utime.ticks_diff(now, self.last_irq) < self.debounce_ms:
+            # keep on debouncing
             return False
-        self.state = self.pin.value()
-        self.event.clear()
+        pv = self.pin.value()
+        if pv == self.pinvalue:
+            # no change
+            return False
+        self.pinvalue = pv
         if self.callback is not None:
-            # pylint: disable=not-callable
-            self.callback(self)
+            self.callback(self) # pylint: disable=not-callable
         return True
 
     def _irq_handler(self, _):
-        now = utime.ticks_ms()
-        if utime.ticks_diff(now, self.last_irq) < self.debounce_ms:
-            return
-        self.last_irq = now
-        self.event.set()
+        self.last_irq = utime.ticks_ms()
