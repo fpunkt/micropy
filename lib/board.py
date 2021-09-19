@@ -125,20 +125,27 @@ MQTT = None
 # the global watchdog
 WD = None
 
+send_memstat = None
 
 def good_time_for_gc():
     # pylint: disable=no-member
     free = gc.mem_free()
     if free > 12000:
         return
+    if send_memstat:
+        send_memstat() # pylint: disable=not-callable
+
     if not DEBUG:
         gc.collect()
-
-    start = utime.ticks_ms()
-    gc.collect()
-    newfree = gc.mem_free()
-    print('GC collected {} bytes in {} ms, free={}'.format(
+    else:
+        start = utime.ticks_ms()
+        gc.collect()
+        newfree = gc.mem_free()
+        print('GC collected {} bytes in {} ms, free={}'.format(
         newfree-free, utime.ticks_diff(utime.ticks_ms(), start), newfree))
+    if send_memstat:
+        send_memstat() # pylint: disable=not-callable
+
 
 # Run async processes
 
@@ -146,10 +153,12 @@ async def arun():
     try:
         await asyncio.gather(*BACKGROUND_RUNNERS)
     except asyncio.TimeoutError:
-        print('asyncIO timeout!')
+        if DEBUG:
+            print('asyncIO timeout!')
     except Exception as e: # pylint: disable=broad-except
-        print('**** ERROR in runner')
-        print(e)
+        if DEBUG:
+            print('**** ERROR in runner')
+            print(e)
 
 def run():
     asyncio.run(arun())

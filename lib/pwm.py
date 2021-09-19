@@ -31,7 +31,7 @@ import canid
 import pwmcode
 
 dimdelay_ms = 5
-dimdelay_ms = 10
+#dimdelay_ms = 10
 
 # PWM freq defines the overall frequency of the device in Hz. 100 Hz is a good number
 pwm_freq = 100
@@ -270,6 +270,7 @@ async def _next_dim_step_task():
         for p in board.PWMs.pwms:
             if p.poll():
                 isdimming = True
+                delay = max(1, dimdelay_ms // 5)
         # ask other async tasks to delay their execution to ensure smooth and uniterrupted dimming
         board.PWM_IS_DIMMING = isdimming
         await asyncio.sleep_ms(delay)

@@ -25,7 +25,12 @@ if 0 == 1:
     # make pylint think that it knows about 'const' variable
     const = lambda x: x
 
+def minutes(n):
+    """Convert to milliseconds"""
+    return int(n*60000)
+
 poll_1_minute = const(1 * 60 * 1000)
+poll_2_minutes = const(2 * 60 * 1000)
 poll_5_minutes = const(5 * 60 * 1000)
 
 default_poll_time = const(poll_5_minutes)

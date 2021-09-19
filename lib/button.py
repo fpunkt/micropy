@@ -30,8 +30,7 @@ class Button(irqio.IRQIO):
         self.state = 0
         self.autorepeat_last_action_timestamp = utime.ticks_ms()
         self.autorepeat_arm_ms = 1000
-        self.autorepeat_speed_ms = 10
-        self.autorepeat_step = 2
+        self.autorepeat_speed_ms = 5
         self.autorepeat_direction = False
         self.autorepeat_state = STATE_AR_IDLE
 
@@ -78,8 +77,13 @@ class Button(irqio.IRQIO):
                 return False
 
         # autorepeat is active, do next step
-        step = max(1, self.pwm.ival // 50)
         ival = self.pwm.ival
+
+        # step = max(1, (ival * ival) // 500)
+        # step = max(1, ival // 100)
+        # step *= step
+        step = max(1, ival // 50)
+        step += ival // 100
         if ival == 0:
             # always dim up when light is off
             self.autorepeat_direction = True
@@ -100,7 +104,8 @@ class Button(irqio.IRQIO):
             if self.autorepeat_state == STATE_AR_ACTIVE:
                 # finished autorepeat
                 self.autorepeat_direction = not self.autorepeat_direction
-                self.pwm.send_status_to_can()
+                # send to CAN and update save
+                self.pwm.seti(self.pwm.ival)
             else:
                 self.pwm.toggle()
             self.state = 0 if self.pwm.dimtovalue == 0 else 1

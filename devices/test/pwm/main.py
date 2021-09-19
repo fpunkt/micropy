@@ -6,13 +6,13 @@ Test module for
 
 """
 
-# pylint: disable=import-error
+# pylint: disable=import-error, wrong-import-order
 # pylint: disable=missing-docstring
 # pylint: disable=unused-import, multiple-statements
 
 import board
 board.LOCATION = 'test'
-board.DEBUG = True
+#board.DEBUG = True
 board.CANID = 0x100
 
 
@@ -21,6 +21,7 @@ if board.DEBUG is True:
     net.start_wlan()
     net.start_repl()
 
+import gc
 import bconf
 import can
 import machine
@@ -55,7 +56,8 @@ def can_callback(msg):
     msg.unknown_command()
 
 def button_callback(button): # pylint: disable=redefined-outer-name
-    print('Button pressed: {}'.format(button))
+    if board.DEBUG:
+        print('Button pressed: {}'.format(button))
 
 b1.callback = button_callback
 b1.pwm = p1
@@ -68,8 +70,10 @@ can.subscribe(can_callback)
 print('CAN initialized, dummy callback installed')
 
 
-dht = sensors.DHT(20, bconf.AUX2_YELLOW, poll_intervall_in_ms=5000)
+dht = sensors.DHT(20, bconf.AUX2_YELLOW, poll_intervall_in_ms=5000 if board.DEBUG else sensors.minutes(2))
 
+# run once to supress memory messages after startup (because gc will be triggered after initialization ...)
+gc.collect()
 
 def r():
     board.run()
