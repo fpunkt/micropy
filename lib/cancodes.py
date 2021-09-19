@@ -9,8 +9,7 @@ cansend 100#fe # STOP WLAN and repl
 
 if 0 == 1:
     # make pylint think that it knows about 'const' variable
-    # pylint: disable=used-before-assignment, undefined-variable, self-assigning-variable
-    const = const
+    const = lambda x: x
 
 # CANID_POWER_ON message sent to the CAN Bus
 CANID_POWER_ON = const(0x3c4)

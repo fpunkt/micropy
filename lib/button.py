@@ -7,109 +7,113 @@ Buttons use IRQ for debouncing and async polling for event processing.
 # pylint: disable=import-error, missing-docstring, redefined-builtin, too-many-arguments
 # pylint: disable=too-few-public-methods, too-many-instance-attributes
 
-import machine
 import board
 import can
 import canid
+import irqio
 import utime
-import micropython
-import uasyncio as asyncio
-import schedule
 
-# TODO: remove async stuff
+if 0 == 1:
+    # make pylint think that it knows about 'const' variable
+    const = lambda x: x
 
-class Button:
+STATE_AR_IDLE = const(0)
+STATE_AR_ARM = const(1)
+STATE_AR_ACTIVE = const(2)
+
+class Button(irqio.IRQIO):
     def __init__(self, sensorid, pinid):
-        self.sensorid = sensorid
-        self.pin = machine.Pin(pinid, machine.Pin.IN, machine.Pin.PULL_UP)
-        self.callback = None
-        self._schedule_async_runner_ref = self._schedule_async_runner
-        self._run_ref = self.run_outside_irq
-        #self._irq_ref = self._irq_handler
-        self.msg = can.makemessage(canid.BUTTON_PRESSED, 5)
-        self.msg.setsender(self.sensorid)
-        self.state = False
-        self.last_irq = utime.ticks_ms()
-        self.last_run = self.last_irq
-        self.last_value = 0
-        self.pin.irq(trigger=machine.Pin.IRQ_RISING | machine.Pin.IRQ_FALLING, handler=self._irq_handler)
-        self.debounce_ms = 200
+        super().__init__(sensorid, pinid)
+        self.msg = can.makemessage(canid.BUTTON_PRESSED, 5, sensorid=self.sensorid)
+        self.debounce_ms = 20
         self.pwm = None
+        self.state = 0
+        self.autorepeat_last_action_timestamp = utime.ticks_ms()
         self.autorepeat_arm_ms = 1000
-        self.autorepeat_speed_ms = 200
-        self.autorepeat_direction = True
-        self.autorepeat_state = None
-        self._irq_pending = False
-        self.event = asyncio.Event()
-        schedule.add_poller(self.poll)
+        self.autorepeat_speed_ms = 10
+        self.autorepeat_step = 2
+        self.autorepeat_direction = False
+        self.autorepeat_state = STATE_AR_IDLE
 
     def __repr__(self):
-        return '<Button #{} Pin {}, state={}>'.format(self.sensorid, self.pin, self.state)
+        return '<{}, {}, state={}>'.format(self._repr, self.pwm, self.state)
 
-    def poll(self):
-        if not self.event.is_set():
+    def run(self):
+        # pylint: disable=too-many-return-statements
+        changed = super().run()
+        if self.autorepeat_arm_ms == 0:
+            # autorepeat disabled, directly react on button down, don't wait for button up
+            if not changed:
+                return False
+            if self.pinvalue == 1:
+                # button released, nothing to do
+                return True
+
+            return self._pressed()
+
+        # autorepeat mode
+
+        if changed:
+            if self.pinvalue == 1:
+                # button released
+                return self._pressed()
+            # button pressed
+            self.autorepeat_last_action_timestamp = utime.ticks_ms()
+            return True
+
+        # button did not change, handle autorepeat
+
+        if self.pinvalue == 1:
+            # button not pressed
             return False
-        if self.pin.value() == 1:
-            self._released()
-        else:
-            self._pressed()
-        self.event.clear()
+
+        now = utime.ticks_ms()
+        ms_since_last_update = utime.ticks_diff(now, self.autorepeat_last_action_timestamp)
+        if self.autorepeat_state == STATE_AR_IDLE:
+            if ms_since_last_update > self.autorepeat_arm_ms:
+                self.autorepeat_last_action_timestamp = now
+                self.autorepeat_state = STATE_AR_ACTIVE
+                # return True
+            else:
+                return False
+
+        # autorepeat is active, do next step
+        step = max(1, self.pwm.ival // 50)
+        ival = self.pwm.ival
+        if ival == 0:
+            # always dim up when light is off
+            self.autorepeat_direction = True
+        if not self.autorepeat_direction:
+            step = -step
+        # ival = self.pwm.pwm.duty()
+        newval = ival + step
+        newval = min(1023, max(1, newval))
+        # print('dim to {}, iv={}, step={}'.format(newval, ival, step))
+        self.pwm.seti_no_can_message(newval)
+        self.pwm.dimtovalue = self.pwm.ival # overwrite dimming
+        self.autorepeat_last_action_timestamp = now
         return True
 
-    def _released(self):
-        if self.autorepeat_state is None:
-            # button already handled when it was pressed
-            return
-
-        if self.autorepeat_state == 'armed':
-            # released before autorepeate kicks in
-            self.autorepeat_state = 'idle'
-            self._pressed()
-
     def _pressed(self):
-        self.state = not self.state
-        # print('{} pressed'.format(self))
+        self.state = 1 - self.state
         if self.pwm is not None:
-            self.state = self.pwm.toggle()
+            if self.autorepeat_state == STATE_AR_ACTIVE:
+                # finished autorepeat
+                self.autorepeat_direction = not self.autorepeat_direction
+                self.pwm.send_status_to_can()
+            else:
+                self.pwm.toggle()
+            self.state = 0 if self.pwm.dimtovalue == 0 else 1
+            # print('btn state {}, iv={}'.format(self.state, self.pwm.ival))
+            self.autorepeat_state = STATE_AR_IDLE
+
         if self.callback is not None:
-            # pylint: disable=not-callable
-            self.callback(self)
+            self.callback(self) # pylint: disable=not-callable
+
         if board.CAN is not None:
             self.msg.payload[3] = self.state
             self.msg.payload[4] = 1
             self.msg.send()
-        # gc.collect()
 
-    def next_autorepeat(self):
-        pass
-
-    def run_outside_irq(self, _):
-        #print('Running {} after schedule'.format(utime.ticks_diff(utime.ticks_ms(), self.last_irq)))
-        # irq_state = machine.disable_irq()
-        # self._irq_pending = False
-        # machine.enable_irq(irq_state)
-
-        #self.last_run = utime.ti
-
-        if self.pin.value() == 1:
-            self._released()
-            return
-        # here we have a button pressed
-        if self.autorepeat_state is None:
-            self._pressed()
-            return
-
-    async def _async_runner(self):
-        self.run_outside_irq(None)
-        await asyncio.sleep(0)
-
-    def _schedule_async_runner(self):
-        micropython.schedule(self._run_ref, None)
-
-    def _irq_handler(self, _):
-        now = utime.ticks_ms()
-        if utime.ticks_diff(now, self.last_irq) < self.debounce_ms:
-            return
-        self.last_irq = now
-        self.event.set()
-        # self.run_outside_irq(None)
+        board.good_time_for_gc()
+        return True

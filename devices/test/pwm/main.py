@@ -1,9 +1,13 @@
 """
-Main Module.
+Test module for
+    2 PWM connected AUX-1 4P on beta board
+    1 AM2320 on AUX-2
+    2 buttons on AUX-3
 
-Function main is executed after standard inits
 """
-# pylint: disable=import-error, missing-docstring, redefined-builtin, too-many-arguments
+
+# pylint: disable=import-error
+# pylint: disable=missing-docstring
 # pylint: disable=unused-import, multiple-statements
 
 # start CAN first, otherwise bus is in undefined state
@@ -14,22 +18,32 @@ import net; net.start_wlan(); net.start_repl()
 # import time; print('Loading main, giving time to abort ....'); time.sleep(2)
 
 import can
-c = can.CAN(0x100)
-
+import bconf
+c = bconf.CAN(0x100)
 
 import board
 
 board.LOCATION = 'test'
+board.DEBUG = True
 
 import machine
 import sensors
 import pwm
+import button
+import uasyncio as asyncio
 
-p = pwm.PWM(1, 14)
+
+p1 = pwm.PWM(1, bconf.AUX1_YELLOW)
+p2 = pwm.PWM(2, bconf.AUX1_WHITE)
+
+p = p1
+
+b1 = button.Button(10, bconf.AUX3_WHITE)
+b2 = button.Button(11, bconf.AUX3_YELLOW)
 
 message_counter = 0
 
-def callback(msg):
+def can_callback(msg):
     # pylint: disable=global-statement
     global message_counter
     message_counter += 1
@@ -40,21 +54,30 @@ def callback(msg):
         while count > 0:
             count -= 1
         print("DONE with stupid looping")
+        return
+    msg.unknown_command()
 
-#c.subscribe(True, callback)
+def button_callback(button): # pylint: disable=redefined-outer-name
+    print('Button pressed: {}'.format(button))
+
+b1.callback = button_callback
+b1.pwm = p1
+b1.autorepeat_arm_ms = 0
+
+b2.pwm = p2
+
+can.subscribe(can_callback)
 
 print('CAN initialized, dummy callback installed')
 
-ping = sensors.PingDevice(poll_intervall_in_ms=2500)
-# t1 = sensors.DHT(1, machine.Pin(4), poll_intervall_in_ms=5000)
 
-w = None
+dht = sensors.DHT(20, bconf.AUX2_YELLOW, poll_intervall_in_ms=5000)
 
-# def s(id=0x111):
-#     can.CANDevice.send(id, [1, 2, 3])
 
-def watchdog():
-    # pylint: disable=global-statement
-    global w
-    w = sensors.WDT()
+def r():
+    board.run()
 
+if 1 == 1: # pylint: disable=comparison-with-itself
+    r()
+else:
+    print('# run r() to start event handler')

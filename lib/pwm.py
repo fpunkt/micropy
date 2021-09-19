@@ -19,19 +19,19 @@ p
 
 """
 
-# pylint: disable=import-error, missing-docstring, redefined-builtin, too-many-arguments
+# pylint: disable=import-error, missing-docstring
 # pylint: disable=too-many-instance-attributes, global-statement
 
-import board
 import machine
+import utime
+import uasyncio as asyncio
+import board
 import can
 import canid
-import utime
 import pwmcode
-import uasyncio as asyncio
-import schedule
 
 dimdelay_ms = 5
+dimdelay_ms = 10
 
 # PWM freq defines the overall frequency of the device in Hz. 100 Hz is a good number
 pwm_freq = 100
@@ -47,30 +47,37 @@ def _i16_to_raw(v):
 
 class PWM:
     """Wrapper for system PWM, using numbers from 0..1 and provide dimming"""
-    def __init__(self, id, pin):
-        self.id = id
+    def __init__(self, pwmid, pin):
+        self.id = pwmid
         self.ival = 0
         self.lastintensity = 100
-        board.SENSORSs.register(id, self)
+        self.pwm = None
+        if pin is not None:
+            self.pwm = machine.PWM(machine.Pin(pin))
+        board.SENSORSs.register(pwmid, self)
         if pin is None:
             return
-        self.pwm = machine.PWM(machine.Pin(pin))
+
         # global pwm_freq
         if pwm_freq > 0:
             self.pwm.freq(pwm_freq)
             # pwm_freq = 0
             utime.sleep_ms(5) # for some strange reason after setting pwm_freq ..
-        # print('setting duty for {}/{} to 0'.format(id, pin))
+        # print('setting duty for {}/{} to 0'.format(pwmid, pin))
         # self.pwm.duty(0)
         self.seti_no_can_message(0) # power off
+        self.seti_no_can_message(0) # power off
+        self.seti_no_can_message(0) # power off
         self.dimtovalue = 0
-        self.button = None
+        # self.button = None
 
         # allocate message once to avoid garbage collection
         self.msg = can.Message(canid.PWM_VALUE, [0, 0, 0, 0, 0, 0, 0])
         self.msg.setsender(self.id)
         board.PWMs.append(self)
-        #schedule.add_poller(self.poll)
+
+    def __repr__(self):
+        return '<PWM {}.{}>'.format(self.id, self.pwm)
 
     def poll(self):
         if self.ival == self.dimtovalue:
@@ -78,18 +85,30 @@ class PWM:
         return self.run_next_dimstep()
 
     def seti_no_can_message(self, ival):
+        """Set PWM value. NOTE: the actual value may not be the one that has been commanded.
+        Call wait_until_set() if you need the value to be correct.
+        (This is not the case for dimming, because dimming reads the value read back
+        from the H/W. Value might be different if commands are send too fast)"""
+        ival = min(1023, max(ival, 0))
         self.pwm.duty(ival)
-        self.ival = ival
+        # self.ival = ival
+        # a direct reading might not return the actual value
+        # we use the actual set/reported value to ensure that dimming works fine
+        # Call wait_until_set() if you want to ensure that the set value is correct
+        self.ival = self.pwm.duty()
 
-    def forcei_no_can_message(self, ival):
-        # for some strange reason sometimes the value is not taken
-        while self.pwm.duty() != ival:
-            self.pwm.duty(ival)
-        self.ival = ival
+    def wait_until_set(self):
+        """Make sure PWM has taken the correct value (potential issue when changing PWM speed in short intervalls)"""
+        while self.pwm.duty() != self.ival:
+            self.seti_no_can_message(self.ival)
+
+    def maxi(self):
+        return self.ival
 
     def seti(self, ival):
         """Set raw integer duty from 0 .. 1023 and send status to CAN"""
         self.seti_no_can_message(ival)
+        self.wait_until_set()
         if ival != 0:
             self.lastintensity = ival
         self.send_status_to_can()
@@ -122,6 +141,7 @@ class PWM:
         return _tofloat(self.ival)
 
     def next_dimstep_if_needed(self):
+        self.ival = self.pwm.duty()
         if self.ival == self.dimtovalue:
             return False
         return self.run_next_dimstep()
@@ -129,15 +149,22 @@ class PWM:
     def run_next_dimstep(self):
         """Set next dimlevel. Return True when more steps are needed"""
         # try smooth dimming
-        # avoid floating point (and malloc)
-        # ds, _ = divmod(device.ival, 10)
-        ds, _ = divmod(self.ival, 4)
-        ds = min(50, max(5, ds))
+        self.ival = self.pwm.duty()
+        ds = self.ival // 4
+        #ds = min(50, max(5, ds))
+        ds = min(200, max(30, ds))
         remaining_counts = self.dimtovalue - self.ival
         if abs(remaining_counts) <= ds:
-            self.forcei_no_can_message(self.dimtovalue)
-            self.seti(self.dimtovalue)
-            return False
+            self.seti_no_can_message(self.dimtovalue)
+            #if board.DEBUG:
+            #    print('{} last step {} is {}'.format(self, self.dimtovalue, self.ival))
+            if self.ival == self.dimtovalue:
+                # accept value and send message to CAN
+                # print('dimming finished')
+                self.seti(self.dimtovalue)
+                board.good_time_for_gc()
+                return False
+            return True
         if remaining_counts > 0:
             self.seti_no_can_message(self.ival + ds)
         else:
@@ -173,10 +200,15 @@ class PWM:
         self.off()
         return False
 
-class PWMList(PWM):
-    def __init__(self, id, *args):
-        super().__init__(id, None)
+
+class List(PWM):
+    def __init__(self, pwmid, *args):
+        super().__init__(pwmid, None)
         self.pwms = list(args)
+        self.toggle_mode = 0
+
+    def __repr__(self):
+        return '<pwm.List with {} entries>'.format(len(self.pwms))
 
     def append(self, pwm):
         self.pwms.append(pwm)
@@ -194,68 +226,79 @@ class PWMList(PWM):
         """get max value of all PWMs"""
         return max([p.ival for p in self.pwms])
 
+    def dimi(self, value):
+        for p in self.pwms:
+            p.dimi(value)
+
+    def on(self):
+        # print('pwm.List #{self.id} on')
+        for p in self.pwms:
+            p.on()
+        return True
+
+    def off(self):
+        # print('pwm.List #{self.id} off')
+        for p in self.pwms:
+            p.off()
+        return False
+
+    def toggle_off(self):
+        # turn off if at least one is on
+        # print('pwm.List #{self.id} toggle')
+        if self.maxi() > 0:
+            return self.off()
+        return self.on()
+        # print('pwm.List #{self.id} toggle done')
+
+    def toggle_on(self):
+        # turn on if at least one is off
+        for p in self.pwms:
+            if p.maxi() == 0:
+                return self.on()
+        return self.off()
+
+    def toggle(self):
+        if self.toggle_mode:
+            return self.toggle_on()
+        return self.toggle_off()
+
 
 async def _next_dim_step_task():
     while True:
+        delay = dimdelay_ms
+        isdimming = False
         for p in board.PWMs.pwms:
-            p.poll()
-        await asyncio.sleep_ms(dimdelay_ms)
+            if p.poll():
+                isdimming = True
+        # ask other async tasks to delay their execution to ensure smooth and uniterrupted dimming
+        board.PWM_IS_DIMMING = isdimming
+        await asyncio.sleep_ms(delay)
 
-schedule.add_task(_next_dim_step_task)
+board.BACKGROUND_RUNNERS.append(_next_dim_step_task())
 
-_pwmcommands = {
-    pwmcode.ON: (2, lambda p, _: p.on()),
-    pwmcode.OFF: (2, lambda p, _: p.off()),
-    pwmcode.SET_INTENSITY: (4, lambda p, msg: p.dimi16(msg.u16(2)))
-}
+board.PWMs = List(0xff) # Create a (dynamic) list that includes ALL PWMs
 
-def handle(msg):
-    """Handle CAN message. Return True if handled"""
-    # print('CAN handle {}'.format(msg))
-    l = len(msg.payload)
-    if l < 1:
-        return False
-    command = msg.payload[0]
+### Handle PWM callbacks
 
-    nargs, callback = _pwmcommands.get(command, (1, None))
-    if callback is None:
-        return False
+# return a PWM for the sensorid.
+# If sensorid >0x7f a list of PWMs (which bit position is set in sensorid) will be returned
+def _getpwm(msg):
+    if msg.payload[1] & 0x80 == 0:
+        return board.SENSORSs.find(msg, (PWM, List), 0xa0)
+    # create a list of PWMs
+    pwms = List(None)
+    i = 0
+    bm = msg.payload[1] & 0x7f
+    while bm != 0:
+        if bm & 1 == 1:
+            p = board.SENSORSs.get_sensor(i)
+            if isinstance(p, (PWM, List)):
+                pwms.append(p)
+        bm >>= 1
+        i += 1
+    return pwms
 
-    if l != nargs:
-        if board.DEBUG:
-            print('Bad number of args {}, expected {}'.format(l, nargs))
-        msg.bad_number_of_args(nargs)
-        return True
-
-    if msg.payload[1] & 0x80:
-        # loop over bitmask
-
-        # stupid copy loop, can't assign to byte array
-        i = 0
-        b = [0] * len(msg.payload)
-        for bb in msg.payload:
-            b[i] = bb
-            i += 1
-
-        msg.payload = b
-
-        i = 0
-        bm = msg.payload[1] & 0x7f
-        # print('Start looping {:2x}'.format(bm))
-        while bm != 0:
-            # print('    looping {:2x} -> {}'.format(bm, bm & 1))
-            if bm & 1 != 0:
-                b[1] = i
-                p = board.SENSORSs.find(msg, (PWM, PWMList), 0xa0)
-                if p:
-                    callback(p, msg)
-            i += 1
-            bm >>= 1
-        return True
-
-    # print('========== single PWM command')
-    p = board.SENSORSs.find(msg, (PWM, PWMList), 0xa0)
-    if p is None:
-        return True
-    callback(p, msg)
-    return True
+can.register(pwmcode.SET_INTENSITY, 4, 4, lambda msg: _getpwm(msg).dimi16(msg.u16(2)))
+can.register(pwmcode.ON, 2, 2, lambda msg: _getpwm(msg).on())
+can.register(pwmcode.OFF, 2, 2, lambda msg: _getpwm(msg).off())
+can.register(pwmcode.TOGGLE, 2, 2, lambda msg: _getpwm(msg).toggle())
