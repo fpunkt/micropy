@@ -43,7 +43,10 @@ def _tofloat(value):
     return value / 1023.0
 
 def _i16_to_raw(v):
-    return v >> 6
+    vv = v >> 6
+    if vv == 0 and v > 0:
+        return 1
+    return vv
 
 class PWM:
     """Wrapper for system PWM, using numbers from 0..1 and provide dimming"""
