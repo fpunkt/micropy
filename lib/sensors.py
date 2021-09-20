@@ -88,15 +88,15 @@ class Sensor:
         self.proclaim()
         while True:
             nextrun_in_ms = self.poll_intervall_in_ms
-            try:
-                if board.PWM_IS_DIMMING:
-                    # minor delay in order to have smooth dimming
-                    nextrun_in_ms = 2
-                else:
+            if board.PWM_IS_DIMMING:
+                # minor delay in order to have smooth dimming
+                nextrun_in_ms = 2
+            else:
+                try:
                     self.run()
-            except Exception as e: # pylint: disable=bare-except, broad-except
-                if board.DEBUG:
-                    print('Exception from {}: {}'.format(self, e))
+                except Exception as e: # pylint: disable=bare-except, broad-except
+                    if board.DEBUG:
+                        print('Exception from {}: {}'.format(self, e))
             await asyncio.sleep_ms(nextrun_in_ms)
 
 
