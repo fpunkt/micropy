@@ -68,6 +68,7 @@ class Sensor:
         self.sensorid = sensorid
         self.pin = pin
         self.poll_intervall_in_ms = poll_intervall_in_ms
+        self.is_fast = False # can interrupt PWM dimming
         board.SENSORSs.register(sensorid, self)
         board.BACKGROUND_RUNNERS.append(self.arun())
 
@@ -88,8 +89,8 @@ class Sensor:
         self.proclaim()
         while True:
             nextrun_in_ms = self.poll_intervall_in_ms
-            if board.PWM_IS_DIMMING:
-                # minor delay in order to have smooth dimming
+            if board.PWM_IS_DIMMING and not self.is_fast:
+                # minor delay in order to have smooth dimming. Used for slow sensors
                 nextrun_in_ms = 2
             else:
                 try:
