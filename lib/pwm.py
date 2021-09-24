@@ -82,10 +82,18 @@ class PWM:
     def __repr__(self):
         return '<PWM {}.{}>'.format(self.id, self.pwm)
 
-    def poll(self):
-        if self.ival == self.dimtovalue:
-            return False
-        return self.run_next_dimstep()
+    def disable_dimming(self):
+        self.dimtovalue = -1
+
+    def enable_dimming(self):
+        self.dimtovalue = self.ival
+
+    # def poll(self):
+    #     if self.dimtovalue < 0:
+    #         return False
+    #     if self.ival == self.dimtovalue:
+    #         return False
+    #     return self.run_next_dimstep()
 
     def seti_no_can_message(self, ival):
         """Set PWM value. NOTE: the actual value may not be the one that has been commanded.
@@ -94,18 +102,20 @@ class PWM:
         from the H/W. Value might be different if commands are send too fast)"""
         ival = min(1023, max(ival, 0))
         self.pwm.duty(ival)
-        # self.ival = ival
+        self.ival = ival
         # a direct reading might not return the actual value
         # we use the actual set/reported value to ensure that dimming works fine
         # Call wait_until_set() if you want to ensure that the set value is correct
-        self.ival = self.pwm.duty()
+        # self.ival = self.pwm.duty()
 
     def wait_until_set(self):
         """Make sure PWM has taken the correct value (potential issue when changing PWM speed in short intervalls)"""
-        while self.pwm.duty() != self.ival:
-            self.seti_no_can_message(self.ival)
+        ival = self.ival
+        while self.pwm.duty() != ival:
+            self.pwm.duty(ival)
 
     def maxi(self):
+        """maximum value currently set (actually useful for lists, to see whether all lights are off)"""
         return self.ival
 
     def seti(self, ival):
@@ -143,11 +153,13 @@ class PWM:
         """Return current value 0..1"""
         return _tofloat(self.ival)
 
-    def next_dimstep_if_needed(self):
-        self.ival = self.pwm.duty()
-        if self.ival == self.dimtovalue:
-            return False
-        return self.run_next_dimstep()
+    # def next_dimstep_if_needed(self):
+    #     if self.dimtovalue < 0:
+    #         return False
+    #     self.ival = self.pwm.duty()
+    #     if self.ival == self.dimtovalue:
+    #         return False
+    #     return self.run_next_dimstep()
 
     def run_next_dimstep(self):
         """Set next dimlevel. Return True when more steps are needed"""
@@ -176,6 +188,9 @@ class PWM:
 
     def dimi(self, value):
         """dim in raw units"""
+        if self.dimtovalue < 0:
+            self.seti(value)
+            return
         self.dimtovalue = value
         if abs(self.ival-value) < 5:
             self.seti(value)
@@ -271,8 +286,10 @@ async def _next_dim_step_task():
         delay = dimdelay_ms
         isdimming = False
         for p in board.PWMs.pwms:
-            if p.poll():
+            if p.dimtovalue >= 0  and  p.pwm.duty() != p.dimtovalue:
+            # if p.poll():
                 isdimming = True
+                p.run_next_dimstep()
                 delay = max(1, dimdelay_ms // 5)
         # ask other async tasks to delay their execution to ensure smooth and uniterrupted dimming
         board.PWM_IS_DIMMING = isdimming

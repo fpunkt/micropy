@@ -55,6 +55,7 @@ class Button(irqio.IRQIO):
         if changed:
             if self.pinvalue == 1:
                 # button released
+                self.pwm.enable_dimming()
                 return self._pressed()
             # button pressed
             self.autorepeat_last_action_timestamp = utime.ticks_ms()
@@ -77,6 +78,7 @@ class Button(irqio.IRQIO):
                 return False
 
         # autorepeat is active, do next step
+        self.pwm.disable_dimming()
         ival = self.pwm.ival
 
         # step = max(1, (ival * ival) // 500)
@@ -94,7 +96,6 @@ class Button(irqio.IRQIO):
         newval = min(1023, max(1, newval))
         # print('dim to {}, iv={}, step={}'.format(newval, ival, step))
         self.pwm.seti_no_can_message(newval)
-        self.pwm.dimtovalue = self.pwm.ival # overwrite dimming
         self.autorepeat_last_action_timestamp = now
         return True
 
@@ -105,6 +106,7 @@ class Button(irqio.IRQIO):
                 # finished autorepeat
                 self.autorepeat_direction = not self.autorepeat_direction
                 # send to CAN and update save
+                # self.pwm.enable_dimming()
                 self.pwm.seti(self.pwm.ival)
             else:
                 self.pwm.toggle()
