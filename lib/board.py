@@ -7,6 +7,7 @@ Loaded modules and defined devices add to global variables in this module
 # pylint: disable=import-error, too-few-public-methods, missing-function-docstring
 
 import gc
+import sys
 import machine
 import utime
 import uasyncio as asyncio
@@ -144,6 +145,9 @@ async def arun():
         if DEBUG:
             print('**** ERROR in runner')
             print(e)
+            sys.print_exception(e) # pylint: disable=no-member
 
 def run():
+    # run GC once to supress memory messages after startup (because gc will be triggered after initialization ...)
+    gc.collect()
     asyncio.run(arun())

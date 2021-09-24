@@ -72,9 +72,6 @@ print('CAN initialized, dummy callback installed')
 
 dht = sensors.DHT(20, bconf.AUX2_YELLOW, poll_intervall_in_ms=5000 if board.DEBUG else sensors.minutes(2))
 
-# run once to supress memory messages after startup (because gc will be triggered after initialization ...)
-gc.collect()
-
 def r():
     board.run()
 

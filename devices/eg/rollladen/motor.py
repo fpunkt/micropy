@@ -2,11 +2,8 @@
 
 
 import pwm
-<<<<<<< HEAD
-# import schedule
-=======
->>>>>>> master
 import utime
+import board
 
 if 0 == 1:
     # make pylint think that it knows about 'const' variable
@@ -31,6 +28,10 @@ class Motor:
         self.status = 0
         self.m1 = pwm.PWM(pid, pin1)
         self.m2 = pwm.PWM(pid+1, pin2)
+        self.m1.disable_dimming()
+        self.m2.disable_dimming()
+        # motor will be one of m1 or m2, depending the direction. That is then the output
+        # where the PWM will change the speed (the other one is pulled low)
         self.motor = None
         self.fullstop()
         self.set_freq(10000)
@@ -55,10 +56,18 @@ class Motor:
 
     def _set(self, speed) -> None:
         # print("{:4d} {}".format(speed, self.motor))
+        if not self.motor:
+            if board.DEBUG:
+                print('Motor not set!')
+            return
         self.currentspeed = speed
         self.motor.seti_no_can_message(self.currentspeed)
 
     def _change(self, tospeed, steps, delay_ms=DEFAULT_ACCELLERATION_DELAY_MS) -> None:
+        if not self.motor:
+            if board.DEBUG:
+                print('Motor not set!')
+            return
         ds = int((tospeed - self.currentspeed) / steps)
         # print("to={:4d}, steps={:4d}, stepsize={:4d} {}".format(tospeed, steps, ds, self.motor))
         while steps > 1:

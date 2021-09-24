@@ -23,7 +23,7 @@ else
     files=`ls -1 *.py`
 fi
 
-echo $# arguments
+# echo $# arguments
 if [ "$#" -ne 0 ]; then
     files="$*"
 fi
