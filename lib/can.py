@@ -17,7 +17,6 @@ import uasyncio as asyncio
 
 class Message:
     """A CAN message"""
-    # pylint: disable=too-few-public-methods
     def __init__(self, cid, payload):
         self.canid = cid
         self.payload = payload
@@ -103,7 +102,7 @@ def register(commandbyte, minargs, maxargs, callback):
 
 
 # cached message to avoid mallocs
-_message = Message(0, [])
+_message = Message(0, bytearray([0, 1, 2, 3, 4, 5, 6, 7]))
 
 class CAN:
     """Wrapper for machine.CAN, providing (some kind of) interrupt and callback"""
@@ -168,7 +167,7 @@ class CAN:
     def any(self):
         return self._can.any()
 
-    def read(self):
+    def read(self) -> Message:
         """Read next message from the bus"""
         packet = self._can.recv()
         return Message(packet[0], packet[3])
