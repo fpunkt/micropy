@@ -1,0 +1,33 @@
+
+location = "mg.buero"
+canid = 0x120
+room = "Büro"
+
+# p1 = pwm.PWM(1, bconf.AUX1_YELLOW)
+# p2 = pwm.PWM(2, bconf.AUX1_WHITE)
+
+[led.1]
+name = "LED 1"
+port = 1
+pin = "AUX1_YELLOW"
+icon = "mdi:ceiling-light"
+
+[led.2]
+name = "LED 2"
+port = 2
+pin = "AUX1_WHITE"
+icon = "mdi:ceiling-light"
+
+# b1 = button.Button(10, bconf.AUX3_WHITE)
+# b2 = button.Button(11, bconf.AUX3_YELLOW)
+
+[button.1]
+name = "Button Left"
+port = 10
+pin = "AUX3_WHITE"
+
+[button.2]
+name = "Button Right"
+port = 11
+pin = "AUX3_WHITE"
+
