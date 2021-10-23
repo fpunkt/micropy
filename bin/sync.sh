@@ -3,6 +3,7 @@
 # sync files via the webrepl interface
 
 ipfile=".espip"
+bindir=`dirname $0`
 
 if [ ! -f "$ipfile" ]; then
     echo "ERROR: You don't have a '$ipfile' file."
@@ -46,7 +47,7 @@ for f in $files; do
         continue
     fi
     echo "# $f"
-    webrepl_cli.py -p x $f $ip: >/dev/null
+    $bindir/../webrepl/webrepl_cli.py -p x $f $ip: >/dev/null
     if [ $? -ne 0 ]; then
         echo "ERROR transfering $f"
         exit 1

@@ -1,14 +1,26 @@
 #! /bin/sh
 
-usb=`ls -1 /dev/ttyUSB*`
+case "$OSTYPE" in
+  solaris*) echo "SOLARIS" ;;
+  darwin*)  lookfor='/dev/tty.usb*' ;;
+  linux*)   lookfor='/dev/ttyUSB*' ;;
+  bsd*)     echo "BSD" ;;
+  msys*)    echo "WINDOWS" ;;
+  cygwin*)  echo "ALSO WINDOWS" ;;
+  *)        echo "unknown: $OSTYPE" ;;
+esac
+
+usb=`ls -1 $lookfor`
+
 nusb=`echo $usb |wc -l`
 
 if [ 1 -ne $nusb ]; then
-    echo "** ERROR: cannot find ttyUSB"
+    echo "** ERROR: cannot find USB device in $lookfor"
     exit 1
 fi
 
 echo "# Using $usb"
+echo "############ Consider using FLTerm"
 
-# exec screen /dev/ttyUSB0 115200
-tio --baudrate 115200  $usb
+exec screen /dev/ttyUSB0 115200
+# tio --baudrate 115200  $usb
