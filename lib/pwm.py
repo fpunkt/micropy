@@ -30,7 +30,7 @@ import can
 import canid
 import pwmcode
 
-dimdelay_ms = 5
+dimdelay_ms = 25
 #dimdelay_ms = 10
 
 # PWM freq defines the overall frequency of the device in Hz. 100 Hz is a good number
@@ -69,8 +69,6 @@ class PWM:
         # print('setting duty for {}/{} to 0'.format(pwmid, pin))
         # self.pwm.duty(0)
         self.seti_no_can_message(0) # power off
-        self.seti_no_can_message(0) # power off
-        self.seti_no_can_message(0) # power off
         self.dimtovalue = 0
         # self.button = None
 
@@ -83,7 +81,7 @@ class PWM:
         return '<PWM {}.{}>'.format(self.id, self.pwm)
 
     def disable_dimming(self):
-        self.dimtovalue = -1
+        self.dimtovalue = -99
 
     def enable_dimming(self):
         self.dimtovalue = self.ival
@@ -109,10 +107,11 @@ class PWM:
         # self.ival = self.pwm.duty()
 
     def wait_until_set(self):
-        """Make sure PWM has taken the correct value (potential issue when changing PWM speed in short intervalls)"""
-        ival = self.ival
-        while self.pwm.duty() != ival:
-            self.pwm.duty(ival)
+        """Make sure PWM has taken the correct value (can take up to about 1 ms,
+        could be an issue when changing PWM speed in short intervalls)"""
+        while self.pwm.duty() != self.ival:
+            #pass
+            self.pwm.duty(self.ival)
 
     def maxi(self):
         """maximum value currently set (actually useful for lists, to see whether all lights are off)"""
@@ -153,33 +152,42 @@ class PWM:
         """Return current value 0..1"""
         return _tofloat(self.ival)
 
-    # def next_dimstep_if_needed(self):
-    #     if self.dimtovalue < 0:
-    #         return False
-    #     self.ival = self.pwm.duty()
-    #     if self.ival == self.dimtovalue:
-    #         return False
-    #     return self.run_next_dimstep()
-
     def run_next_dimstep(self):
         """Set next dimlevel. Return True when more steps are needed"""
         # try smooth dimming
         self.ival = self.pwm.duty()
-        ds = self.ival // 4
+        ds = (2*self.ival) // 5
         #ds = min(50, max(5, ds))
-        ds = min(200, max(30, ds))
+        ds = min(150, max(10, ds))
         remaining_counts = self.dimtovalue - self.ival
         if abs(remaining_counts) <= ds:
-            self.seti_no_can_message(self.dimtovalue)
-            #if board.DEBUG:
-            #    print('{} last step {} is {}'.format(self, self.dimtovalue, self.ival))
-            if self.ival == self.dimtovalue:
-                # accept value and send message to CAN
-                # print('dimming finished')
-                self.seti(self.dimtovalue)
-                board.good_time_for_gc()
-                return False
-            return True
+            self.seti(self.dimtovalue)
+            self.dimtovalue = -1
+            return False
+            # Accepting the PWM value takes a while. If waiting with utime.sleep_us(1000)
+            # you can easily reach 10 loops (sometimes 2 or 3 or so)
+#            self.seti_no_can_message(self.dimtovalue)
+#            #if board.DEBUG:
+#            #    print('{} last step {} is {}'.format(self, self.dimtovalue, self.ival))
+#            # wait for PWM to settle
+#            maxcount = 10
+#            while maxcount >= 0 and self.pwm.duty() != self.dimtovalue:
+#                utime.sleep_us(1000) # wait for PWM to settle
+#                maxcount -= 1
+#                if maxcount < 0:
+#                    print("Did not reach PWM value")
+#                else:
+#                    print("Reached PWM after {} steps".format(10-maxcount))
+#
+#
+#            if True or self.pwm.duty() == self.dimtovalue:
+#                # accept value and send message to CAN
+#                # print('dimming finished')
+#                self.seti(self.dimtovalue)
+#                self.dimtovalue = -1 # stop dimming
+#                #board.good_time_for_gc()
+#                return False
+#            return True
         if remaining_counts > 0:
             self.seti_no_can_message(self.ival + ds)
         else:
@@ -188,7 +196,7 @@ class PWM:
 
     def dimi(self, value):
         """dim in raw units"""
-        if self.dimtovalue < 0:
+        if self.dimtovalue < -10:
             self.seti(value)
             return
         self.dimtovalue = value
@@ -282,18 +290,30 @@ class List(PWM):
 
 
 async def _next_dim_step_task():
+    isdimming = False
+    #dimsteps = 0
+    #starttime = 0
     while True:
-        delay = dimdelay_ms
+        #if isdimming:
+        #    if dimsteps == 0:
+        #        starttime = utime.ticks_ms()
+        #    dimsteps += 1
         isdimming = False
         for p in board.PWMs.pwms:
             if p.dimtovalue >= 0  and  p.pwm.duty() != p.dimtovalue:
-            # if p.poll():
                 isdimming = True
                 p.run_next_dimstep()
-                delay = max(1, dimdelay_ms // 5)
         # ask other async tasks to delay their execution to ensure smooth and uniterrupted dimming
         board.PWM_IS_DIMMING = isdimming
-        await asyncio.sleep_ms(delay)
+        #if not isdimming and dimsteps > 1:
+        #    # finished dimming
+        #    print("finished dimming with {} steps in {} ms".format(dimsteps, utime.ticks_diff(utime.ticks_ms(), starttime)))
+        #    print("sleep time should have been {} ms".format(max(1, dimdelay_ms // 5)))
+        #    dimsteps = 0
+        #if isdimming:
+        #    #utime.sleep_us(500)
+        #    continue
+        await asyncio.sleep_ms(max(1, dimdelay_ms // 5) if isdimming else dimdelay_ms)
 
 board.BACKGROUND_RUNNERS.append(_next_dim_step_task())
 
