@@ -47,7 +47,7 @@ class WDT:
             print('\033[38;5;226mStaring watchdog, {:.1f} seconds\033[0m'.format(self.repeat_ms/1000.0))
         self.wdt = machine.WDT(timeout=2*self.repeat_ms)
 
-    async def arun(self):
+    async def watchdog_task(self):
         while True:
             if self.wdt:
                 self.wdt.feed()
@@ -58,11 +58,11 @@ class WDT:
             self.wdt.feed()
 
 board.WD = WDT()
-board.BACKGROUND_RUNNERS.append(board.WD.arun())
+board.BACKGROUND_RUNNERS.append(board.WD.watchdog_task())
 
 
 class Sensor:
-    def __init__(self, name, sensorid, pin, poll_intervall_in_ms) -> None:
+    def __init__(self, name, sensorid, pin, poll_intervall_in_ms, background_task=None) -> None:
         # pylint: disable=redefined-outer-name
         self.name = name
         self.sensorid = sensorid
@@ -70,7 +70,9 @@ class Sensor:
         self.poll_intervall_in_ms = poll_intervall_in_ms
         self.is_fast = False # can interrupt PWM dimming
         board.SENSORSs.register(sensorid, self)
-        board.BACKGROUND_RUNNERS.append(self.arun())
+        if background_task is None:
+            background_task = self.sensor_task()
+        board.BACKGROUND_RUNNERS.append(background_task)
 
     def __repr__(self) -> str:
         if isinstance(self.sensorid, int):
@@ -85,7 +87,7 @@ class Sensor:
     def run(self): # pylint: disable=no-self-use
         return None
 
-    async def arun(self):
+    async def sensor_task(self):
         self.proclaim()
         while True:
             nextrun_in_ms = self.poll_intervall_in_ms
@@ -104,7 +106,7 @@ class Sensor:
 class DHT(Sensor):
     """Temperature sensor"""
     def __init__(self, sensorid, pin, poll_intervall_in_ms=poll_5_minutes):
-        super().__init__('DHT', sensorid, pin, poll_intervall_in_ms)
+        super().__init__('DHT', sensorid, pin, poll_intervall_in_ms, self.dht_task())
         self.dht = dht.DHT22(machine.Pin(pin))
         self.msg = can.makemessage(canid.DATALOGGER_AM2302, 7)
         self.msg.setsender(self.sensorid)
@@ -112,6 +114,9 @@ class DHT(Sensor):
     def proclaim(self):
         if board.MQTT:
             board.MQTT.publish_sensor_status("TempHum", self.sensorid, "ON")
+
+    async def dht_task(self):
+        asyncio.run(self.sensor_task())
 
     def run(self):
         # self.msg.setsender(self.sensorid)
