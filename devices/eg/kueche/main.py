@@ -11,39 +11,42 @@ To update run
 1 temp sensor
 """
 
-# pylint: disable=multiple-statements
-#import time; print('Loading main, giving time to abort ....'); time.sleep(2)
-
-# import time; print('Loading boot, giving time to abort (initializing network) ....'); time.sleep(2)
-import net; net.start_wlan(); net.start_repl()
-
-# pylint: disable=import-error, missing-docstring, redefined-builtin, multiple-statements, no-member
-# pylint: disable=wrong-import-order
-# pylint: disable=unused-import
-
-import can
-can.CAN(0x350, rx=35, tx=32)
-
-import pwm
-import sensors
-# import utime
 import board
+board.LOCATION = 'kueche'
+# board.DEBUG = True
+board.CANID = 0x350
+
+if board.DEBUG is True:
+    print("This is eg/kueche, location {}, CANID {:03x}".format(board.LOCATION, board.CANID))
+
+if board.DEBUG is True:
+    import net
+    net.start_wlan()
+    net.start_repl()
+
+import gc
+# import bconf
+import can
+import machine
+import sensors
+import pwm
 import button
-<<<<<<< HEAD
-import schedule
-=======
->>>>>>> master
+import uasyncio as asyncio
 import motionsensor
 
-board.DEBUG = True
-print('Hi, debug = {}'.format(board.DEBUG))
 
+can.CAN(board.CANID, rx=35, tx=32)
+
+if 0 == 1:
+    # make pylint think that it knows about 'const' variable
+    const = lambda x: x
 
 #board.SENSORSs = sensors.RegisteredSensorIDs()
 #board.PWMs = pwm.PWMList(-1)
 
-_defi1 = 800
-_defi2 = 1000
+_defi1 = const(800)
+_defi2 = const(1000)
+
 p0 = pwm.PWM(0, 15) # Dunsthaube warm
 p0.lastintensity = _defi1
 
@@ -102,19 +105,14 @@ b3.pwm = pl2
 #
 temperature = sensors.DHT(0x30, 33, poll_intervall_in_ms=5*60*1000)
 
-ping = sensors.PingDevice(2*60*1000)
-
 message_counter = 0
-
 
 def can_callback(msg):
     # pylint: disable=global-statement
     global message_counter
     message_counter += 1
     # print("GOT CAN message #{:4d}: {}".format(message_counter, msg))
-    if pwm.handle_can_message(msg):
-        # print('Message handled by PWM')
-        return
+
     if len(msg.payload) > 3 and msg.payload[0] == 0x11:
         count = 100*(msg.payload[1]<<8 + msg.payload[2])
         print("DOING SOME STUPID LOOPING", count)
@@ -130,4 +128,7 @@ can.subscribe(can_callback)
 def r():
     board.run()
 
-r()
+if 1 == 1: # pylint: disable=comparison-with-itself
+    r()
+else:
+    print('# run r() to start event handler')
