@@ -36,6 +36,7 @@ import uasyncio as asyncio
 
 p1 = pwm.PWM(1, bconf.AUX1_YELLOW)
 p2 = pwm.PWM(2, bconf.AUX1_WHITE)
+pl = pwm.List(0x20, p1, p2)
 
 p = p1
 

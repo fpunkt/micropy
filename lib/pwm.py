@@ -31,10 +31,15 @@ import canid
 import pwmcode
 
 dimdelay_ms = 25
-#dimdelay_ms = 10
+dimdelay_ms = 10
 
-# PWM freq defines the overall frequency of the device in Hz. 100 Hz is a good number
-pwm_freq = 100
+# PWM freq defines the overall frequency of the device in Hz.
+# 100 Hz is a good no-flicker number, but dimming is not as smooth as it could be
+# the PWM needs some time to settle (change only at end of cycle?), higher frequency allows
+# for higher change rates when setting the PWM, e.g. smoother dimming.
+# 200 Hz has nicer dimming.
+# pwm_freq = 100
+pwm_freq = 200
 
 def _float_to_raw(value):
     return max(0, min(1023, int(value*1023)))
@@ -156,38 +161,19 @@ class PWM:
         """Set next dimlevel. Return True when more steps are needed"""
         # try smooth dimming
         self.ival = self.pwm.duty()
-        ds = (2*self.ival) // 5
+        # Picking the correct step size is key for smooth dimming
+        ds = (2*self.ival) // 7
         #ds = min(50, max(5, ds))
-        ds = min(150, max(10, ds))
+        #ds = min(150, max(5, ds)) # about 350 ms when min step is 5
+        ds = min(150, max(10, ds)) # about 200 ms when min step is 10
         remaining_counts = self.dimtovalue - self.ival
         if abs(remaining_counts) <= ds:
+            # Accepting the PWM value takes a while, probably until the end of the phase.
+            # So in the order of a few milliseconds (up to 10 with 100 Hz pwm frequency)
+            # However, simply setting is OK, it will come there sooner or later.
             self.seti(self.dimtovalue)
             self.dimtovalue = -1
             return False
-            # Accepting the PWM value takes a while. If waiting with utime.sleep_us(1000)
-            # you can easily reach 10 loops (sometimes 2 or 3 or so)
-#            self.seti_no_can_message(self.dimtovalue)
-#            #if board.DEBUG:
-#            #    print('{} last step {} is {}'.format(self, self.dimtovalue, self.ival))
-#            # wait for PWM to settle
-#            maxcount = 10
-#            while maxcount >= 0 and self.pwm.duty() != self.dimtovalue:
-#                utime.sleep_us(1000) # wait for PWM to settle
-#                maxcount -= 1
-#                if maxcount < 0:
-#                    print("Did not reach PWM value")
-#                else:
-#                    print("Reached PWM after {} steps".format(10-maxcount))
-#
-#
-#            if True or self.pwm.duty() == self.dimtovalue:
-#                # accept value and send message to CAN
-#                # print('dimming finished')
-#                self.seti(self.dimtovalue)
-#                self.dimtovalue = -1 # stop dimming
-#                #board.good_time_for_gc()
-#                return False
-#            return True
         if remaining_counts > 0:
             self.seti_no_can_message(self.ival + ds)
         else:
@@ -290,9 +276,19 @@ class List(PWM):
 
 
 async def _next_dim_step_task():
-    isdimming = False
+    #isdimming = False
     #dimsteps = 0
     #starttime = 0
+
+    # since we have just set the PWM we can tell how long it will take until the next value
+    # will be accepted
+
+    # could use some 10% margin here but there is also the python runtime
+    # And if we are slightly faster than the PWM it shouldn't hurt. Worst case
+    # we would skip one setting around the end of the dimming process
+    # dimdelay = max(1, 1100 // pwm_freq)
+
+    dimdelay_when_dimming = max(1, 1000 // pwm_freq)
     while True:
         #if isdimming:
         #    if dimsteps == 0:
@@ -305,15 +301,37 @@ async def _next_dim_step_task():
                 p.run_next_dimstep()
         # ask other async tasks to delay their execution to ensure smooth and uniterrupted dimming
         board.PWM_IS_DIMMING = isdimming
+
         #if not isdimming and dimsteps > 1:
         #    # finished dimming
         #    print("finished dimming with {} steps in {} ms".format(dimsteps, utime.ticks_diff(utime.ticks_ms(), starttime)))
         #    print("sleep time should have been {} ms".format(max(1, dimdelay_ms // 5)))
         #    dimsteps = 0
+
+        # NOTE: numbers below are strongly depending on the (min/max) stepsize chosen in
+        # run_next_dimstep() -> there is the real lever for smooth dimming.
+        #
+        # Calling this faster than about 1ms does not help since the PWM needs some time to settle
+        # Using 200Hz PWM frequency:
+        #  delay of     0 us -> about 150 steps in about 140 ms
+        #  delay of   500 us -> about  90 steps in about 140 ms
+        #  delay of  1000 us -> about  65 steps in about 140 ms
+        #
+        # Using 100Hz PWM frequency:
+        #  delay of  1000 us -> about 130 steps in about 270 ms
+
+        # If control is given back to the scheduler with 2ms sleep time
+        # then dimming takes about 160 ms with about 25 steps. But still looks smooth
+
+        # If control is given back to the scheduler with 1ms sleep time
+        # then dimming takes about 160 ms with about 30 steps. But still looks smooth
+
+        # don't yield to other tasks while we are dimming.
+        # OK since dimming takes less than 200 ms
         #if isdimming:
-        #    #utime.sleep_us(500)
+        #    utime.sleep_ms(dimdelay_when_dimming)
         #    continue
-        await asyncio.sleep_ms(max(1, dimdelay_ms // 5) if isdimming else dimdelay_ms)
+        await asyncio.sleep_ms(dimdelay_when_dimming if isdimming else dimdelay_ms)
 
 board.BACKGROUND_RUNNERS.append(_next_dim_step_task())
 
