@@ -15,6 +15,9 @@ board.LOCATION = 'test'
 board.DEBUG = True
 board.CANID = 0x120
 
+if board.DEBUG is True:
+    print("This is test/pwm, location {}, CANID {:03x}".format(board.LOCATION, board.CANID))
+
 
 if board.DEBUG is True:
     import net

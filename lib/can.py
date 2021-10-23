@@ -241,7 +241,7 @@ async def _poll_CAN():
         board.CAN.poll()
         if not board.CAN.any():
             board.good_time_for_gc()
-        await asyncio.sleep_ms(1)
+        await asyncio.sleep_ms(board.CANPOLLTIME_MS)
 
 board.BACKGROUND_RUNNERS.append(_poll_CAN())
 
@@ -266,7 +266,7 @@ async def _ping_job():
             _send_ping()
         if board.MQTT is not None:
             board.MQTT.publish('info/uptime/{}'.format(board.LOCATION), str(board.uptime_s()))
-        await asyncio.sleep(2 if board.DEBUG else 120)
+        await asyncio.sleep(board.PINGTIME)
 
 board.BACKGROUND_RUNNERS.append(_ping_job())
 
@@ -307,7 +307,7 @@ board.run_gc = run_gc
 async def _memstat_jop():
     while True:
         _send_memstat()
-        await asyncio.sleep(2 if board.DEBUG else 120)
+        await asyncio.sleep(board.MEMSTATTIME)
 
 board.BACKGROUND_RUNNERS.append(_memstat_jop())
 

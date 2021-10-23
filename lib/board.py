@@ -18,6 +18,11 @@ DEBUG = False
 # CANID of the application. Set in main.py
 CANID = None
 
+
+PINGTIME = 300
+MEMSTATTIME = 300
+CANPOLLTIME_MS = 5
+
 def PRINT(formatstring, *args):
     if not DEBUG:
         return
@@ -101,6 +106,7 @@ PWMs = None
 # external functions (like dimming) can temporarily disable sensor accquisition (looks nicer)
 PWM_IS_DIMMING = False
 
+# BACKGROUND_RUNNERS is a list of all tasks that run (indefinitely) as independent async task
 BACKGROUND_RUNNERS = []
 
 last_boot_s = utime.time()
