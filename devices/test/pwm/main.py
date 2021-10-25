@@ -11,13 +11,12 @@ Test module for
 # pylint: disable=unused-import, multiple-statements
 
 import board
-board.LOCATION = 'test'
+board.LOCATION = 'testpwm'
 board.DEBUG = True
 board.CANID = 0x120
 
 if board.DEBUG is True:
-    print("This is test/pwm, location {}, CANID {:03x}".format(board.LOCATION, board.CANID))
-
+    print("This is {}, CANID {:03x}".format(board.LOCATION, 0 if board.CANID is None else board.CANID))
 
 if board.DEBUG is True:
     import net
@@ -32,7 +31,6 @@ import sensors
 import pwm
 import button
 import uasyncio as asyncio
-
 
 p1 = pwm.PWM(1, bconf.AUX1_YELLOW)
 p2 = pwm.PWM(2, bconf.AUX1_WHITE)
@@ -72,7 +70,6 @@ b2.pwm = p2
 can.subscribe(can_callback)
 
 print('CAN initialized, dummy callback installed')
-
 
 dht = sensors.DHT(20, bconf.AUX2_YELLOW, poll_intervall_in_ms=5000 if board.DEBUG else sensors.minutes(2))
 

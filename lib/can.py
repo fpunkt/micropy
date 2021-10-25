@@ -13,6 +13,7 @@ import canerror
 import net
 import utime
 import uasyncio as asyncio
+import fsmqtt
 
 
 class Message:
@@ -111,14 +112,16 @@ class CAN:
         # self, canid=None, rx=13, tx=12, baudrate=125, mode=machine.CAN.NORMAL
         # bus = CAN(0, mode=CAN.NORMAL, baudrate=125, rx_io=13, tx_io=12)
         # c = machine.CAN(0, mode=machine.CAN.NORMAL, baudrate=125, rx_io=13, tx_io=12)
-        self._can = machine.CAN(0, mode=mode, baudrate=baudrate, rx_io=rx, tx_io=tx, rx_queue=10, tx_queue=8)
+        self._can = None
         self._callback = None
         self._subscribed_to = None
         #self._cbrunner = self._run_callback
         self.canid = cid
         self.canid_bytes = [cid >> 8, cid & 0xff]
-        board.CAN = self
-        self.send_poweron()
+        if hasattr(machine, 'CAN'):
+            self._can = machine.CAN(0, mode=mode, baudrate=baudrate, rx_io=rx, tx_io=tx, rx_queue=10, tx_queue=8)
+            board.CAN = self
+            self.send_poweron()
         # subscribe to standard commands so we can still switch on/off WLAN in case booting fails for whatever reason
         # self.can.callback(self._cbrunner)
 
@@ -235,7 +238,7 @@ def errormessage(payload):
 async def _poll_CAN():
     # CAN initialized ?
     while board.CAN is None:
-        await asyncio.sleep_ms(500)
+        await asyncio.sleep_ms(5000)
 
     while True:
         board.CAN.poll()
@@ -265,7 +268,7 @@ async def _ping_job():
         if board.CAN is not None:
             _send_ping()
         if board.MQTT is not None:
-            board.MQTT.publish('info/uptime/{}'.format(board.LOCATION), str(board.uptime_s()))
+            fsmqtt.publish('info/uptime/'+fsmqtt.options.name, board.uptime_hms())
         await asyncio.sleep(board.PINGTIME)
 
 board.BACKGROUND_RUNNERS.append(_ping_job())
@@ -274,17 +277,20 @@ _memstat_message = Message(canid.MEMORY_STATUS, [board.CANID >> 8, board.CANID &
 _gc_counter = 0
 
 def _send_memstat():
-    b = _memstat_message.payload
-    # b[0] = _memstat_message.canid >> 8
-    # b[1] = _memstat_message.canid & 0xff
     free = gc.mem_free()     # pylint: disable=no-member
-    b[2] = (_gc_counter >>  8) & 0xff
-    b[3] = _gc_counter & 0xff
-    b[4] = (free >> 24) & 0xff
-    b[5] = (free >> 16) & 0xff
-    b[6] = (free >>  8) & 0xff
-    b[7] = free & 0xff
-    _memstat_message.send()
+    if board.CAN:
+        b = _memstat_message.payload
+        # b[0] = _memstat_message.canid >> 8
+        # b[1] = _memstat_message.canid & 0xff
+        b[2] = (_gc_counter >>  8) & 0xff
+        b[3] = _gc_counter & 0xff
+        b[4] = (free >> 24) & 0xff
+        b[5] = (free >> 16) & 0xff
+        b[6] = (free >>  8) & 0xff
+        b[7] = free & 0xff
+        _memstat_message.send()
+    if board.MQTT:
+        fsmqtt.publish('info/gc/{}'.format(board.LOCATION), '{{"n": {}, "bytes": {}}}'.format(_gc_counter, free))
 
 
 def run_gc():
@@ -304,12 +310,12 @@ def run_gc():
 
 board.run_gc = run_gc
 
-async def _memstat_jop():
+async def _memstat_reporter_task():
     while True:
         _send_memstat()
         await asyncio.sleep(board.MEMSTATTIME)
 
-board.BACKGROUND_RUNNERS.append(_memstat_jop())
+board.BACKGROUND_RUNNERS.append(_memstat_reporter_task())
 
 
 ### Common config commands

@@ -106,6 +106,9 @@ PWMs = None
 # external functions (like dimming) can temporarily disable sensor accquisition (looks nicer)
 PWM_IS_DIMMING = False
 
+# modules can register STARTUP_FUNCTIONS that are called at the beginning of the run loop
+STARTUP_FUNCTIONS = []
+
 # BACKGROUND_RUNNERS is a list of all tasks that run (indefinitely) as independent async task
 BACKGROUND_RUNNERS = []
 
@@ -114,6 +117,11 @@ last_boot_s = utime.time()
 def uptime_s():
     """Return time since last (soft) boot in seconds"""
     return utime.time() - last_boot_s
+
+def uptime_hms():
+    h, ms = divmod(uptime_s(), 3600)
+    m, s = divmod(ms, 60)
+    return '{:03d}:{:02d}:{:02d}'.format(h, m, s)
 
 # Location of the board, overwritten by main.py. Used e.g. by MQTT to construct the message
 LOCATION = "unknown"
@@ -154,6 +162,8 @@ async def arun():
             sys.print_exception(e) # pylint: disable=no-member
 
 def run():
+    for f in STARTUP_FUNCTIONS:
+        f()
     # run GC once to supress memory messages after startup (because gc will be triggered after initialization ...)
     gc.collect()
     asyncio.run(arun())

@@ -29,6 +29,7 @@ import board
 import can
 import canid
 import pwmcode
+import fsmqtt
 
 dimdelay_ms = 25
 dimdelay_ms = 10
@@ -76,6 +77,7 @@ class PWM:
         self.seti_no_can_message(0) # power off
         self.dimtovalue = 0
         # self.button = None
+        self.mqttstate = None # cache to avoid gc
 
         # allocate message once to avoid garbage collection
         self.msg = can.Message(canid.PWM_VALUE, [0, 0, 0, 0, 0, 0, 0])
@@ -148,6 +150,14 @@ class PWM:
         payload[5] = i16 >> 8
         payload[6] = i16 & 0xff
         self.msg.send()
+        if board.MQTT:
+            if self.mqttstate is None:
+                self.mqttstate = 'light/{}/{}/status'.format(fsmqtt.options.name, self.id)
+            if i1 == 0:
+                payload = '{"state": "OFF"}'
+            else:
+                payload = '{{"state": "ON", "brightness": {}}}'.format(i16 >>8)
+            fsmqtt.publish(self.mqttstate, payload)
 
     def setf(self, value):
         """Set values from 0..1"""
@@ -212,6 +222,34 @@ class PWM:
         self.off()
         return False
 
+    def mqtt_callback(self, _, msg):
+        try:
+            value = int(msg)
+            self.dimi16(((value & 0xff) << 8) | value)
+            return
+        except:
+            pass
+        # print('PWM {} got called by MQTT: {}'.format(self.id, msg))
+        if msg == b'{"state": "OFF"}':
+            self.dimi(0)
+            return
+        if msg == b'{"state": "ON"}':
+            self.on()
+            return
+        # {"state": "ON", "brightness": 97}
+        l = len(msg) - 1
+        if l < 5:
+            print('Bad MQTT message {}'.format(msg))
+            return
+        # search for blank
+        while l > 0 and msg[l] != ord(' ') and msg[l] != ord(':'):
+            l -= 1
+        print('PWM callback got value "{}"'.format(msg[l:-1]))
+        value = int(msg[l:-1])
+        print('Setting PWM {} to {}'.format(self.id, value))
+        self.dimi16(((value & 0xff) << 8) | value)
+        return
+
 
 class List(PWM):
     def __init__(self, pwmid, *args):
@@ -273,6 +311,10 @@ class List(PWM):
         if self.toggle_mode:
             return self.toggle_on()
         return self.toggle_off()
+
+    def mqtt_callback(self, topic, msg):
+        for p in self.pwms:
+            p.mqtt_callback(topic, msg)
 
 
 async def _next_dim_step_task():
@@ -361,3 +403,12 @@ can.register(pwmcode.SET_INTENSITY, 4, 4, lambda msg: _getpwm(msg).dimi16(msg.u1
 can.register(pwmcode.ON, 2, 2, lambda msg: _getpwm(msg).on())
 can.register(pwmcode.OFF, 2, 2, lambda msg: _getpwm(msg).off())
 can.register(pwmcode.TOGGLE, 2, 2, lambda msg: _getpwm(msg).toggle())
+
+def _setup_mqtt_callbacks():
+    if not board.MQTT:
+        return
+    for p in board.PWMs.pwms:
+        # ha/light/led_mg_buero_dimm_spotwand/set
+        fsmqtt.subscribe('light/{}/{}/set'.format(board.LOCATION, p.id), p.mqtt_callback)
+
+board.STARTUP_FUNCTIONS.append(_setup_mqtt_callbacks)

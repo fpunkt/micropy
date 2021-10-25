@@ -20,6 +20,7 @@ import board
 import can
 import canid
 import uasyncio as asyncio
+import fsmqtt
 
 if 0 == 1:
     # make pylint think that it knows about 'const' variable
@@ -69,6 +70,7 @@ class Sensor:
         self.pin = pin
         self.poll_intervall_in_ms = poll_intervall_in_ms
         self.is_fast = False # can interrupt PWM dimming
+        self._mqtt_state_topic = None
         board.SENSORSs.register(sensorid, self)
         if background_task is None:
             background_task = self.sensor_task()
@@ -84,8 +86,23 @@ class Sensor:
     def proclaim(self): # pylint: disable=no-self-use
         return None
 
+    def mqtt_setup_and_proclaim(self, topic):
+        """setup mqtt state and proclaim on MQTT"""
+        if board.MQTT:
+            s = '{}/{}/{}/'.format(topic, board.LOCATION, self.sensorid)
+            self._mqtt_state_topic = s + 'state'
+            fsmqtt.publish(s + "status", "ON")
+
     def run(self): # pylint: disable=no-self-use
         return None
+
+    # def mqtttopic(self, topic, state):
+    #     return '{}/{}/{}/{}'.format(topic, board.LOCATION, self.sensorid, state)
+#
+    # def mqttstate(self, topic):
+    #     if board.MQTT and self._mqtt_state_topic is None:
+    #         self._mqtt_state_topic = self.mqtttopic(topic, "state")
+    #     return self._mqtt_state_topic
 
     async def sensor_task(self):
         self.proclaim()
@@ -112,8 +129,8 @@ class DHT(Sensor):
         self.msg.setsender(self.sensorid)
 
     def proclaim(self):
-        if board.MQTT:
-            board.MQTT.publish_sensor_status("TempHum", self.sensorid, "ON")
+        super().proclaim()
+        self.mqtt_setup_and_proclaim("TempHum")
 
     async def dht_task(self):
         asyncio.run(self.sensor_task())
@@ -139,8 +156,10 @@ class DHT(Sensor):
             self.msg.send()
 
         if board.MQTT:
-            board.MQTT.publish_sensor_state("TempHum", self.sensorid,
-                '{{"temperature": {:.1f}, "humidity": {:.1f}}}'.format(t/10.0, h/10.0))
+            # avoid floating point
+            h1, h2 = divmod(h, 10)
+            t1, t2 = divmod(t, 10)
+            fsmqtt.publish(self._mqtt_state_topic, '{{"temperature": {}.{:d}, "humidity": {}.{:d}}}'.format(t1, t2, h1, h2))
 
 
 class Brightness(Sensor):
@@ -152,6 +171,11 @@ class Brightness(Sensor):
         self.last_read = 0
         self.last_read_pwm_off = 0
         self.msg = can.makemessage(canid.DATALOGGER_BRIGHTNESS_SENSOR_8, 5)
+
+    def proclaim(self):
+        super().proclaim()
+        self.mqtt_setup_and_proclaim("brightness")
+
 
     def read(self):
         self.last_read = 0xff - (self.adc.read() >> 1) # 8 bit
@@ -168,5 +192,4 @@ class Brightness(Sensor):
             self.msg.send()
 
         if board.MQTT is not None:
-            board.MQTT.publish_sensor_state("bright", self.sensorid,
-                '{{"brightess": {}, "dark": {}}}'.format(self.last_read, self.last_read_pwm_off))
+            fsmqtt.publish(self._mqtt_state_topic, '{{"brightess": {}, "dark": {}}}'.format(self.last_read, self.last_read_pwm_off))
