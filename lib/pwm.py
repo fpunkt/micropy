@@ -64,6 +64,9 @@ class PWM:
         if pin is not None:
             self.pwm = machine.PWM(machine.Pin(pin))
         board.SENSORSs.register(pwmid, self)
+        if board.PWMs is not None:
+            # is still None for ALL pwm list
+            board.PWMs.append(self)
         if pin is None:
             return
 
@@ -82,7 +85,6 @@ class PWM:
         # allocate message once to avoid garbage collection
         self.msg = can.Message(canid.PWM_VALUE, [0, 0, 0, 0, 0, 0, 0])
         self.msg.setsender(self.id)
-        board.PWMs.append(self)
 
     def __repr__(self):
         return '<PWM {}.{}>'.format(self.id, self.pwm)
@@ -230,10 +232,11 @@ class PWM:
         except:
             pass
         # print('PWM {} got called by MQTT: {}'.format(self.id, msg))
-        if msg == b'{"state": "OFF"}':
+        msg = msg.upper()
+        if msg == b'{"STATE": "OFF"}' or msg == b'OFF':
             self.dimi(0)
             return
-        if msg == b'{"state": "ON"}':
+        if msg == b'{"STATE": "ON"}' or msg == b'ON':
             self.on()
             return
         # {"state": "ON", "brightness": 97}
@@ -256,6 +259,7 @@ class List(PWM):
         super().__init__(pwmid, None)
         self.pwms = list(args)
         self.toggle_mode = 0
+        self.dimtovalue = -99
 
     def __repr__(self):
         return '<pwm.List with {} entries>'.format(len(self.pwms))
