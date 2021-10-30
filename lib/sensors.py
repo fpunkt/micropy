@@ -20,7 +20,10 @@ import board
 import can
 import canid
 import uasyncio as asyncio
-import fsmqtt
+try:
+    import fsmqtt
+except:
+    fsmqtt = None
 
 if 0 == 1:
     # make pylint think that it knows about 'const' variable
@@ -191,5 +194,5 @@ class Brightness(Sensor):
             payload[4] = self.last_read_pwm_off
             self.msg.send()
 
-        if board.MQTT is not None:
+        if board.MQTT:
             fsmqtt.publish(self._mqtt_state_topic, '{{"brightess": {}, "dark": {}}}'.format(self.last_read, self.last_read_pwm_off))

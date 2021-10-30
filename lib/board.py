@@ -28,6 +28,7 @@ def PRINT(formatstring, *args):
         return
     print(formatstring.format(*args))
 
+
 class Led:
     """On/Off LED"""
     def __init__(self, pin):

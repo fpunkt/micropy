@@ -30,7 +30,9 @@ import machine
 import network
 import webrepl
 
-import board
+LED = None # filled in later, avoid import of board.py (easier bootstep on 1M boards)
+
+# import board
 
 # ap = network.WLAN(network.AP_IF)
 # print(ap.ifconfig())
@@ -39,6 +41,7 @@ import board
 # print('network activated: ', x)
 
 def start_wlan():
+    stop_hotspot()
     wlan = network.WLAN(network.STA_IF) # create station interface
     if wlan.isconnected():
         cfg = wlan.ifconfig()
@@ -60,7 +63,8 @@ def start_wlan():
         print('ERROR: cannot connect to WLAN.')
         return None
     cfg = wlan.ifconfig()
-    board.LED.on()
+    if LED:
+        LED.on()
     print("Connected to ", cfg)
     return cfg
 
@@ -71,8 +75,13 @@ def start_hotspot():
     ap.config(max_clients=3) # set how many clients can connect to the network
     ap.active(True)         # activate the interface
     time.sleep(1)
-    board.LED.on()
+    if LED:
+        LED.on()
     return serial
+
+def stop_hotspot():
+    ap = network.WLAN(network.AP_IF) # create access-point interface
+    ap.active(False)
 
 def stop_wlan():
     try:
@@ -81,7 +90,8 @@ def stop_wlan():
         pass
     network.WLAN().disconnect()
     network.WLAN().active(False)
-    board.LED.off()
+    if LED:
+        LED.off()
 
 def start_repl(password='x'):
     webrepl.start(password=password)

@@ -29,7 +29,11 @@ import board
 import can
 import canid
 import pwmcode
-import fsmqtt
+try:
+    import fsmqtt
+except: #pylint: disable=bare-except
+    fsmqtt = None
+
 
 dimdelay_ms = 25
 dimdelay_ms = 10
@@ -152,7 +156,7 @@ class PWM:
         payload[5] = i16 >> 8
         payload[6] = i16 & 0xff
         self.msg.send()
-        if board.MQTT:
+        if fsmqtt and board.MQTT:
             if self.mqttstate is None:
                 self.mqttstate = 'light/{}/{}/status'.format(fsmqtt.options.name, self.id)
             if i1 == 0:
@@ -410,6 +414,8 @@ can.register(pwmcode.TOGGLE, 2, 2, lambda msg: _getpwm(msg).toggle())
 
 def _setup_mqtt_callbacks():
     if not board.MQTT:
+        return
+    if not fsmqtt:
         return
     for p in board.PWMs.pwms:
         # ha/light/led_mg_buero_dimm_spotwand/set

@@ -2,6 +2,6 @@ webrepl/__pycache__
 run.py
 .lastsync
 .espip
-
+*.mpy
 *.pyc
 __pycache__

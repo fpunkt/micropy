@@ -46,10 +46,22 @@ for f in $files; do
         echo "# ignoring secrets"
         continue
     fi
-    echo "# $f"
-    $bindir/../webrepl/webrepl_cli.py -p x $f $ip: >/dev/null
+    if [ $f = "main.py" ]; then
+        compiled=$f
+    else
+        mpy-cross $f
+        #compiled=`basename $f .py`.mpy
+        compiled=`echo $f| sed s/py$/mpy/`
+    fi
+    #echo $compiled
+    if [ ! -f $compiled ]; then
+        echo "# WARNING: cannot compile $f"
+        compiled=$f
+    fi
+    echo "# $compiled"
+    $bindir/../webrepl/webrepl_cli.py -p x $compiled $ip: >/dev/null
     if [ $? -ne 0 ]; then
-        echo "ERROR transfering $f"
+        echo "ERROR transfering $compiled"
         exit 1
     fi
 #    let "count++"

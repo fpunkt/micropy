@@ -78,6 +78,9 @@ def _mqtt_callback(topic, message):
 
 async def _mqtt_poller_task():
     while True:
+        if not board.MQTT:
+            await asyncio.sleep_ms(1000)
+            continue
         msg = board.MQTT.check_msg()
         if msg is not None:
             print('Poller got message: M={}'.format(msg))

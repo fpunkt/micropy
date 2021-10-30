@@ -89,7 +89,7 @@ def makemessage(cid, size, sensorid=None):
         m.setsender(sensorid)
     return m
 
-Badmessage = Message(0x777, [1, 2, 3, 4])
+#Badmessage = Message(0x777, [1, 2, 3, 4])
 
 
 # dict of list(minargs, maxargs, callback)
