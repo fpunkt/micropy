@@ -38,6 +38,7 @@ echo "# syncing $nfiles files to $ip"
 # echo $files
 
 for f in $files; do
+    # echo "# file: $f"
     if [ "$f" = "./secrets.py" ]; then
         echo "# ignoring secrets"
         continue
@@ -46,7 +47,7 @@ for f in $files; do
         echo "# ignoring secrets"
         continue
     fi
-    if [ $f = "main.py" ]; then
+    if [ `basename $f` = "main.py" ]; then
         compiled=$f
     else
         mpy-cross $f
