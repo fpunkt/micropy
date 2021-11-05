@@ -7,17 +7,27 @@ Loaded modules and defined devices add to global variables in this module
 # pylint: disable=import-error, too-few-public-methods, missing-function-docstring
 
 import gc
+import sys
 import machine
 import utime
 import uasyncio as asyncio
 
-# If DEBUG is set, additinoal messages will be printed
+# If DEBUG is set, additinoal messages will be printed. Set in main.py
 DEBUG = False
+
+# CANID of the application. Set in main.py
+CANID = None
+
+
+PINGTIME = 300
+MEMSTATTIME = 300
+CANPOLLTIME_MS = 5
 
 def PRINT(formatstring, *args):
     if not DEBUG:
         return
     print(formatstring.format(*args))
+
 
 class Led:
     """On/Off LED"""
@@ -97,6 +107,10 @@ PWMs = None
 # external functions (like dimming) can temporarily disable sensor accquisition (looks nicer)
 PWM_IS_DIMMING = False
 
+# modules can register STARTUP_FUNCTIONS that are called at the beginning of the run loop
+STARTUP_FUNCTIONS = []
+
+# BACKGROUND_RUNNERS is a list of all tasks that run (indefinitely) as independent async task
 BACKGROUND_RUNNERS = []
 
 last_boot_s = utime.time()
@@ -104,6 +118,11 @@ last_boot_s = utime.time()
 def uptime_s():
     """Return time since last (soft) boot in seconds"""
     return utime.time() - last_boot_s
+
+def uptime_hms():
+    h, ms = divmod(uptime_s(), 3600)
+    m, s = divmod(ms, 60)
+    return '{:03d}:{:02d}:{:02d}'.format(h, m, s)
 
 # Location of the board, overwritten by main.py. Used e.g. by MQTT to construct the message
 LOCATION = "unknown"
@@ -122,20 +141,12 @@ MQTT = None
 # the global watchdog
 WD = None
 
+run_gc = None
 
 def good_time_for_gc():
     # pylint: disable=no-member
-    free = gc.mem_free()
-    if free > 12000:
-        return
-    if not DEBUG:
-        gc.collect()
-
-    start = utime.ticks_ms()
-    gc.collect()
-    newfree = gc.mem_free()
-    print('GC collected {} bytes in {} ms, free={}'.format(
-        newfree-free, utime.ticks_diff(utime.ticks_ms(), start), newfree))
+    if run_gc and gc.mem_free() < 6000:
+        run_gc() # pylint: disable=not-callable
 
 # Run async processes
 
@@ -143,10 +154,17 @@ async def arun():
     try:
         await asyncio.gather(*BACKGROUND_RUNNERS)
     except asyncio.TimeoutError:
-        print('asyncIO timeout!')
+        if DEBUG:
+            print('asyncIO timeout!')
     except Exception as e: # pylint: disable=broad-except
-        print('**** ERROR in runner')
-        print(e)
+        if DEBUG:
+            print('**** ERROR in runner')
+            print(e)
+            sys.print_exception(e) # pylint: disable=no-member
 
 def run():
+    for f in STARTUP_FUNCTIONS:
+        f()
+    # run GC once to supress memory messages after startup (because gc will be triggered after initialization ...)
+    gc.collect()
     asyncio.run(arun())

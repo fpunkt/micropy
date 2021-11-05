@@ -8,7 +8,7 @@ if 0 == 1:
     # make pylint think that it knows about 'const' variable
     const = lambda x: x
 
-
+import board
 import can
 
 AUX1_YELLOW = const(13)
@@ -33,5 +33,5 @@ ML10_PWM_7 = const(19)
 ML10_PWM_8 = const(21)
 
 
-def CAN(canid):
-    return can.CAN(canid, rx=35, tx=32)
+if board.CANID is not None:
+    can.CAN(board.CANID, rx=35, tx=32)

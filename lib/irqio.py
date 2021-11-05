@@ -16,6 +16,8 @@ import sensors
 class IRQIO(sensors.Sensor):
     def __init__(self, sensorid, pinid, trigger=None, pullup=True):
         super().__init__(self, sensorid, pinid, poll_intervall_in_ms=10)
+        # typically buttons or motions sensors have very short running handlers
+        self.is_fast = True
         if trigger is None:
             trigger = machine.Pin.IRQ_RISING | machine.Pin.IRQ_FALLING
         elif trigger == 'rise':

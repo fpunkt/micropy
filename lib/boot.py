@@ -9,6 +9,7 @@
 
 # disable the interrupt catcher
 import machine
+
 #machine.CAN(0xff)
 
 #import esp

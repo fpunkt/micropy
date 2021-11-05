@@ -10,20 +10,23 @@ case "$OSTYPE" in
   *)        echo "unknown: $OSTYPE" ;;
 esac
 
-usb=`ls -1 $lookfor`
+serial=`ls -1 $lookfor`
 
-nusb=`echo $usb |wc -l`
+nusb=`echo $serial |wc -l`
 
 if [ 1 -ne $nusb ]; then
     echo "** ERROR: cannot find USB device in $lookfor"
     exit 1
 fi
 
-echo "# Using $usb"
+echo "# Using $serial"
 
-echo "############ Consider using FLTerm"
-echo "# tty.usbserial-22310"
-echo "#  115200,n,8,1"
+upload()
+{
+    echo "# uploading $1"
+    ampy -p $serial put $1
+}
 
-echo screen $usb 115200
-# tio --baudrate 115200  $usb
+for f in $*; do
+    upload $f
+done

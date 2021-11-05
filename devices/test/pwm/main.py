@@ -6,35 +6,35 @@ Test module for
 
 """
 
-# pylint: disable=import-error
+# pylint: disable=import-error, wrong-import-order
 # pylint: disable=missing-docstring
 # pylint: disable=unused-import, multiple-statements
 
-# start CAN first, otherwise bus is in undefined state
-
-# import time; print('Loading boot, giving time to abort (initializing network) ....'); time.sleep(2)
-import net; net.start_wlan(); net.start_repl()
-
-# import time; print('Loading main, giving time to abort ....'); time.sleep(2)
-
-import can
-import bconf
-c = bconf.CAN(0x100)
-
 import board
-
-board.LOCATION = 'test'
+board.LOCATION = 'testpwm'
 board.DEBUG = True
+board.CANID = 0x120
 
+if board.DEBUG is True:
+    print("This is {}, CANID {:03x}".format(board.LOCATION, 0 if board.CANID is None else board.CANID))
+
+if board.DEBUG is True:
+    import net
+    net.start_wlan()
+    net.start_repl()
+
+import gc
+import bconf
+import can
 import machine
 import sensors
 import pwm
 import button
 import uasyncio as asyncio
 
-
 p1 = pwm.PWM(1, bconf.AUX1_YELLOW)
 p2 = pwm.PWM(2, bconf.AUX1_WHITE)
+pl = pwm.List(0x20, p1, p2)
 
 p = p1
 
@@ -58,7 +58,8 @@ def can_callback(msg):
     msg.unknown_command()
 
 def button_callback(button): # pylint: disable=redefined-outer-name
-    print('Button pressed: {}'.format(button))
+    if board.DEBUG:
+        print('Button pressed: {}'.format(button))
 
 b1.callback = button_callback
 b1.pwm = p1
@@ -70,9 +71,7 @@ can.subscribe(can_callback)
 
 print('CAN initialized, dummy callback installed')
 
-
-dht = sensors.DHT(20, bconf.AUX2_YELLOW, poll_intervall_in_ms=5000)
-
+dht = sensors.DHT(20, bconf.AUX2_YELLOW, poll_intervall_in_ms=5000 if board.DEBUG else sensors.minutes(2))
 
 def r():
     board.run()

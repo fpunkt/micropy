@@ -2,7 +2,10 @@
 
 
 import pwm
-import utime
+import board
+import uasyncio as asyncio
+import machine
+
 
 if 0 == 1:
     # make pylint think that it knows about 'const' variable
@@ -17,19 +20,38 @@ ACCELLERATING = const(3)
 LEFT = const(1)
 RIGHT = const(2)
 
-DEFAULT_ACCELLERATION_DELAY_MS = 2
-DEFAULT_ACCELLERATION_INCREMENT = 10
-DEFAULT_STOP_INCREMENT = 50
+_motors = []
 
 class Motor:
-    def __init__(self, pid, pin1, pin2) -> None:
+    # pylint: disable=too-many-instance-attributes
+    def __init__(self, pid, pin1, pin2, sensorpin) -> None:
         self.currentspeed = 0
+        self.targetspeed = 0
+        self.position = 0
         self.status = 0
         self.m1 = pwm.PWM(pid, pin1)
         self.m2 = pwm.PWM(pid+1, pin2)
+        self.m1.disable_dimming()
+        self.m2.disable_dimming()
+        # motor will be one of m1 or m2, depending the direction. That is then the output
+        # where the PWM will change the speed (the other one is pulled low)
         self.motor = None
         self.fullstop()
         self.set_freq(10000)
+
+        self._sensorpin = None
+        self.sensorcount = 0
+
+        if sensorpin is not None:
+            self._sensorpin = machine.Pin(sensorpin, machine.Pin.IN, machine.Pin.PULL_UP)
+            self._sensorpin.irq(trigger=machine.Pin.IRQ_RISING, handler=self._sensor_irq_handler)
+
+        _motors.append(self)
+
+    def _sensor_irq_handler(self, _):
+        # note: in practice this always remains a short integer number so we don't have to do
+        # special casting here
+        self.sensorcount += 1
 
     def fullstop(self) -> None:
         self.m1.seti_no_can_message(0)
@@ -37,6 +59,7 @@ class Motor:
         self.status = STOPPED
         self.motor = None
         self.currentspeed = 0
+        self.targetspeed = 0
         self.m1.wait_until_set()
         self.m2.wait_until_set()
 
@@ -49,34 +72,37 @@ class Motor:
             return self.m1
         return self.m2
 
-    def _set(self, speed) -> None:
-        # print("{:4d} {}".format(speed, self.motor))
+    def setspeed(self, speed) -> None:
+        """Set speed of current motor immediately. Motor must already be set (choose direction) """
         self.currentspeed = speed
-        self.motor.seti_no_can_message(self.currentspeed)
+        self.motor.seti_no_can_message(speed)
+        if speed == 0:
+            self.fullstop()
 
-    def _change(self, tospeed, steps, delay_ms=DEFAULT_ACCELLERATION_DELAY_MS) -> None:
-        ds = int((tospeed - self.currentspeed) / steps)
-        # print("to={:4d}, steps={:4d}, stepsize={:4d} {}".format(tospeed, steps, ds, self.motor))
-        while steps > 1:
-            self._set(self.currentspeed + ds)
-            steps -= 1
-            utime.sleep_ms(delay_ms)
-        self._set(tospeed)
-        # make sure we are there
-        self.motor.wait_until_set()
-        if tospeed == 0:
-            self.status = STOPPED
-            self.motor = None
+    def next_speedup_step_or_monitor(self) -> None:
+        """Helper function for smooth accelleration. Called in the background every x millisecond"""
+        if not self.motor:
+            return
+        ds = self.targetspeed - self.currentspeed
+        if ds == 0:
+            # moving a target speed. Monitor motionsensor
+            return
+        minstep = max(1, self.currentspeed // 10)
+        if ds > 0:
+            diff = min(ds, minstep)
+        else:
+            diff = -min(-ds, minstep)
+        # print('ds={:6d} min={:4d} tar={:4d} cur={:4d} diff={:4d}'.format(
+        #     ds, minstep, self.targetspeed, self.currentspeed, diff))
+        self.setspeed(self.currentspeed + diff)
 
-    def change(self, tospeed):
-        steps = max(1, abs(int((tospeed - self.currentspeed) / DEFAULT_ACCELLERATION_INCREMENT)))
-        self._change(tospeed, steps)
+    def smooth_change_speed(self, tospeed):
+        """Change speed of motor (but keep direction). Speed is smoothly updated in the background"""
+        self.targetspeed = tospeed
 
     def stop(self) -> None:
         if self.status != STOPPED:
-            steps = max(1, abs(int(self.currentspeed / DEFAULT_STOP_INCREMENT)))
-            self._change(0, steps)
-        self.fullstop()
+            self.setspeed(0)
 
     def setspeedanddirection(self, direction, speed=True) -> None:
         if speed is True:
@@ -91,12 +117,20 @@ class Motor:
             self.status = MOVING_LEFT
         else:
             self.status = MOVING_RIGHT
-        self.change(speed)
+        self.smooth_change_speed(speed)
 
     def speed(self, s):
         if s == 0:
-            self.change(0) # a softer stop if we change direction
+            self.smooth_change_speed(0) # a softer stop if we change direction
         elif s > 0:
             self.setspeedanddirection(LEFT, s)
         else:
             self.setspeedanddirection(RIGHT, -s)
+
+async def _motor_accellerator():
+    while True:
+        for m in _motors:
+            m.next_speedup_step_or_monitor()
+        await asyncio.sleep_ms(10)
+
+board.BACKGROUND_RUNNERS.append(_motor_accellerator())

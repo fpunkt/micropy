@@ -26,6 +26,10 @@ import sensors
 # import utime
 import board
 import button
+<<<<<<< HEAD
+import schedule
+=======
+>>>>>>> master
 import motionsensor
 
 board.DEBUG = True
@@ -122,9 +126,16 @@ def can_callback(msg):
 can.subscribe(can_callback)
 
 def r():
+<<<<<<< HEAD
+    schedule.run()
+
+s = schedule.schedule_list
+r()
+=======
     board.run()
 
 if 1 == 1: # pylint: disable=comparison-with-itself
     r()
 else:
     print('# run r() to start event handler')
+>>>>>>> master
