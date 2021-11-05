@@ -10,4 +10,5 @@ fi
 alias sync=$mp/bin/sync.sh
 alias ampyput=$mp/bin/ampyput.sh
 
+PS1="(mpy) \u\$ "
 echo "# Aliases set up"
