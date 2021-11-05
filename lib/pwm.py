@@ -143,19 +143,20 @@ class PWM:
         self.seti(_i16_to_raw(i16))
 
     def send_status_to_can(self):
-        # self.msg.setsender(self.id)
         i1 = self.ival
-        payload = self.msg.payload
-        # self.msg[0] = board.CAN.canid >> 8
-        # self.msg[1] = board.CAN.canid & 0xff
-        payload[3] = i1 >> 8
-        payload[4] = i1 & 0xff
         i16 = i1 << 6
-        if i1 == 1023:
-            i16 = 0xffff
-        payload[5] = i16 >> 8
-        payload[6] = i16 & 0xff
-        self.msg.send()
+        if board.CAN:
+            # self.msg.setsender(self.id)
+            payload = self.msg.payload
+            # self.msg[0] = board.CAN.canid >> 8
+            # self.msg[1] = board.CAN.canid & 0xff
+            payload[3] = i1 >> 8
+            payload[4] = i1 & 0xff
+            if i1 == 1023:
+                i16 = 0xffff
+            payload[5] = i16 >> 8
+            payload[6] = i16 & 0xff
+            self.msg.send()
         if fsmqtt and board.MQTT:
             if self.mqttstate is None:
                 self.mqttstate = 'light/{}/{}/status'.format(fsmqtt.options.name, self.id)
@@ -231,6 +232,8 @@ class PWM:
     def mqtt_callback(self, _, msg):
         try:
             value = int(msg)
+            if value > 255:
+                value = 255
             self.dimi16(((value & 0xff) << 8) | value)
             return
         except:
@@ -325,7 +328,15 @@ class List(PWM):
             p.mqtt_callback(topic, msg)
 
 
+board.PWMs = List(0xff) # Create a (dynamic) list that includes ALL PWMs
+
+
 async def _next_dim_step_task():
+    # set all dimto values to current values, otherwise we can't initialize PWM values for poweron
+    for p in board.PWMs.pwms:
+        if p.dimtovalue >= 0:
+            p.dimtovalue = p.ival
+
     #isdimming = False
     #dimsteps = 0
     #starttime = 0
@@ -385,7 +396,6 @@ async def _next_dim_step_task():
 
 board.BACKGROUND_RUNNERS.append(_next_dim_step_task())
 
-board.PWMs = List(0xff) # Create a (dynamic) list that includes ALL PWMs
 
 ### Handle PWM callbacks
 
