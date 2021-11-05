@@ -34,6 +34,7 @@ import button
 print('# loading asyncio')
 import uasyncio as asyncio
 print('# loading fsmqtt')
+import fsmqtt
 
 import machine
 
@@ -47,11 +48,19 @@ print("mem: ", gc.mem_free())
 gc.collect()
 print("mem: ", gc.mem_free())
 
+#p1 = pwm.PWM(1, 14)
+#p2 = pwm.PWM(2, 12)
+#pl = pwm.List(0x20, p1, p2)
+#
+#p = p1
+
 p1 = pwm.PWM(1, 14)
 p2 = pwm.PWM(2, 12)
-pl = pwm.List(0x20, p1, p2)
+p3 = pwm.PWM(3, 13)
 
-p = p1
+p1.seti(1023)
+p2.seti(1023)
+p3.seti(1023)
 
 
 if False: # some buttons for debugging
