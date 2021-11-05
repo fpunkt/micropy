@@ -69,6 +69,7 @@ class CAN:
         pass
 
 board.CAN = CAN()
+board.CAN = None
 
 Badmessage = Message(0x777, [1, 2, 3, 4])
 
