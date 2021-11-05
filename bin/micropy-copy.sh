@@ -4,6 +4,8 @@
 
 ipfile=".espip"
 
+bindir=`dirname $0`
+
 if [ ! -f "$ipfile" ]; then
     echo "ERROR: You don't have a '$ipfile' file."
     echo "Create one containing     192.168.178.XX    as single line and try again"
@@ -17,7 +19,7 @@ for f in $*; do
         echo "FILE NOT FOUND ERROR: $f"
         continue
     fi
-    webrepl_cli.py -p x $f $ip: >/dev/null
+    $bindir/../webrepl/webrepl_cli.py -p x $f $ip: >/dev/null
     if [ $? -ne 0 ]; then
         echo "ERROR transfering $f"
         exit 1

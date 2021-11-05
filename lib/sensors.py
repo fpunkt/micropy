@@ -20,12 +20,21 @@ import board
 import can
 import canid
 import uasyncio as asyncio
+try:
+    import fsmqtt
+except:
+    fsmqtt = None
 
 if 0 == 1:
     # make pylint think that it knows about 'const' variable
     const = lambda x: x
 
+def minutes(n):
+    """Convert to milliseconds"""
+    return int(n*60000)
+
 poll_1_minute = const(1 * 60 * 1000)
+poll_2_minutes = const(2 * 60 * 1000)
 poll_5_minutes = const(5 * 60 * 1000)
 
 default_poll_time = const(poll_5_minutes)
@@ -42,7 +51,7 @@ class WDT:
             print('\033[38;5;226mStaring watchdog, {:.1f} seconds\033[0m'.format(self.repeat_ms/1000.0))
         self.wdt = machine.WDT(timeout=2*self.repeat_ms)
 
-    async def arun(self):
+    async def watchdog_task(self):
         while True:
             if self.wdt:
                 self.wdt.feed()
@@ -53,18 +62,22 @@ class WDT:
             self.wdt.feed()
 
 board.WD = WDT()
-board.BACKGROUND_RUNNERS.append(board.WD.arun())
+board.BACKGROUND_RUNNERS.append(board.WD.watchdog_task())
 
 
 class Sensor:
-    def __init__(self, name, sensorid, pin, poll_intervall_in_ms) -> None:
+    def __init__(self, name, sensorid, pin, poll_intervall_in_ms, background_task=None) -> None:
         # pylint: disable=redefined-outer-name
         self.name = name
         self.sensorid = sensorid
         self.pin = pin
         self.poll_intervall_in_ms = poll_intervall_in_ms
+        self.is_fast = False # can interrupt PWM dimming
+        self._mqtt_state_topic = None
         board.SENSORSs.register(sensorid, self)
-        board.BACKGROUND_RUNNERS.append(self.arun())
+        if background_task is None:
+            background_task = self.sensor_task()
+        board.BACKGROUND_RUNNERS.append(background_task)
 
     def __repr__(self) -> str:
         if isinstance(self.sensorid, int):
@@ -76,36 +89,54 @@ class Sensor:
     def proclaim(self): # pylint: disable=no-self-use
         return None
 
+    def mqtt_setup_and_proclaim(self, topic):
+        """setup mqtt state and proclaim on MQTT"""
+        if board.MQTT:
+            s = '{}/{}/{}/'.format(topic, board.LOCATION, self.sensorid)
+            self._mqtt_state_topic = s + 'state'
+            fsmqtt.publish(s + "status", "ON")
+
     def run(self): # pylint: disable=no-self-use
         return None
 
-    async def arun(self):
+    # def mqtttopic(self, topic, state):
+    #     return '{}/{}/{}/{}'.format(topic, board.LOCATION, self.sensorid, state)
+#
+    # def mqttstate(self, topic):
+    #     if board.MQTT and self._mqtt_state_topic is None:
+    #         self._mqtt_state_topic = self.mqtttopic(topic, "state")
+    #     return self._mqtt_state_topic
+
+    async def sensor_task(self):
         self.proclaim()
         while True:
             nextrun_in_ms = self.poll_intervall_in_ms
-            try:
-                if board.PWM_IS_DIMMING:
-                    # minor delay in order to have smooth dimming
-                    nextrun_in_ms = 2
-                else:
+            if board.PWM_IS_DIMMING and not self.is_fast:
+                # minor delay in order to have smooth dimming. Used for slow sensors
+                nextrun_in_ms = 2
+            else:
+                try:
                     self.run()
-            except Exception as e: # pylint: disable=bare-except, broad-except
-                if board.DEBUG:
-                    print('Exception from {}: {}'.format(self, e))
+                except Exception as e: # pylint: disable=bare-except, broad-except
+                    if board.DEBUG:
+                        print('Exception from {}: {}'.format(self, e))
             await asyncio.sleep_ms(nextrun_in_ms)
 
 
 class DHT(Sensor):
     """Temperature sensor"""
     def __init__(self, sensorid, pin, poll_intervall_in_ms=poll_5_minutes):
-        super().__init__('DHT', sensorid, pin, poll_intervall_in_ms)
+        super().__init__('DHT', sensorid, pin, poll_intervall_in_ms, self.dht_task())
         self.dht = dht.DHT22(machine.Pin(pin))
         self.msg = can.makemessage(canid.DATALOGGER_AM2302, 7)
         self.msg.setsender(self.sensorid)
 
     def proclaim(self):
-        if board.MQTT:
-            board.MQTT.publish_sensor_status("TempHum", self.sensorid, "ON")
+        super().proclaim()
+        self.mqtt_setup_and_proclaim("TempHum")
+
+    async def dht_task(self):
+        asyncio.run(self.sensor_task())
 
     def run(self):
         # self.msg.setsender(self.sensorid)
@@ -128,8 +159,10 @@ class DHT(Sensor):
             self.msg.send()
 
         if board.MQTT:
-            board.MQTT.publish_sensor_state("TempHum", self.sensorid,
-                '{{"temperature": {:.1f}, "humidity": {:.1f}}}'.format(t/10.0, h/10.0))
+            # avoid floating point
+            h1, h2 = divmod(h, 10)
+            t1, t2 = divmod(t, 10)
+            fsmqtt.publish(self._mqtt_state_topic, '{{"temperature": {}.{:d}, "humidity": {}.{:d}}}'.format(t1, t2, h1, h2))
 
 
 class Brightness(Sensor):
@@ -141,6 +174,11 @@ class Brightness(Sensor):
         self.last_read = 0
         self.last_read_pwm_off = 0
         self.msg = can.makemessage(canid.DATALOGGER_BRIGHTNESS_SENSOR_8, 5)
+
+    def proclaim(self):
+        super().proclaim()
+        self.mqtt_setup_and_proclaim("brightness")
+
 
     def read(self):
         self.last_read = 0xff - (self.adc.read() >> 1) # 8 bit
@@ -156,6 +194,5 @@ class Brightness(Sensor):
             payload[4] = self.last_read_pwm_off
             self.msg.send()
 
-        if board.MQTT is not None:
-            board.MQTT.publish_sensor_state("bright", self.sensorid,
-                '{{"brightess": {}, "dark": {}}}'.format(self.last_read, self.last_read_pwm_off))
+        if board.MQTT:
+            fsmqtt.publish(self._mqtt_state_topic, '{{"brightess": {}, "dark": {}}}'.format(self.last_read, self.last_read_pwm_off))

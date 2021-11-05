@@ -22,6 +22,10 @@ import board
 import pwm
 import sensors
 import button
+<<<<<<< HEAD
+import schedule
+=======
+>>>>>>> master
 
 board.DEBUG = True
 
@@ -54,6 +58,14 @@ can.subscribe(can_callback)
 
 # Uncomment line below to enable the watchdog
 # wd = sensors.WDT()
+<<<<<<< HEAD
+
+def r():
+    schedule.run()
+
+s = schedule.schedule_list
+# r()
+=======
 def r():
     board.run()
 
@@ -61,3 +73,4 @@ if 1 == 1: # pylint: disable=comparison-with-itself
     r()
 else:
     print('# run r() to start event handler')
+>>>>>>> master

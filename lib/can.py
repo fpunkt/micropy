@@ -11,12 +11,13 @@ import canconf
 import board
 import canerror
 import net
+import utime
 import uasyncio as asyncio
+import fsmqtt
 
 
 class Message:
     """A CAN message"""
-    # pylint: disable=too-few-public-methods
     def __init__(self, cid, payload):
         self.canid = cid
         self.payload = payload
@@ -88,7 +89,7 @@ def makemessage(cid, size, sensorid=None):
         m.setsender(sensorid)
     return m
 
-Badmessage = Message(0x777, [1, 2, 3, 4])
+#Badmessage = Message(0x777, [1, 2, 3, 4])
 
 
 # dict of list(minargs, maxargs, callback)
@@ -102,7 +103,7 @@ def register(commandbyte, minargs, maxargs, callback):
 
 
 # cached message to avoid mallocs
-_message = Message(0, [])
+_message = Message(0, bytearray([0, 1, 2, 3, 4, 5, 6, 7]))
 
 class CAN:
     """Wrapper for machine.CAN, providing (some kind of) interrupt and callback"""
@@ -111,14 +112,16 @@ class CAN:
         # self, canid=None, rx=13, tx=12, baudrate=125, mode=machine.CAN.NORMAL
         # bus = CAN(0, mode=CAN.NORMAL, baudrate=125, rx_io=13, tx_io=12)
         # c = machine.CAN(0, mode=machine.CAN.NORMAL, baudrate=125, rx_io=13, tx_io=12)
-        self._can = machine.CAN(0, mode=mode, baudrate=baudrate, rx_io=rx, tx_io=tx, rx_queue=10, tx_queue=8)
+        self._can = None
         self._callback = None
         self._subscribed_to = None
         #self._cbrunner = self._run_callback
         self.canid = cid
         self.canid_bytes = [cid >> 8, cid & 0xff]
-        board.CAN = self
-        self.send_poweron()
+        if hasattr(machine, 'CAN'):
+            self._can = machine.CAN(0, mode=mode, baudrate=baudrate, rx_io=rx, tx_io=tx, rx_queue=10, tx_queue=8)
+            board.CAN = self
+            self.send_poweron()
         # subscribe to standard commands so we can still switch on/off WLAN in case booting fails for whatever reason
         # self.can.callback(self._cbrunner)
 
@@ -167,7 +170,7 @@ class CAN:
     def any(self):
         return self._can.any()
 
-    def read(self):
+    def read(self) -> Message:
         """Read next message from the bus"""
         packet = self._can.recv()
         return Message(packet[0], packet[3])
@@ -207,20 +210,6 @@ class CAN:
         """Send a WLAN connected packet with IP."""
         self.send(canid.WLAN_CONNECTED, [self.canid >>8, self.canid & 0xff, ip[0], ip[1], ip[2], ip[3]])
 
-    def send_ping(self):
-        """Send a ping message"""
-        # Hack ... this should be a member of class CAN, we treat self like this
-        uptime = board.uptime_s()
-        # use pre-allocated message to avoid garbage collection
-        b = _pingmessage.payload
-        b[0] = self.canid >> 8
-        b[1] = self.canid & 0xff
-        b[2] = (uptime >> 24) & 0xff
-        b[3] = (uptime >> 16) & 0xff
-        b[4] = (uptime >>  8) & 0xff
-        b[5] = (uptime >>  0) & 0xff
-        _pingmessage.send()
-
     def _identify(self, packetid):
         if self.canid is not None:
             serial = machine.unique_id()
@@ -232,7 +221,7 @@ class CAN:
                     serial[-2], serial[-1]]) # CPU serial
 
 # allocate once
-_pingmessage = Message(canid.PING_MESSAGE, [0, 0, 0, 0, 0, 0])
+_pingmessage = Message(canid.PING_MESSAGE, [board.CANID >> 8, board.CANID & 0xff, 0, 0, 0, 0])
 Badmessage = Message(0x777, [1, 2, 3, 4])
 
 # cache message, only update payload. OK since with asyncio the will be no raceing
@@ -249,41 +238,84 @@ def errormessage(payload):
 async def _poll_CAN():
     # CAN initialized ?
     while board.CAN is None:
-        await asyncio.sleep_ms(500)
+        await asyncio.sleep_ms(5000)
 
     while True:
         board.CAN.poll()
-        await asyncio.sleep_ms(1)
+        if not board.CAN.any():
+            board.good_time_for_gc()
+        await asyncio.sleep_ms(board.CANPOLLTIME_MS)
 
 board.BACKGROUND_RUNNERS.append(_poll_CAN())
+
+def _send_ping():
+    """Send a ping message"""
+    # Hack ... this should be a member of class CAN, we treat self like this
+    uptime = board.uptime_s()
+    # use pre-allocated message to avoid garbage collection
+    b = _pingmessage.payload
+    # b[0] = self.canid >> 8
+    # b[1] = self.canid & 0xff
+    b[2] = (uptime >> 24) & 0xff
+    b[3] = (uptime >> 16) & 0xff
+    b[4] = (uptime >>  8) & 0xff
+    b[5] = (uptime >>  0) & 0xff
+    _pingmessage.send()
 
 
 async def _ping_job():
     while True:
         if board.CAN is not None:
-            board.CAN.send_ping()
+            _send_ping()
         if board.MQTT is not None:
-            board.MQTT.publish('info/uptime/{}'.format(board.LOCATION), str(board.uptime_s()))
-        await asyncio.sleep(2)
+            fsmqtt.publish('info/uptime/'+fsmqtt.options.name, board.uptime_hms())
+        await asyncio.sleep(board.PINGTIME)
 
 board.BACKGROUND_RUNNERS.append(_ping_job())
 
-_memstat_message = Message(0x765, [0, 0, 0, 0])
-def _send_memstat():
-    b = _memstat_message.payload
-    b[0] = _memstat_message.canid >> 8
-    b[1] = _memstat_message.canid & 0xff
-    free = gc.mem_free()     # pylint: disable=no-member
-    b[2] = free >> 8
-    b[3] = free & 0xff
-    _memstat_message.send()
+_memstat_message = Message(canid.MEMORY_STATUS, [board.CANID >> 8, board.CANID & 0xff, 0, 0, 0, 0, 0, 0])
+_gc_counter = 0
 
-async def _memstat_jop():
+def _send_memstat():
+    free = gc.mem_free()     # pylint: disable=no-member
+    if board.CAN:
+        b = _memstat_message.payload
+        # b[0] = _memstat_message.canid >> 8
+        # b[1] = _memstat_message.canid & 0xff
+        b[2] = (_gc_counter >>  8) & 0xff
+        b[3] = _gc_counter & 0xff
+        b[4] = (free >> 24) & 0xff
+        b[5] = (free >> 16) & 0xff
+        b[6] = (free >>  8) & 0xff
+        b[7] = free & 0xff
+        _memstat_message.send()
+    if board.MQTT:
+        fsmqtt.publish('info/gc/{}'.format(board.LOCATION), '{{"n": {}, "bytes": {}}}'.format(_gc_counter, free))
+
+
+def run_gc():
+    global _gc_counter # pylint: disable=global-statement
+    _send_memstat()
+    _gc_counter += 1
+    if not board.DEBUG:
+        gc.collect()
+    else:
+        free = gc.mem_free() # pylint: disable=no-member
+        start = utime.ticks_ms()
+        gc.collect()
+        newfree = gc.mem_free() # pylint: disable=no-member
+        print('GC collected {} bytes in {} ms, free={}'.format(
+            newfree-free, utime.ticks_diff(utime.ticks_ms(), start), newfree))
+    _send_memstat()
+
+board.run_gc = run_gc
+
+async def _memstat_reporter_task():
     while True:
         _send_memstat()
-        await asyncio.sleep(2)
+        await asyncio.sleep(board.MEMSTATTIME)
 
-board.BACKGROUND_RUNNERS.append(_memstat_jop())
+board.BACKGROUND_RUNNERS.append(_memstat_reporter_task())
 
 
 ### Common config commands
@@ -306,12 +338,14 @@ def _connect(ip):
 register(canconf.WLAN_CONNECT, 1, 1, lambda _: _connect(net.start_wlan()))
 register(canconf.WLAN_HOTSPOT, 1, 1, lambda _: _connect(net.start_hotspot()))
 register(canconf.WLAN_STOP, 1, 1, lambda _: net.stop_wlan())
-register(canconf.SEND_PING, 1, 1, lambda _: board.CAN.send_ping())
+register(canconf.SEND_PING, 1, 1, lambda _: _send_ping())
 register(canconf.SOFT_RESET, 1, 1, lambda _: machine.soft_reset())
 register(canconf.HARD_RESET, 1, 1, lambda _: machine.reset())
 register(canconf.INDENTIFY, 1, 1, lambda _: board.CAN.identify())
 register(canconf.WEBREPL_START, 1, 1, lambda _: net.start_repl())
 register(canconf.WEBREPL_STOP, 1, 1, lambda _: net.stop_repl())
+register(canconf.SEND_FREEMEM, 1, 1, lambda _: _send_memstat())
+register(canconf.ENABLE_WATCHDOG, 1, 1, lambda _: board.WD.enable())
 
 ### Provide convenient access to global CAN instance (stored in board.CAN)
 
