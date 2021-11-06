@@ -18,9 +18,16 @@ if sys.platform != 'linux':
 import usocket as socket
 
 
+import net
+net.start_wlan()
+net.start_repl() # need for copy
+
 addr_info = socket.getaddrinfo("192.168.178.4", 14711)
 addr = addr_info[0][-1]
-print('connecting to {}.{}.{}.{}'.format(addr[4], addr[5], addr[6], addr[7]))
+if sys.platform == 'linux':
+    print('# connecting to {}.{}.{}.{}'.format(addr[4], addr[5], addr[6], addr[7]))
+else:
+    print('# connecting to {}:{}'.format(addr[0], addr[1]))
 s = socket.socket()
 s.connect(addr)
 

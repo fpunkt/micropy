@@ -6,6 +6,9 @@
         //"./mupystubs",
         //"./mupystubs",
     ],
+    "files.exclude": {
+        "**/*.mpy": true
+    },
     //"python.analysis.diagnosticSeverityOverrides": {
     //    "reportMissingImports": "none"
     //}

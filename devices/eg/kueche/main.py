@@ -35,7 +35,7 @@ import uasyncio as asyncio
 import motionsensor
 
 
-can.CAN(board.CANID, rx=35, tx=32)
+can.CAN.init(board.CANID, rx=35, tx=32)
 
 if 0 == 1:
     # make pylint think that it knows about 'const' variable

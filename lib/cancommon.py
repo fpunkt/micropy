@@ -1,0 +1,270 @@
+import board
+import canid
+import canerror
+import canconf
+import uasyncio as asyncio
+import gc
+import machine
+import net
+import utime
+
+class Message:
+    """A CAN message"""
+    def __init__(self, cid, payload):
+        self.canid = cid
+        self.payload = payload
+
+    def payloadstring(self):
+        return ' '.join('{:02x}'.format(x) for x in self.payload)
+        # return _payloadstring(self.payload)
+
+    def __repr__(self):
+        return '<Message #{:03x} [{}] {}>'.format(self.canid, len(self.payload), self.payloadstring())
+
+    def setsender(self, senderid):
+        """Fill canid and senderid"""
+        if board.CAN is None:
+            return
+        self.payload[0] = board.CANID >> 8
+        self.payload[1] = board.CANID & 0xff
+        self.payload[2] = senderid
+
+    def send(self):
+        """Send message"""
+        if board.CAN is None:
+            return
+        board.CAN.write(self.canid, self.payload)
+
+    def u16(self, pos):
+        return (self.payload[pos] << 8) + self.payload[pos+1]
+
+    def bad_number_of_args(self, min, max=None):
+        p = self.payload
+        if len(p) < 1:
+            errormessage([canerror.INTERNAL_ERROR, 0xa0])
+            return
+        # fmt.Sprintf("Bad number of parameters for command #%02x: got %d expected %d .. %d", d[0], d[1], d[2], d[3])
+        if max is None:
+            max = min
+        errormessage([canerror.BAD_NUMBER_OF_PARAMETERS, p[0], len(p), min, max])
+
+    # "Command #%02x: bad value for paramenter %d, found %d expected, %d .. %d", d0, d1, d2, d3, d4)
+    def bad_parameter_value(self, n, min, max):
+        p = self.payload
+        pn = 0
+        if n >= len(p):
+            if board.DEBUG:
+                print('want param {} for {}'.format(n, self))
+            errormessage([canerror.INTERNAL_ERROR, 0xa1])
+        else:
+            pn = p[n]
+        errormessage([canerror.BAD_PARAMETER_VALUE, p[0], n, pn, min, max])
+
+    def bad_sensor_id(self):
+        self.bad_parameter_value(1, 0xff, 0xff)
+
+    def bad_sensor_type(self, expected):
+        self.bad_parameter_value(1, 0xff, 0)
+
+    def unknown_command(self):
+        c = 0
+        if len(self.payload) > 0:
+            c = self.payload[0]
+        errormessage([canerror.CAN_UNKNOWN_COMMAND, c])
+
+
+def makemessage(cid, size, sensorid=None):
+    m = Message(cid, [0]*size)
+    if sensorid is not None:
+        m.setsender(sensorid)
+    return m
+
+
+# cached message to avoid mallocs
+static_incomming_message = Message(0, bytearray([0, 1, 2, 3, 4, 5, 6, 7]))
+Badmessage = Message(0x777, [1, 2, 3, 4])
+
+
+
+# cache message, only update payload. OK since with asyncio the will be no raceing
+_errormessage = Message(canid.ERROR_MESSAGE, [])
+
+def errormessage(payload):
+    if board.CAN is None:
+        return
+    _errormessage.payload = board.CAN.canid_bytes + payload
+    _errormessage.send()
+
+
+
+
+# Ping
+_pingmessage = Message(canid.PING_MESSAGE, [board.CANID >> 8, board.CANID & 0xff, 0, 0, 0, 0])
+
+def _send_ping():
+    """Send a ping message"""
+    # Hack ... this should be a member of class CAN, we treat self like this
+    uptime = board.uptime_s()
+    # use pre-allocated message to avoid garbage collection
+    b = _pingmessage.payload
+    # b[0] = self.canid >> 8
+    # b[1] = self.canid & 0xff
+    b[2] = (uptime >> 24) & 0xff
+    b[3] = (uptime >> 16) & 0xff
+    b[4] = (uptime >>  8) & 0xff
+    b[5] = (uptime >>  0) & 0xff
+    _pingmessage.send()
+
+async def _ping_job():
+    while True:
+        if board.CAN is not None:
+            _send_ping()
+        await asyncio.sleep(board.PINGTIME)
+
+board.BACKGROUND_RUNNERS.append(_ping_job())
+
+
+_memstat_message = Message(canid.MEMORY_STATUS, [board.CANID >> 8, board.CANID & 0xff, 0, 0, 0, 0, 0, 0])
+_gc_counter = 0
+
+def _send_memstat():
+    free = gc.mem_free()     # pylint: disable=no-member
+    if board.CAN:
+        b = _memstat_message.payload
+        # b[0] = _memstat_message.canid >> 8
+        # b[1] = _memstat_message.canid & 0xff
+        b[2] = (_gc_counter >>  8) & 0xff
+        b[3] = _gc_counter & 0xff
+        b[4] = (free >> 24) & 0xff
+        b[5] = (free >> 16) & 0xff
+        b[6] = (free >>  8) & 0xff
+        b[7] = free & 0xff
+        _memstat_message.send()
+
+
+def send_poweron():
+    """Send a power-on message to the bus"""
+    _identify(canid.POWER_ON)
+
+def identify():
+    _identify(canid.IDENTIFY)
+
+def send_wlan_connected(ip):
+    """Send a WLAN connected packet with IP."""
+    if board.CAN:
+        board.CAN.write(canid.WLAN_CONNECTED, [board.CANID >>8, board.CANID & 0xff, ip[0], ip[1], ip[2], ip[3]])
+
+def _identify(packetid):
+    if board.CAN and board.CANID:
+        serial = machine.unique_id()
+        board.CAN.write(packetid, [board.CANID >>8, board.CANID & 0xff,
+                machine.reset_cause(), # startup reason
+                2, # HClib Version
+                12, # HW Type -- make this 12 for ESP32 ..
+                0xa0, # Application type and Version - make this the library version
+                serial[-2], serial[-1]]) # CPU serial
+
+
+def run_gc():
+    global _gc_counter # pylint: disable=global-statement
+    _send_memstat()
+    _gc_counter += 1
+    if not board.DEBUG:
+        gc.collect()
+    else:
+        free = gc.mem_free() # pylint: disable=no-member
+        start = utime.ticks_ms()
+        gc.collect()
+        newfree = gc.mem_free() # pylint: disable=no-member
+        print('GC collected {} bytes in {} ms, free={}'.format(
+            newfree-free, utime.ticks_diff(utime.ticks_ms(), start), newfree))
+    _send_memstat()
+
+board.run_gc = run_gc
+
+async def _memstat_reporter_task():
+    while True:
+        _send_memstat()
+        await asyncio.sleep(board.MEMSTATTIME)
+
+board.BACKGROUND_RUNNERS.append(_memstat_reporter_task())
+
+
+# Regiser CAN commands known by this device
+
+# dict of list(minargs, maxargs, callback)
+_handlers = dict()
+
+def register(commandbyte, minargs, maxargs, callback):
+    if _handlers.get(commandbyte, None) is not None:
+        raise RuntimeError('CAN callback for {} already defined'.format(commandbyte))
+
+    _handlers[commandbyte] = (minargs, maxargs, callback)
+
+### Common config commands
+
+# Basic configuration commands common to all applications are handled by this layer.
+#
+# Config commands (assuming CAN address 100)
+#
+# cansend 100#fd # START WLAN and repl
+# cansend 100#fe # STOP WLAN and repl
+#
+# cansend 200#fd # START WLAN and repl
+
+def _connect(ip):
+    board.LED.on()
+    ipx = list(map(int, ip[0].split('.')))
+    #print('ipx', ipx)
+    board.CAN.send_wlan_connected(ipx)
+
+register(canconf.WLAN_CONNECT, 1, 1, lambda _: _connect(net.start_wlan()))
+register(canconf.WLAN_HOTSPOT, 1, 1, lambda _: _connect(net.start_hotspot()))
+register(canconf.WLAN_STOP, 1, 1, lambda _: net.stop_wlan())
+register(canconf.SEND_PING, 1, 1, lambda _: _send_ping())
+register(canconf.SOFT_RESET, 1, 1, lambda _: machine.soft_reset())
+register(canconf.HARD_RESET, 1, 1, lambda _: machine.reset())
+register(canconf.INDENTIFY, 1, 1, lambda _: board.CAN.identify())
+register(canconf.WEBREPL_START, 1, 1, lambda _: net.start_repl())
+register(canconf.WEBREPL_STOP, 1, 1, lambda _: net.stop_repl())
+register(canconf.SEND_FREEMEM, 1, 1, lambda _: _send_memstat())
+register(canconf.ENABLE_WATCHDOG, 1, 1, lambda _: board.WD.enable())
+
+
+_callback = None
+_subscribed_to_canid = None
+
+def subscribe(callback, canid=None):
+    """Subscribe to packages on the CAN bus.
+    cid==True subscribes to all messages
+    cid==None subscribes to the own CAN ID
+    cid==id subscribes to messages with the given ID"""
+    global _callback, _subscribed_to_canid
+    _callback = callback
+    _subscribed_to_canid = canid
+
+
+def dispatch_incomming_message():
+    # check for installed handler for that message
+    payload = static_incomming_message.payload
+    if board.CANID == static_incomming_message.canid and len(payload) > 0:
+        handler = _handlers.get(payload[0], None)
+        if handler is not None:
+            minargs, maxargs, callback = handler
+            if len(payload) < minargs or len(payload) > maxargs:
+                if board.DEBUG:
+                    print('Bad number of args {}, expected {}..{}'.format(len(payload), minargs, maxargs))
+                static_incomming_message.bad_number_of_args(minargs, maxargs)
+            # run the callback
+            try:
+                callback(static_incomming_message)
+            except Exception as e: # pylint: disable=broad-except
+                if board.DEBUG:
+                    print('Callback raised error: {}'.format(e))
+            return True
+        if _callback is None:
+            return False
+        if _subscribed_to_canid is True or _subscribed_to_canid == board.CANID:
+            _callback(static_incomming_message)
+            return True
+    return False

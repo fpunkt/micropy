@@ -9,7 +9,6 @@ if 0 == 1:
     const = lambda x: x
 
 import board
-import can
 
 AUX1_YELLOW = const(13)
 AUX1_WHITE = const(12)
@@ -34,4 +33,7 @@ ML10_PWM_8 = const(21)
 
 
 if board.CANID is not None:
-    can.CAN(board.CANID, rx=35, tx=32)
+    import can
+    can.init(board.CANID, rx=35, tx=32)
+    board.CAN = can
+    can.cancommon.send_poweron()
