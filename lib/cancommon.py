@@ -92,7 +92,7 @@ _errormessage = Message(canid.ERROR_MESSAGE, [])
 def errormessage(payload):
     if board.CAN is None:
         return
-    _errormessage.payload = board.CAN.canid_bytes + payload
+    _errormessage.payload = [(board.CANID >> 8) & 0xff, (board.CANID >> 0) & 0xff] + payload
     _errormessage.send()
 
 
@@ -247,6 +247,7 @@ def subscribe(callback, canid=None):
 def dispatch_incomming_message():
     # check for installed handler for that message
     payload = static_incomming_message.payload
+    print('# Dispatching {:03x} for board {:03x}'.format(static_incomming_message.canid, board.CANID))
     if board.CANID == static_incomming_message.canid and len(payload) > 0:
         handler = _handlers.get(payload[0], None)
         if handler is not None:
