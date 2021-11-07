@@ -13,6 +13,7 @@ import net
 import utime
 import uasyncio as asyncio
 import cancommon
+import sys
 
 ### Provide convenient access to global CAN instance (stored in board.CAN)
 
@@ -30,11 +31,14 @@ def write(message):
 def init(*args):
     raise RuntimeError('CAN backend not loaded')
 
-
-if hasattr(machine, 'CAN'):
-    print('# loading ESP32 CAN')
+if sys.platform == 'esp32':
+    # print('# loading ESP32 CAN')
     import canesp32
     read = canesp32.read
     write = canesp32.write
     init = canesp32.init
 
+if sys.platform == 'esp8266':
+    import canoverlan
+    write = canoverlan.write
+    init = canoverlan.init
