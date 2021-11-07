@@ -1,1 +1,1 @@
-../../../lib/canstub.py
+../../../lib/can.py

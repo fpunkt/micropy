@@ -64,7 +64,7 @@ class RegisteredSensorIDs:
         """Find a registered sensor ID that is provided as 2nd value in the CAN payload.
         The sensor should have one of the classes in withclass (or None if you don't care).
         If the sensor is not found the function returns and raises an error on
-        CAN/mqtt bus.
+        CAN bus.
         The optional sensortype is used in the errormessage.
         """
         p = msg.payload
@@ -91,7 +91,7 @@ class RegisteredSensorIDs:
 
 # Provide global variables that allow functions to access all devices when they have
 # included board.py
-# This allows e.g. sensors to use serve MQTT and CAN even if one of these backends
+# This allows e.g. sensors to use serve CAN even if the backend
 # has not been initialized.
 
 # The on-chip LED
@@ -130,13 +130,6 @@ LOCATION = "unknown"
 # Global CAN device. Use board.CAN to access the CAN bus from everywhere.
 # The actual value is set when can.py is loaded/initialized
 CAN = None
-
-# class _dummyMqtt:
-#     def publish_sensor(self, sensortype, sensorid, payload):
-#         """publish a sensor message"""
-
-# MQTT connection, set by main.py if applicable
-MQTT = None
 
 # the global watchdog
 WD = None

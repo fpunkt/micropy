@@ -36,7 +36,7 @@ async def receiver():
     while True:
         try:
             res = await sreader.read(12)
-            canid = (res[0]<<16) | (res[1]<<8)|res[3]
+            canid = (res[0]<<16) | (res[1]<<8) | res[2]
             print('Got message ', canid)
         except:
             sys.exit(1)

@@ -33,16 +33,11 @@ print('# loading button')
 import button
 print('# loading asyncio')
 import uasyncio as asyncio
-print('# loading fsmqtt')
-import fsmqtt
 
-import machine
-
-from umqttsimple import MQTTClient
-mqttclient = MQTTClient(board.LOCATION, fsmqtt.secrets.mqtt_server)
-import fsmqtt
-fsmqtt.connect(mqttclient, board.LOCATION)
-
+import can
+board.CAN = can
+can.init()
+can.cancommon.send_poweron()
 
 print("mem: ", gc.mem_free())
 gc.collect()

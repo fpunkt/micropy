@@ -69,8 +69,6 @@ b2.pwm = p2
 
 can.subscribe(can_callback)
 
-print('CAN initialized, dummy callback installed')
-
 dht = sensors.DHT(20, bconf.AUX2_YELLOW, poll_intervall_in_ms=5000 if board.DEBUG else sensors.minutes(2))
 
 def r():
