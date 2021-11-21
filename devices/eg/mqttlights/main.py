@@ -1,5 +1,7 @@
 """
-MQTT client with some PWMs connected
+CAN over WLAN client with some PWMs connected
+
+
 """
 
 # pylint: disable=import-error, wrong-import-order
@@ -37,7 +39,6 @@ import uasyncio as asyncio
 import can
 board.CAN = can
 can.init()
-can.cancommon.send_poweron()
 
 print("mem: ", gc.mem_free())
 gc.collect()
@@ -56,6 +57,10 @@ p3 = pwm.PWM(3, 13)
 p1.seti(1023)
 p2.seti(1023)
 p3.seti(1023)
+
+t1 = sensors.DHT(0x30, 5, poll_intervall_in_ms=5000)
+t2 = sensors.DHT(0x31, 4, poll_intervall_in_ms=6000)
+
 
 
 if False: # some buttons for debugging

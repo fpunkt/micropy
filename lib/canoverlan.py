@@ -19,17 +19,26 @@ except:
 
 _sock = None
 
-def init(brokerip='192.168.178.4', port=14711):
+def init(brokerip=None, port=14711):
     global _sock
-    net.start_wlan()
+    cfg = net.start_wlan()
+    # ipx = list(map(int, cfg[0].split('.')))
+    if brokerip is None:
+        if cfg[0][0] == '10':
+            brokerip = '10.10.4.2'
+        else:
+            brokerip = '192.168.178.4'
+
     addr_info = socket.getaddrinfo(brokerip, port)
     addr = addr_info[0][-1]
     if sys.platform == 'linux':
         print('# connecting to {}.{}.{}.{}'.format(addr[4], addr[5], addr[6], addr[7]))
     else:
-        print('# connecting to {}:{}'.format(addr[0], addr[1]))
+        if board.DEBUG:
+            print('# connecting to {}:{}'.format(addr[0], addr[1]))
     _sock = socket.socket()
     _sock.connect(addr)
+    cancommon.send_poweron()
 
 async def can_receiver():
     while True:

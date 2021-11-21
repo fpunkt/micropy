@@ -22,14 +22,14 @@ subscribe = cancommon.subscribe
 Message = cancommon.Message
 makemessage = cancommon.makemessage
 
-def read():
-    raise RuntimeError('CAN backend not loaded')
-
-def write(message):
-    raise RuntimeError('CAN backend not loaded')
-
-def init(*args):
-    raise RuntimeError('CAN backend not loaded')
+# def read():
+#     raise RuntimeError('CAN backend not loaded')
+#
+# def write(message):
+#     raise RuntimeError('CAN backend not loaded')
+#
+# def init(*args):
+#     raise RuntimeError('CAN backend not loaded')
 
 if sys.platform == 'esp32':
     # print('# loading ESP32 CAN')

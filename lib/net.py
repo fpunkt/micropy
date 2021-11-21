@@ -25,10 +25,11 @@ import network
 
 import time
 
-import secrets
+# import secrets
 import machine
 import network
 import webrepl
+import c
 
 LED = None # filled in later, avoid import of board.py (easier bootstep on 1M boards)
 
@@ -40,7 +41,7 @@ LED = None # filled in later, avoid import of board.py (easier bootstep on 1M bo
 # x = ap.active(True)
 # print('network activated: ', x)
 
-def start_wlan():
+def start_wlan(base=32):
     stop_hotspot()
     wlan = network.WLAN(network.STA_IF) # create station interface
     if wlan.isconnected():
@@ -53,7 +54,8 @@ def start_wlan():
     wlan.scan()             # scan for access points
     time.sleep(1)
     # pylint: disable=no-member
-    wlan.connect(secrets.wlan_ssid, secrets.wlan_password) # connect to an AP
+    s, p = c.s(base)
+    wlan.connect(s, p) # connect to an AP
     for i in range(30):
         if wlan.isconnected():
             break      # check if the station is connected to an AP

@@ -218,6 +218,7 @@ def _connect(ip):
     #print('ipx', ipx)
     board.CAN.send_wlan_connected(ipx)
 
+# TODO: provide parameter to CONNECT to select network
 register(canconf.WLAN_CONNECT, 1, 1, lambda _: _connect(net.start_wlan()))
 register(canconf.WLAN_HOTSPOT, 1, 1, lambda _: _connect(net.start_hotspot()))
 register(canconf.WLAN_STOP, 1, 1, lambda _: net.stop_wlan())

@@ -15,6 +15,7 @@ def read() -> cancommon.Message:
 def init(self, rx=33, tx=32, baudrate=125, mode=machine.CAN.NORMAL):
     global _hw_interface
     _hw_interface = machine.CAN(0, mode=mode, baudrate=baudrate, rx_io=rx, tx_io=tx, rx_queue=10, tx_queue=8)
+    cancommon.send_poweron()
 
 
 def _send(cid, payload):

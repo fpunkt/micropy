@@ -75,38 +75,6 @@ func pad() {
 	}
 }
 
-//func addip(ip string) {
-//	log.Debug().Str("ip", ip).Msg("Adding IP")
-//	for _, section := range strings.Split(ip, ".") {
-//		i, err := strconv.Atoi(section)
-//		if err != nil {
-//			log.Fatal().Err(err).Str("ip", ip).Msg("Bad IP string")
-//		}
-//		addbyte(byte(i))
-//	}
-//}
-
-//func bytestring(bytes []byte) string {
-//	return string(bytes[:])
-//}
-
-//func isip(s string) bool {
-//	parts := strings.Split(s, ".")
-//	if len(parts) != 4 {
-//		return false
-//	}
-//	for _, p := range parts {
-//		i, err := strconv.Atoi(p)
-//		if err != nil {
-//			return false
-//		}
-//		if i < 0 || i > 255 {
-//			return false
-//		}
-//	}
-//	return true
-//}
-
 func main() {
 	pflag.CountVarP(&verbose, "verbose", "v", "verbose messages")
 	outputFile := pflag.StringP("output", "o", "", "Output file for generated python code")
@@ -162,7 +130,9 @@ func main() {
 			fd.WriteString(detab(mainCode))
 		}
 	}
-
+	for i := 0; i < currentPad-blockSize; i += blockSize {
+		fmt.Printf("# use     s(%d)\n", i)
+	}
 }
 
 const (
@@ -175,26 +145,16 @@ def _s(o):
 	while True:
         o += 1
         c = b[o] - b[(o)%ni+1]
-		print('# Getting @{:2d}: {:3d} -> {:3d} {:3d} {}'.format(o, b[o], c, c & 0xff, chr(c&0xff)))
+		#print('# Getting @{:2d}: {:3d} -> {:3d} {:3d} {}'.format(o, b[o], c, c & 0xff, chr(c&0xff)))
 		if c == 0:
 			return r, o-ni
 		r = r+chr(c&0xff)
 
 def s(n):
     a, b = _s(n)
-	print('#   GOT {} {}'.format(b, a))
+	#print('#   GOT {} {}'.format(b, a))
 	c, _ = _s(b)
 	return a, c
-
-def i(o):
-	o += ni
-	r = ''
-	for _ in range(4):
-		c = b[o+1] - b[o%ni+1]
-		o += 1
-		# print('# Getting @{:2d}: {:3d} -> {:3d} {:3d}'.format(o, b[o], c, c & 0xff))
-		r = r + str(c & 0xff) + "."
-	return r[:-1]
 `
 	mainCode = `
 if __name__ == '__main__':
