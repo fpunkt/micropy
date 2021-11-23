@@ -248,7 +248,7 @@ def subscribe(callback, canid=None):
 def dispatch_incomming_message():
     # check for installed handler for that message
     payload = static_incomming_message.payload
-    print('# Dispatching {:03x} for board {:03x}'.format(static_incomming_message.canid, board.CANID))
+    # print('# Dispatching {:03x} for board {:03x}'.format(static_incomming_message.canid, board.CANID))
     if board.CANID == static_incomming_message.canid and len(payload) > 0:
         handler = _handlers.get(payload[0], None)
         if handler is not None:

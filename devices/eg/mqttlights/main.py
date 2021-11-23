@@ -10,7 +10,7 @@ CAN over WLAN client with some PWMs connected
 
 import board
 board.LOCATION = 'eg/xmasvorne'
-board.DEBUG = True
+# board.DEBUG = True
 board.CANID = 0x140
 
 if board.DEBUG is True:
@@ -20,6 +20,11 @@ if board.DEBUG is True:
     import net
     net.LED = board.LED
     net.start_wlan()
+    net.start_repl()
+else:
+    import net
+    net.LED = board.LED
+    net.start_wlan(0)
     net.start_repl()
 
 import gc
@@ -58,8 +63,8 @@ p1.seti(1023)
 p2.seti(1023)
 p3.seti(1023)
 
-t1 = sensors.DHT(0x30, 5, poll_intervall_in_ms=5000)
-t2 = sensors.DHT(0x31, 4, poll_intervall_in_ms=6000)
+t1 = sensors.DHT(0x30, 5, poll_intervall_in_ms=5000 if board.DEBUG else None)
+t2 = sensors.DHT(0x31, 4, poll_intervall_in_ms=7000 if board.DEBUG else None)
 
 
 

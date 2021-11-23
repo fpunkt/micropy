@@ -46,11 +46,11 @@ async def can_receiver():
             await asyncio.sleep(2)
             continue
         try:
-            print('# CAN going to wait for message')
+            #print('# CAN going to wait for message')
             res = await asyncio.StreamReader(_sock).read(12)
             cancommon.static_incomming_message.canid = (res[0]<<8) | res[1]
             cancommon.static_incomming_message.payload = res[4:len(res)-4]
-            print('Got message {}'.format(cancommon.static_incomming_message))
+            #print('Got message {}'.format(cancommon.static_incomming_message))
             cancommon.dispatch_incomming_message()
         except:
             sys.exit(1)

@@ -159,9 +159,7 @@ def s(n):
 	mainCode = `
 if __name__ == '__main__':
     print('block is {} bytes'.format(len(b)))
-    #print(i(0))
     print(s(0))
-    #print(i(25))
     print(s(32))
 `
 )
