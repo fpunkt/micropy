@@ -67,7 +67,10 @@ class Sensor:
         self.name = name
         self.sensorid = sensorid
         self.pin = pin
+        if poll_intervall_in_ms is None:
+            poll_intervall_in_ms = poll_5_minutes
         self.poll_intervall_in_ms = poll_intervall_in_ms
+        # TODO: do we really need fast? Go and write your own async() if needed.
         self.is_fast = False # can interrupt PWM dimming
         board.SENSORSs.register(sensorid, self)
         if background_task is None:
@@ -106,7 +109,7 @@ class Sensor:
 class DHT(Sensor):
     """Temperature sensor"""
     def __init__(self, sensorid, pin, poll_intervall_in_ms=poll_5_minutes):
-        super().__init__('DHT', sensorid, pin, poll_intervall_in_ms, self.dht_task())
+        super().__init__('DHT', sensorid, pin, poll_intervall_in_ms)
         self.dht = dht.DHT22(machine.Pin(pin))
         self.msg = can.makemessage(canid.DATALOGGER_AM2302, 7)
         self.msg.setsender(self.sensorid)
@@ -114,10 +117,11 @@ class DHT(Sensor):
     def proclaim(self):
         super().proclaim()
 
-    async def dht_task(self):
-        asyncio.run(self.sensor_task())
+    #async def dht_task(self):
+    #    asyncio.run(self.sensor_task())
 
     def run(self):
+        #print('Measure {}'.format(self.sensorid))
         # self.msg.setsender(self.sensorid)
         # if board.CAN is None:
         #     return
