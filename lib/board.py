@@ -31,14 +31,15 @@ def PRINT(formatstring, *args):
 
 class Led:
     """On/Off LED"""
-    def __init__(self, pin):
+    def __init__(self, pin, onvalue=1):
         self.led = machine.Pin(pin, mode=machine.Pin.OUT)
+        self.onvalue = onvalue
     def on(self):
         """turn LED on"""
-        self.led.value(1)
+        self.led.value(self.onvalue)
     def off(self):
         """turn LED off"""
-        self.led.value(0)
+        self.led.value(1-self.onvalue)
 
 
 class RegisteredSensorIDs:
@@ -94,8 +95,7 @@ class RegisteredSensorIDs:
 # This allows e.g. sensors to use serve CAN even if the backend
 # has not been initialized.
 
-# The on-chip LED
-LED = Led(2)
+
 
 # Sensors will be set by sensors.py and will provide funtions
 # register and find.

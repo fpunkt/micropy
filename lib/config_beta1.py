@@ -10,6 +10,9 @@ if 0 == 1:
 
 import board
 
+# The on-chip LED
+board.LED = board.Led(2)
+
 AUX1_YELLOW = const(13)
 AUX1_WHITE = const(12)
 
