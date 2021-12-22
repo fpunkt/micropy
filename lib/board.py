@@ -161,3 +161,6 @@ def run():
     # run GC once to supress memory messages after startup (because gc will be triggered after initialization ...)
     gc.collect()
     asyncio.run(arun())
+
+def restart():
+    asyncio.run(arun())

@@ -29,9 +29,11 @@ import time
 import machine
 import network
 import webrepl
+import gc
 import c
 
 LED = None # filled in later, avoid import of board.py (easier bootstep on 1M boards)
+DEBUG = None
 
 # import board
 
@@ -41,7 +43,8 @@ LED = None # filled in later, avoid import of board.py (easier bootstep on 1M bo
 # x = ap.active(True)
 # print('network activated: ', x)
 
-def start_wlan(base=32):
+def start_wlan(base=0):
+    gc.collect()
     stop_hotspot()
     wlan = network.WLAN(network.STA_IF) # create station interface
     if wlan.isconnected():
@@ -55,6 +58,8 @@ def start_wlan(base=32):
     time.sleep(1)
     # pylint: disable=no-member
     s, p = c.s(base)
+#    if DEBUG:
+#        print('Connect to {} / {}'.format(s, p))
     wlan.connect(s, p) # connect to an AP
     for i in range(30):
         if wlan.isconnected():
@@ -69,6 +74,13 @@ def start_wlan(base=32):
         LED.on()
     print("Connected to ", cfg)
     return cfg
+
+def wlan_ip(ipstring=None):
+    if ipstring is None:
+        wlan = network.WLAN(network.STA_IF) # create station interface
+        if wlan.isconnected():
+            return wlan.ifconfig()
+    return None
 
 def start_hotspot():
     serial = machine.unique_id()

@@ -149,11 +149,6 @@ def send_poweron():
 def identify():
     _identify(canid.IDENTIFY)
 
-def send_wlan_connected(ip):
-    """Send a WLAN connected packet with IP."""
-    if board.CAN:
-        board.CAN.write(canid.WLAN_CONNECTED, [board.CANID >>8, board.CANID & 0xff, ip[0], ip[1], ip[2], ip[3]])
-
 def _identify(packetid):
     if board.CAN and board.CANID:
         serial = machine.unique_id()
@@ -212,15 +207,30 @@ def register(commandbyte, minargs, maxargs, callback):
 #
 # cansend 200#fd # START WLAN and repl
 
-def _connect(ip):
+def send_wlan_connected(ip=None):
+    if not board.CAN:
+        return
     board.LED.on()
-    ipx = list(map(int, ip[0].split('.')))
-    #print('ipx', ipx)
-    board.CAN.send_wlan_connected(ipx)
+    if ip is None:
+        ip = net.wlan_ip(ip)
+    try:
+        ip = list(map(int, ip[0].split('.')))
+        #print('ipx', ipx)
+        board.CAN.write(canid.WLAN_CONNECTED, [board.CANID >>8, board.CANID & 0xff, ip[0], ip[1], ip[2], ip[3]])
+    except:
+        if board.DEBUG:
+            print('** ERROR: Cannot send WLAN IP for {}'.format(ip))
+
+def _connect_to_wlan(m):
+    if len(m.payload) == 2:
+        b = m.payload[1]
+    else:
+        b = 0
+    send_wlan_connected(net.start_wlan(b))
 
 # TODO: provide parameter to CONNECT to select network
-register(canconf.WLAN_CONNECT, 1, 1, lambda _: _connect(net.start_wlan()))
-register(canconf.WLAN_HOTSPOT, 1, 1, lambda _: _connect(net.start_hotspot()))
+register(canconf.WLAN_CONNECT, 1, 2, lambda m: _connect_to_wlan(m))
+register(canconf.WLAN_HOTSPOT, 1, 1, lambda _: send_wlan_connected(net.start_hotspot()))
 register(canconf.WLAN_STOP, 1, 1, lambda _: net.stop_wlan())
 register(canconf.SEND_PING, 1, 1, lambda _: _send_ping())
 register(canconf.SOFT_RESET, 1, 1, lambda _: machine.soft_reset())

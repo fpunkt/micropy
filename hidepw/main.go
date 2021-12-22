@@ -13,6 +13,8 @@ package main
 
 // go run main.go    192.168.178.2   meinpasswort-1   10.10.4.2    deinpw-2
 //
+// go run main.go -m -o c.py iot-ssid iot-pw   alternate-ssid alternate-pw
+//
 // will generate a Python file where you can call
 //
 // import xx
@@ -88,6 +90,11 @@ func main() {
 	for _, o := range offsets {
 		buffer.WriteByte(o)
 	}
+
+	if pflag.NArg() == 0 {
+		log.Error().Msg("Need at least two arguments, use like hidepw  ssid-1 pw-1  ssid-2 pw-2")
+		return
+	}
 	for i, arg := range pflag.Args() {
 		//if isip(arg) {
 		//	addip(arg)
@@ -130,8 +137,9 @@ func main() {
 			fd.WriteString(detab(mainCode))
 		}
 	}
-	for i := 0; i < currentPad-blockSize; i += blockSize {
-		fmt.Printf("# use     s(%d)\n", i)
+	for i, c := 0, 0; i < currentPad-blockSize; i += blockSize {
+		fmt.Printf("# use     s(%3d)   # %16s %s\n", i, pflag.Arg(c), pflag.Arg(c+1))
+		c += 2
 	}
 }
 

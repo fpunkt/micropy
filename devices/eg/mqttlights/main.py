@@ -1,6 +1,9 @@
 """
 CAN over WLAN client with some PWMs connected
 
+source ../../../tools/alias.sh
+
+
 
 """
 
@@ -12,6 +15,9 @@ import board
 board.LOCATION = 'eg/xmasvorne'
 # board.DEBUG = True
 board.CANID = 0x140
+
+board.LED = board.Led(2, 0)
+
 
 if board.DEBUG is True:
     print("This is {}, CANID {:03x}".format(board.LOCATION, 0 if board.CANID is None else board.CANID))
@@ -43,7 +49,6 @@ import uasyncio as asyncio
 
 import can
 board.CAN = can
-can.init()
 
 print("mem: ", gc.mem_free())
 gc.collect()
@@ -66,6 +71,12 @@ p3.seti(1023)
 t1 = sensors.DHT(0x30, 5, poll_intervall_in_ms=5000 if board.DEBUG else None)
 t2 = sensors.DHT(0x31, 4, poll_intervall_in_ms=7000 if board.DEBUG else None)
 
+can.init()
+
+print('can.canoverlan._sock is {}'.format(can.canoverlan._sock))
+
+if can.canoverlan._sock is None:
+    raise RuntimeError("Cannot start CAN")
 
 
 if False: # some buttons for debugging

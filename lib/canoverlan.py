@@ -22,6 +22,13 @@ _sock = None
 def init(brokerip=None, port=14711):
     global _sock
     cfg = net.start_wlan()
+    if cfg is None:
+        if board.DEBUG:
+            print('# cannot read config from start_wlan')
+        net.stop_hotspot()
+        net.stop_repl()
+        net.stop_wlan()
+        return
     # ipx = list(map(int, cfg[0].split('.')))
     if brokerip is None:
         if cfg[0][0] == '10':
