@@ -22,6 +22,9 @@ subscribe = cancommon.subscribe
 Message = cancommon.Message
 makemessage = cancommon.makemessage
 
+net.DEBUG = board.DEBUG
+net.LED = board.LED
+
 # def read():
 #     raise RuntimeError('CAN backend not loaded')
 #
