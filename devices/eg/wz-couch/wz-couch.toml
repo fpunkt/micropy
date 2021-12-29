@@ -1,0 +1,44 @@
+location = "eg.wz.couch"
+canid = 0x368
+
+[led.wandleuchte]
+name = "Wandleuchte"
+port = 1
+# default = 50
+
+[led.redlight]
+name = "Rote Lampe"
+port = 2
+# default = 50
+
+[led.xmaslight]
+name = "Weihnachtslichterkette Fensterbank"
+port = 3
+# default = 30
+
+[led.vitrine]
+name = "Vitrine"
+port = 4
+
+[led.spare]
+name = "Spare"
+port = 5
+
+# TODO: implement switch
+[light.dcdc]
+name = "DC/DC for Xmastree"
+port = 6
+
+[led.xmaspwm]
+name = "Weihnachtsbaum raw"
+port = 7
+
+[button.button1]
+port = 0x0a
+
+[button.button2]
+port = 0x0b
+
+[am2302.temperature]
+port = 0x14
+
