@@ -18,11 +18,11 @@ port = 3
 
 [led.vitrine]
 name = "Vitrine"
-port = 4
-
-[led.spare]
-name = "Spare"
 port = 5
+
+[led.readinglight]
+name = "Leselampe"
+port = 4
 
 # TODO: implement switch
 [light.dcdc]
@@ -30,8 +30,12 @@ name = "DC/DC for Xmastree"
 port = 6
 
 [led.xmaspwm]
-name = "Weihnachtsbaum raw"
+name = "Weihnachtsbaum"
 port = 7
+
+[led.ncxmaspwm]
+name = "Not connected (no FET)"
+port = 8
 
 [button.button1]
 port = 0x0a
