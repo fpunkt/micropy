@@ -34,4 +34,4 @@ port = 7                    # CHECK
 
 [am2302.temperaturekueche]
 port = 0x30
-name = "Bad (unter der Verkleidung)"
+name = "Küche"

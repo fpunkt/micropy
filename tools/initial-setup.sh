@@ -59,14 +59,18 @@ upload()
     ampy -p $serial put $1
 }
 
-upload /usr/local/etc/secrets.py
-upload $libdir/net.py
+
+upload $libdir/net.mpy
+upload $libdir/c.mpy
 # upload $libdir/board.py
 # ampy -p $serial put /usr/local/etc/secrets.py
 # ampy -p $serial put $libdir/net.py
 # ampy -p $serial put $libdir/board.py
 
-echo "# Files copied to board. Now start a terminal (FLTerm on macOS, tio on linux) and run"
+echo "# Network stuff copied to board. Now start a terminal (FLTerm on macOS, tio on linux) and run"
 echo "#"
 echo "import net"
-echo "net."
+echo "net.start_wlan(32)"
+echo "net.start_repl()"
+echo "#"
+echo "# After this you can use the bin/upload.sh script to upload all files needed for your project"

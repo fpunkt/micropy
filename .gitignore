@@ -6,3 +6,4 @@ run.py
 *.pyc
 __pycache__
 devices/eg/mqttlights/c.py
+bin/upload
