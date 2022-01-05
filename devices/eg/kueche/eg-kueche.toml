@@ -1,0 +1,37 @@
+location = "eg.kueche"
+canid = 0x350
+room = "Küche"
+
+[led.arbeitsplattewarm]
+name = "Arbeitsplatte (warm)"
+port = 0
+
+[led.arbeitsplattecold]
+name = "Arbeitsplatte (kalt)"
+port = 1
+
+[led.hoodwarm]
+name = "Abzugshaube (warm)"
+port = 2
+
+[led.hoodcold]
+name = "Abzugshaube (kalt)"
+port = 3
+
+[led.wall]
+name = "Eckschrank"
+port = 5
+
+[led.window]
+name = "Kaffeemühle"
+port = 4
+
+[button.buttonright]
+port = 6                    # CHECK
+
+[button.buttonleft]
+port = 7                    # CHECK
+
+[am2302.temperaturekueche]
+port = 0x30
+name = "Bad (unter der Verkleidung)"
