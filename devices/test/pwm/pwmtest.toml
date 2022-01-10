@@ -1,7 +1,6 @@
 
-location = "mg.buero.test"
+device = "mg.buero.test"
 canid = 0x120
-room = "Büro"
 
 # p1 = pwm.PWM(1, bconf.AUX1_YELLOW)
 # p2 = pwm.PWM(2, bconf.AUX1_WHITE)

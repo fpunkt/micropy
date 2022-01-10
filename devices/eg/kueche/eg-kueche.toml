@@ -1,4 +1,4 @@
-location = "eg.kueche"
+device = "eg.kueche.fridge"
 canid = 0x350
 room = "Küche"
 

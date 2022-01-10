@@ -1,4 +1,4 @@
-location = "eg.wz.couch"
+device = "eg.wz.couch"
 canid = 0x368
 
 [led.wandleuchte]
@@ -44,5 +44,6 @@ port = 0x0a
 port = 0x0b
 
 [am2302.temperature]
+name = "Unter der Couch"
 port = 0x14
 
