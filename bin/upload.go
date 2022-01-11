@@ -3,15 +3,25 @@ package main
 import (
 	"bytes"
 	"fmt"
-	"log"
 	"os"
 	"os/exec"
 	"path/filepath"
 	"strings"
 	"time"
+
+	"github.com/rs/zerolog/log"
+	"github.com/spf13/pflag"
+	"gitlab.com/fpunkts/zlog"
+
+	toml "github.com/pelletier/go-toml"
 )
 
 var libdir, bindir, ipstring string
+
+var options = struct {
+	verbose int
+	dryrun  bool
+}{}
 
 const (
 	importfile   = ".imports"
@@ -21,24 +31,32 @@ const (
 
 func main() {
 	// if err := os.Chdir(os.ExpandEnv("${HOME}/Projects/fpunkts/micropy/devices/test/pwm")); err != nil {
-	// 	log.Fatal(err)
+	// 	log.Fatal().Err(err).Msg("Fatal error")
 	// }
+	pflag.CountVarP(&options.verbose, "verbose", "v", "verbose messages")
+	pflag.BoolVarP(&options.dryrun, "dryrun", "d", false, "compile but don't upload file")
+	pflag.Parse()
 
+	log.Logger = zlog.New()
+	zlog.SetLevel(options.verbose)
 	starttime := time.Now()
 
-	dependencies, err := os.ReadFile(importfile)
+	dependencies, err := readDependencies()
+
+	log.Trace().Int("dependencies", len(dependencies)).Msg("Loaded dependencies")
+
 	if err != nil {
-		log.Fatal(err)
+		log.Fatal().Err(err).Msg("Fatal error")
 	}
 
 	if ips, err := os.ReadFile(ipfile); err != nil {
-		log.Fatal(err)
+		log.Fatal().Err(err).Msg("Fatal error")
 	} else {
 		ipstring = strings.TrimSpace(string(ips))
 	}
 	execdir, err := os.Executable()
 	if err != nil {
-		log.Fatal(err)
+		log.Fatal().Err(err).Msg("Fatal error")
 	}
 
 	if strings.HasPrefix(execdir, "/var/") {
@@ -46,34 +64,21 @@ func main() {
 	} else {
 		bindir = filepath.Dir(execdir)
 	}
+
 	libdir = filepath.Clean(bindir + "/../lib")
+	log.Trace().Str("libdir", libdir).Msg("Located libdir")
 	//fmt.Printf("bindir = %s, libdir = %s\n", bindir, libdir)
 
 	here, err := os.Getwd()
 	if err != nil {
-		log.Fatal(err)
+		log.Fatal().Err(err).Msg("Fatal error")
 	}
 	if err := os.Chdir(libdir); err != nil {
-		log.Fatal(err)
+		log.Fatal().Err(err).Msg("Fatal error")
 	}
 
-	//err, sout, serr := run("make")
-	//
-	//if !strings.HasPrefix(sout, "make: Nothing to be done") {
-	//	if err != nil {
-	//		fmt.Printf("sout=%q, serr=%q, err=%s\n", sout, serr, err)
-	//		log.Fatal(err)
-	//	}
-	//	if serr != "" {
-	//		fmt.Printf("# make ERROR - %s\n", serr)
-	//	}
-	//	for _, line := range lines(sout) {
-	//		fmt.Printf("# %s\n", line)
-	//	}
-	//}
-
 	if err := os.Chdir(here); err != nil {
-		log.Fatal(err)
+		log.Fatal().Err(err).Msg("Fatal error")
 	}
 
 	var lastupload time.Time
@@ -83,12 +88,12 @@ func main() {
 
 	//var changed []string
 
-	changed := comileFiles(libdir, lines(string(dependencies)), lastupload)
+	changed := compileFiles(libdir, dependencies, lastupload)
 
 	// check files in current directory
 	direntries, err := os.ReadDir(".")
 	if err != nil {
-		log.Fatal(err)
+		log.Fatal().Err(err).Msg("Fatal error")
 	}
 	var files []string
 	for _, f := range direntries {
@@ -97,7 +102,7 @@ func main() {
 			files = append(files, fname)
 		}
 	}
-	files = comileFiles(".", files, lastupload)
+	files = compileFiles(".", files, lastupload)
 	changed = append(changed, files...)
 
 	if len(changed) == 0 {
@@ -105,22 +110,42 @@ func main() {
 		return
 	}
 
-	fmt.Printf("# Uploading %d files to %s\n", len(changed), ipstring)
+	log.Info().Int("nfiles", len(changed)).Str("host", ipstring).Msg("Uploading files")
+	currentdir, _ := os.Getwd()
 
 	for _, file := range changed {
 		s, err := os.Stat(file)
 		if err != nil {
-			log.Fatal(err)
+			log.Fatal().Err(err).Msg("Fatal error")
 		}
 		//fmt.Printf("%20s: %s - %s - %T\n", file, s.ModTime(), lastupload, s.ModTime().Before(lastupload))
+		// HUH? We already checked that?
 		if s.ModTime().Before(lastupload) {
 			continue
 		}
-		upload(file)
+		relp := file
+		if currentdir != "" {
+			relp, err = filepath.Rel(file, currentdir)
+			if err != nil {
+				relp = file
+			}
+		}
+		log.Info().Str("file", relp).Msg("Uploading file")
+		if options.dryrun {
+			log.Debug().Msg("Not Uploading because of dryrun")
+		} else {
+			upload(file)
+		}
 	}
 
-	fmt.Printf("# Uploaded %d files in %s\n", len(changed), time.Since(starttime).Truncate(time.Millisecond).String())
-	run("touch " + lastsyncfile)
+	log.Info().
+		Int("nfiles", len(changed)).
+		Str("duration", time.Since(starttime).Truncate(time.Millisecond).String()).
+		Msg("Uploaded files")
+
+	if !options.dryrun {
+		run("touch " + lastsyncfile)
+	}
 
 	//	fmt.Println(lines(string(dependencies)))
 	//	fmt.Println(changed)
@@ -128,56 +153,50 @@ func main() {
 }
 
 func upload(fname string) {
-	fmt.Printf("# Uploading %s\n", fname)
 	if 1 == 0 {
 		return
 	}
-	err, _, serr := run(libdir + "/../webrepl/webrepl_cli.py -p x " + fname + " " + ipstring + ":")
+	_, serr, err := run(libdir + "/../webrepl/webrepl_cli.py -p x " + fname + " " + ipstring + ":")
 	if serr != "" {
 		fmt.Printf("# ERROR - uploading %s: %s\n", fname, serr)
 	}
 	if err != nil {
-		log.Fatal(err)
+		log.Fatal().Err(err).Msg("Fatal error")
 	}
-}
-
-// split string into lines
-func lines(s string) []string {
-	var out []string
-	for _, line := range strings.Split(s, "\n") {
-		if line != "" {
-			out = append(out, line)
-		}
-	}
-	return out
 }
 
 // run shell command, return err, stdout, stderr
-func run(command string) (error, string, string) {
+func run(command string) (string, string, error) {
 	var stdout bytes.Buffer
 	var stderr bytes.Buffer
 	cmd := exec.Command("/bin/sh", "-c", command)
 	cmd.Stdout = &stdout
 	cmd.Stderr = &stderr
 	err := cmd.Run()
-	return err, stdout.String(), stderr.String()
+	return stdout.String(), stderr.String(), err
 }
 
 // compile files in directory if they are newer than timestamp
-func comileFiles(directory string, files []string, timestamp time.Time) []string {
+func compileFiles(directory string, files []string, timestamp time.Time) []string {
 	var changed []string
 	for _, basename := range files {
 		fullname := filepath.Join(directory, basename)
 		_, err := os.Stat(fullname)
 		if err != nil {
-			log.Fatal(err)
+			log.Fatal().Err(err).Msg("Fatal error")
 		}
-		compiled := compile(fullname, timestamp)
-		s, err := os.Stat(compiled)
-		if err != nil {
-			log.Fatal(err)
-		}
-		if s.ModTime().After(timestamp) {
+		//compiled := compile(fullname, timestamp)
+		//s, err := os.Stat(compiled)
+		//if err != nil {
+		//	log.Fatal().Err(err).Msg("Fatal error")
+		//}
+		compiled, newts := compile(fullname)
+		if newts.After(timestamp) {
+			log.Debug().
+				Str("file", filepath.Base(compiled)).
+				Str("last", ts(timestamp)).
+				Str("modtime", ts(newts)).
+				Msg("File has changed since last upload")
 			changed = append(changed, compiled)
 		}
 	}
@@ -189,34 +208,115 @@ var exclude = map[string]struct{}{
 	"main.py": {},
 }
 
+func ts(t time.Time) string { return t.Format("2006-01-02 15:04:05") }
+func mustModTime(fname string) time.Time {
+	s, err := os.Stat(fname)
+	if err != nil {
+		log.Fatal().Err(err).Str("file", fname).Msg("Fatal error")
+	}
+	return s.ModTime()
+}
+
 // compile file if outdated
-func compile(fname string, timestamp time.Time) string {
-	if _, ok := exclude[fname]; ok {
-		return fname
+func compile(fname string) (string, time.Time) {
+	ftime := mustModTime(fname)
+	if _, ok := exclude[filepath.Base(fname)]; ok {
+		log.Trace().Str("file", fname).Msg("Ignoring file from excludes")
+		return fname, ftime
 	}
 	//dir := filepath.Dir(fname)
 	here, err := os.Getwd()
 	if err != nil {
-		log.Fatal(err)
+		log.Fatal().Err(err).Msg("Fatal error")
 	}
 	defer os.Chdir(here)
 
 	outfile := strings.TrimSuffix(fname, ".py") + ".mpy"
 	stat, err := os.Stat(outfile)
-	if err == nil && stat.ModTime().Before(timestamp) {
-		// fmt.Printf("# no need to compile %s\n", fname)
-		return outfile
+	if err == nil {
+		log.Trace().
+			Str("file", filepath.Base(fname)).
+			Str("py", ts(ftime)).
+			Str("mpy", ts(stat.ModTime())).
+			Msg("Compiled file exists")
 	}
-	fmt.Printf("# compiling %s\n", fname)
-	err, sout, serr := run("mpy-cross " + fname)
+	if err == nil && stat.ModTime().After(ftime) {
+		log.Debug().Str("file", fname).Msg("No need to compile because binary is newer")
+		// fmt.Printf("# no need to compile %s\n", fname)
+		return outfile, stat.ModTime()
+	}
+	log.Info().Str("file", fname).Msg("Compiling")
+	log.Trace().
+		Str("file", filepath.Base(fname)).
+		Str("ts", ts(ftime)).
+		Str("mod", ts(stat.ModTime())).
+		Msg("Compiling")
+	sout, serr, err := run("mpy-cross " + fname)
 	if err != nil {
-		log.Fatal(err)
+		log.Fatal().Err(err).Msg("Fatal error")
 	}
 	if serr != "" {
-		fmt.Printf("# ERROR comiling %s: %s\n", fname, serr)
+		log.Error().Str("err", serr).Str("file", fname).Msg("Compile error")
+		//fmt.Printf("# ERROR comiling %s: %s\n", fname, serr)
 	}
 	if serr != "" {
 		fmt.Printf("# comiling %s: %s\n", fname, sout)
 	}
-	return strings.TrimSuffix(fname, ".py") + ".mpy"
+	return strings.TrimSuffix(fname, ".py") + ".mpy", time.Now()
+}
+
+func readDependencies() ([]string, error) {
+	if _, err := os.Stat(importfile); err != nil {
+		return readTOML()
+	}
+	b, err := os.ReadFile(importfile)
+	if err != nil {
+		return nil, err
+	}
+
+	// split string into lines
+	var out []string
+	for _, line := range strings.Split(string(b), "\n") {
+		if line != "" {
+			out = append(out, line)
+		}
+	}
+	return out, nil
+}
+
+func readTOML() ([]string, error) {
+	tomlfiles, err := filepath.Glob("*.toml")
+	if err != nil {
+		return nil, err
+	}
+	if len(tomlfiles) != 1 {
+		s := "none"
+		if len(tomlfiles) > 1 {
+			s = fmt.Sprintf("%d (%v)", len(tomlfiles), tomlfiles)
+		}
+		return nil, fmt.Errorf("need %s or exactly one .toml file, found %s", importfile, s)
+	}
+	config, err := toml.LoadFile(tomlfiles[0])
+	if err != nil {
+		return nil, err
+	}
+	// retrieve data directly
+	imports := config.Get("dependencies.libfiles")
+	if ia, ok := imports.([]interface{}); ok {
+		var out []string
+		for _, i := range ia {
+			if s, ok := i.(string); ok {
+				out = append(out, s)
+			} else {
+				return nil, fmt.Errorf("item is not a string: %T - %v", i, i)
+			}
+
+		}
+		return out, nil
+	}
+	//if len(imports) == 0 {
+	//	return nil, fmt.Errorf("File %s does not contain a [depencencies.libfiles] section", tomlfiles[0])
+	//}
+	fmt.Printf("imports: %T %v\n", imports, imports)
+	return nil, nil
 }
