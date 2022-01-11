@@ -48,14 +48,14 @@ def _float_to_raw(value):
 def _tofloat(value):
     return value / 1023.0
 
-def _i16_to_raw(v):
+def i16_to_raw(v):
     vv = v >> 6
     if vv == 0 and v > 0:
         return 1
     return vv
 
 class PWM:
-    """Wrapper for system PWM, using numbers from 0..1 and provide dimming"""
+    """TODO: fix docstring? Wrapper for system PWM, using numbers from 0..1 and provide dimming"""
     def __init__(self, pwmid, pin):
         self.id = pwmid
         self.ival = 0
@@ -135,9 +135,11 @@ class PWM:
 
     def seti16(self, i16):
         """Set integer 0..0xffff"""
-        self.seti(_i16_to_raw(i16))
+        self.seti(i16_to_raw(i16))
 
     def send_status_to_can(self):
+        if self.id is None:
+            return
         i1 = self.ival
         i16 = i1 << 6
         if board.CAN:
@@ -195,8 +197,9 @@ class PWM:
 
     def dimi16(self, value):
         """dim to values from 0..0xffff"""
-        self.dimi(_i16_to_raw(value))
+        self.dimi(i16_to_raw(value))
 
+    # TODO: remove float? This is a CAN bus system, float does not make a lot of sense
     def dimf(self, value):
         self.dimi(_float_to_raw(value))
 
