@@ -25,17 +25,17 @@ name = "Leselampe"
 port = 4
 
 # TODO: implement switch
-[light.dcdc]
+[light.xmasdcdc]
 name = "DC/DC for Xmastree"
 port = 6
 
-[led.xmaspwm]
+[led.xmastree]
 name = "Weihnachtsbaum"
 port = 7
 
-[led.ncxmaspwm]
-name = "Not connected (no FET)"
-port = 8
+# [led.ncxmaspwm]
+# name = "Not connected (no FET)"
+# port = 8
 
 [button.button1]
 port = 0x0a
@@ -46,4 +46,3 @@ port = 0x0b
 [am2302.temperature]
 name = "Unter der Couch"
 port = 0x14
-
