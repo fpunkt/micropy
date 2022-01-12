@@ -42,17 +42,13 @@ dimdelay_ms = 10
 # pwm_freq = 100
 pwm_freq = 200
 
-def _float_to_raw(value):
-    return max(0, min(1023, int(value*1023)))
-
-def _tofloat(value):
-    return value / 1023.0
-
 def i16_to_raw(v):
     vv = v >> 6
     if vv == 0 and v > 0:
         return 1
     return vv
+
+def valid(i): return min(1023, max(i, 0))
 
 class PWM:
     """TODO: fix docstring? Wrapper for system PWM, using numbers from 0..1 and provide dimming"""
@@ -106,7 +102,7 @@ class PWM:
         Call wait_until_set() if you need the value to be correct.
         (This is not the case for dimming, because dimming reads the value read back
         from the H/W. Value might be different if commands are send too fast)"""
-        ival = min(1023, max(ival, 0))
+        ival = valid(ival)
         self.pwm.duty(ival)
         self.ival = ival
         # a direct reading might not return the actual value
@@ -155,14 +151,6 @@ class PWM:
             payload[6] = i16 & 0xff
             self.msg.send()
 
-    def setf(self, value):
-        """Set values from 0..1"""
-        self.seti(_float_to_raw(value))
-
-    def getf(self):
-        """Return current value 0..1"""
-        return _tofloat(self.ival)
-
     def run_next_dimstep(self):
         """Set next dimlevel. Return True when more steps are needed"""
         # try smooth dimming
@@ -187,21 +175,22 @@ class PWM:
         return True
 
     def dimi(self, value):
-        """dim in raw units"""
+        """dim in raw units, return False if value is directly set, return True otherwise (dimming)"""
+        value = valid(value)
+        if value == self.ival and value == self.pwm.duty():
+            return False
         if self.dimtovalue < -10:
             self.seti(value)
-            return
+            return False
         self.dimtovalue = value
         if abs(self.ival-value) < 5:
             self.seti(value)
+            return False
+        return True
 
     def dimi16(self, value):
         """dim to values from 0..0xffff"""
-        self.dimi(i16_to_raw(value))
-
-    # TODO: remove float? This is a CAN bus system, float does not make a lot of sense
-    def dimf(self, value):
-        self.dimi(_float_to_raw(value))
+        return self.dimi(i16_to_raw(value))
 
     def on(self):
         if self.ival == self.lastintensity:
@@ -308,13 +297,11 @@ async def _next_dim_step_task():
 
     dimdelay_when_dimming = max(1, 1000 // pwm_freq)
     was_dimming = False
+
     while True:
-        #if isdimming:
-        #    if dimsteps == 0:
-        #        starttime = utime.ticks_ms()
-        #    dimsteps += 1
         isdimming = False
         for p in board.PWMs.pwms:
+#            if p.dimtovalue >= 0  and  p.pwm.duty() != p.dimtovalue:
             if p.dimtovalue >= 0  and  p.pwm.duty() != p.dimtovalue:
                 isdimming = True
                 p.run_next_dimstep()
