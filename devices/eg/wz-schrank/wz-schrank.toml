@@ -1,6 +1,6 @@
 device = "eg.wz.schrank"
-#canid = 0x338
-canid = 0x10
+canid = 0x338
+# canid = 0x10
 
 [led.wand]
 name = "Lampe auf dem Schrank"
@@ -17,26 +17,37 @@ name = "Weihnachtslichterkette"
 port = 3
 # default = 30
 
+# [led.spare]
+# name = "Spare"
+# port = 4
+
 [rgb.rgb]
 name = "Farbige Lichterkette"
-port = 4
+port = 9
 
 # 2 * motionsensor
 
-[button.button1]
-port = 0x0a
+[motionsensor.directiondoor]
+name = "Schrank Richtung WZ Tür"
+port = 0x10
 
-[button.button2]
-port = 0x0b
+[motionsensor.directionessz]
+name = "Schrank Richtung Esszimmer"
+port = 0x11
+
 
 [am2302.temperature]
 name = "Wohnzimmerschrank"
-port = 0x09
+port = 0x20
+
+[trigger.dingdong]
+name = "DingDong Klingel"
+port = 0x30
 
 
 [dependencies]
 libfiles = ["board.py", "boot.py", "button.py", "can.py", "cancodes.py", "cancommon.py",
     "canconf.py", "canerror.py", "canesp32.py", "canid.py", "caninfo.py", "irqio.py",
     "motionsensor.py", "net.py", "pwm.py", "pwmcode.py", "sensors.py",
-    "rgb.py"
+    "rgb.py", "digiio.py"
 ]

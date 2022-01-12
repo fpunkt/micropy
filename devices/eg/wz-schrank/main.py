@@ -1,16 +1,17 @@
 """
 WZ Schrank
-    // 2 PWM connected AUX-1 4P on beta board
-    7 PWM connected to ML-10
+
+    PWM connected to ML-10
         1: Wandlampe
-        2: rote Lampe
-        3: Weihnachtslämpchen Fensterbank
-        4: Vitrine
-        5: unused
-        6: driving an upconverter (set to 31 V for the xmas tree)
-        7: output of the upconverter driving the LEDs for the xmas tree
+        2: Salzlampe
+        3: Weihnachtslämpchen
+        4:
+        5: Ding-Dong Klingel
+        6, 7, 8: RGB Lichterkette
+
     1 AM2320 on AUX-2
-    2 buttons on AUX-3
+    2 Motionsensor on AUX-1
+
         2 buttons are connected to the small handleld to enable the reading light
 
 """
@@ -21,10 +22,11 @@ WZ Schrank
 
 import board
 board.LOCATION = 'wz-schrank'
-board.DEBUG = True
-board.CANID = 0x10
+# board.DEBUG = True
+board.CANID = 0x338
 
 if board.DEBUG is True:
+    # board.CANID = 0x10
     print("This is {}, CANID {:03x}".format(board.LOCATION, 0 if board.CANID is None else board.CANID))
 
 if board.DEBUG is True:
@@ -42,6 +44,8 @@ import pwm
 import button
 import uasyncio as asyncio
 import rgb
+import digiio
+import motionsensor
 
 if board.CAN and board.DEBUG:
     board.CAN.cancommon.send_wlan_connected()
@@ -51,23 +55,46 @@ if board.CAN and board.DEBUG:
 p1 = pwm.PWM(1, bconf.ML10_PWM_1)
 p2 = pwm.PWM(2, bconf.ML10_PWM_2)
 p3 = pwm.PWM(3, bconf.ML10_PWM_3)
-c = rgb.RGB(4, bconf.ML10_PWM_6,  bconf.ML10_PWM_7, bconf.ML10_PWM_8)
-print("# c initialized and all components set to 0")
+p4 = pwm.PWM(4, bconf.ML10_PWM_4)
+
+dindongping = digiio.DigitalOut(0x30, bconf.ML10_PWM_5)
+
+rgbkette = rgb.RGB(9, bconf.ML10_PWM_6,  bconf.ML10_PWM_7, bconf.ML10_PWM_8)
+if board.DEBUG:
+    print("# rgbkette initialized")
+
+temp = sensors.DHT(0x20, bconf.AUX2_WHITE, poll_intervall_in_ms=50000 if board.DEBUG else sensors.minutes(5))
+
+m1 = motionsensor.Motionsensor(0x10, bconf.AUX1_WHITE)
+m2 = motionsensor.Motionsensor(0x11, bconf.AUX1_YELLOW)
+
+
 # stop_here()
 
-# p11 = pwm.PWM(0x11, bconf.AUX1_YELLOW)
-# p12 = pwm.PWM(0x12, bconf.AUX1_WHITE)
-# pl = pwm.List(0x20, p1, p2)
+ddTrigger = asyncio.Event()
+ddMS = 1000
 
+async def dingdongtask():
+    if board.DEBUG:
+        print('DingDongTask started')
+    while True:
+        await ddTrigger.wait()
+        ddTrigger.clear()
+        print('DD got trigger')
+        dindongping.on()
+        await asyncio.sleep_ms(ddMS)
+        dindongping.off()
 
-#b1 = button.Button(10, bconf.AUX3_YELLOW)
-#b2 = button.Button(11, bconf.AUX3_WHITE)
-#
-#if board.DEBUG:
-#    b1.callback = lambda b: print('Button pressed: {}'.format(b))
+board.BACKGROUND_RUNNERS.append(dingdongtask())
 
+def dingdonghandler(msg):
+    global ddMS
+    #print('ddh: len={}, m={}'.format(len(msg.payload), msg.payload))
+    ddMS = 50 + 10*msg.payload[1] if len(msg.payload) == 2 else 500
+    ddTrigger.set()
 
-# dht = sensors.DHT(20, bconf.AUX2_YELLOW, poll_intervall_in_ms=5000 if board.DEBUG else sensors.minutes(5))
+can.register(0x30, 1, 2, dingdonghandler)
+
 
 def r():
     board.restart()
