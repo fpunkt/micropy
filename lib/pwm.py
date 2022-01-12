@@ -58,7 +58,7 @@ class PWM:
         self.lastintensity = 100
         self.pwm = None
         if pin is not None:
-            self.pwm = machine.PWM(machine.Pin(pin))
+            self.pwm = machine.PWM(machine.Pin(pin), duty=0, freq=pwm_freq)
         board.SENSORSs.register(pwmid, self)
         if board.PWMs is not None:
             # is still None for ALL pwm list
@@ -67,10 +67,10 @@ class PWM:
             return
 
         # global pwm_freq
-        if pwm_freq > 0:
-            self.pwm.freq(pwm_freq)
-            # pwm_freq = 0
-            utime.sleep_ms(5) # for some strange reason after setting pwm_freq ..
+#        if pwm_freq > 0:
+#            self.pwm.freq(pwm_freq)
+#            # pwm_freq = 0
+#            utime.sleep_ms(5) # for some strange reason after setting pwm_freq ..
         # print('setting duty for {}/{} to 0'.format(pwmid, pin))
         # self.pwm.duty(0)
         self.seti_no_can_message(0) # power off
@@ -384,6 +384,7 @@ def _getpwm(msg):
     return pwms
 
 can.register(pwmcode.SET_INTENSITY16, 4, 4, lambda msg: _getpwm(msg).dimi16(msg.u16(2)))
+can.register(pwmcode.SET_INTENSITY_NATIVE, 4, 4, lambda msg: _getpwm(msg).dimi(msg.u16(2)))
 can.register(pwmcode.ON, 2, 2, lambda msg: _getpwm(msg).on())
 can.register(pwmcode.OFF, 2, 2, lambda msg: _getpwm(msg).off())
 can.register(pwmcode.TOGGLE, 2, 2, lambda msg: _getpwm(msg).toggle())
