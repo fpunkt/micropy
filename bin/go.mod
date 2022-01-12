@@ -1,4 +1,4 @@
-module upload
+module mpyupload
 
 go 1.17
 

@@ -16,7 +16,7 @@ import (
 	toml "github.com/pelletier/go-toml"
 )
 
-var libdir, bindir, ipstring string
+var libdir, ipstring string
 
 var options = struct {
 	verbose int
@@ -54,19 +54,13 @@ func main() {
 	} else {
 		ipstring = strings.TrimSpace(string(ips))
 	}
-	execdir, err := os.Executable()
-	if err != nil {
-		log.Fatal().Err(err).Msg("Fatal error")
-	}
 
-	if strings.HasPrefix(execdir, "/var/") {
-		bindir = os.ExpandEnv("${HOME}/Projects/fpunkts/micropy/bin")
-	} else {
-		bindir = filepath.Dir(execdir)
-	}
-
-	libdir = filepath.Clean(bindir + "/../lib")
-	log.Trace().Str("libdir", libdir).Msg("Located libdir")
+	libdir = locateLibdir()
+	//bindir = filepath.Clean(libdir + "../bin/")
+	log.Trace().
+		Str("libdir", libdir).
+		//Str("bindir", bindir).
+		Msg("Located libdir")
 	//fmt.Printf("bindir = %s, libdir = %s\n", bindir, libdir)
 
 	here, err := os.Getwd()
@@ -149,6 +143,45 @@ func main() {
 
 	//	fmt.Println(lines(string(dependencies)))
 	//	fmt.Println(changed)
+
+}
+
+func locateLibdir() string {
+	cwd, err := os.Getwd()
+	if err != nil {
+		log.Fatal().Err(err).Msg("Cannot read cwd")
+	}
+	abs, err := filepath.Abs(cwd)
+	if err != nil {
+		log.Fatal().Err(err).Str("cwd", abs).Msg("Cannot get abs path")
+	}
+	var libdir string
+	for i := 1; i < 7; i++ {
+		p := filepath.Clean(abs + strings.Repeat("/..", i) + "/lib")
+		log.Trace().Str("dir"+"/fsmpylibdir.md", p).Msg("Looking for libdir")
+		if s, err := os.Stat(p); err != nil || !s.IsDir() {
+			fmt.Printf("p: %s, e: %s\n", p, err)
+			continue
+		}
+		libdir = p
+		break
+	}
+	if libdir == "" {
+		log.Fatal().Msg("Cannot find libdir")
+	}
+	return libdir
+	//	execdir, err := os.Executable()
+	//	if err != nil {
+	//		log.Fatal().Err(err).Msg("Fatal error")
+	//	}
+	//
+	//	if strings.HasPrefix(execdir, "/var/") {
+	//		bindir = os.ExpandEnv("${HOME}/Projects/fpunkts/micropy/bin")
+	//	} else {
+	//		bindir = filepath.Dir(execdir)
+	//	}
+	//
+	//	libdir = filepath.Clean(bindir + "/../lib")
 
 }
 
@@ -241,15 +274,19 @@ func compile(fname string) (string, time.Time) {
 			Msg("Compiled file exists")
 	}
 	if err == nil && stat.ModTime().After(ftime) {
-		log.Debug().Str("file", fname).Msg("No need to compile because binary is newer")
+		log.Trace().Str("file", fname).Msg("No need to compile because binary is newer")
 		// fmt.Printf("# no need to compile %s\n", fname)
 		return outfile, stat.ModTime()
 	}
 	log.Info().Str("file", fname).Msg("Compiling")
+	modTime := "new"
+	if stat != nil {
+		ts(stat.ModTime())
+	}
 	log.Trace().
 		Str("file", filepath.Base(fname)).
 		Str("ts", ts(ftime)).
-		Str("mod", ts(stat.ModTime())).
+		Str("mod", modTime).
 		Msg("Compiling")
 	sout, serr, err := run("mpy-cross " + fname)
 	if err != nil {
