@@ -160,7 +160,7 @@ func locateLibdir() string {
 		p := filepath.Clean(abs + strings.Repeat("/..", i) + "/lib")
 		log.Trace().Str("dir"+"/fsmpylibdir.md", p).Msg("Looking for libdir")
 		if s, err := os.Stat(p); err != nil || !s.IsDir() {
-			fmt.Printf("p: %s, e: %s\n", p, err)
+			//fmt.Printf("p: %s, e: %s\n", p, err)
 			continue
 		}
 		libdir = p
@@ -296,8 +296,9 @@ func compile(fname string) (string, time.Time) {
 		log.Error().Str("err", serr).Str("file", fname).Msg("Compile error")
 		//fmt.Printf("# ERROR comiling %s: %s\n", fname, serr)
 	}
-	if serr != "" {
-		fmt.Printf("# comiling %s: %s\n", fname, sout)
+	if sout != "" {
+		log.Warn().Str("file", fname).Str("compiler", sout).Msg("Compiler output")
+		//fmt.Printf("# comiling %s: %s\n", fname, sout)
 	}
 	return strings.TrimSuffix(fname, ".py") + ".mpy", time.Now()
 }
