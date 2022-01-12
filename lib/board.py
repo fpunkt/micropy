@@ -47,19 +47,19 @@ class RegisteredSensorIDs:
     def __init__(self):
         self.r = dict()
 
-    def register(self, sensorid, sensor):
-        if sensorid is None:
+    def register(self, portid, sensor):
+        if portid is None:
             return
-        if self.get_sensor(sensorid):
-            raise RuntimeError("id #{} is already registered as {} ({})".format(sensorid, self.r[sensorid], sensor))
-        self.r[sensorid] = sensor
+        if self.get_sensor(portid):
+            raise RuntimeError("id #{} is already registered as {} ({})".format(portid, self.r[portid], sensor))
+        self.r[portid] = sensor
 
     def dump(self):
         for i, v in self.r:
             print("ID {:2d} = {}".format(i, v))
 
-    def get_sensor(self, sensorid):
-        return self.r.get(sensorid, None)
+    def get_sensor(self, portid):
+        return self.r.get(portid, None)
 
     def find(self, msg, withclass, sensortype=0xfe):
         """Find a registered sensor ID that is provided as 2nd value in the CAN payload.
@@ -69,20 +69,20 @@ class RegisteredSensorIDs:
         The optional sensortype is used in the errormessage.
         """
         p = msg.payload
-        sensorid = 0xff
+        portid = 0xff
         if len(p) > 1:
-            sensorid = p[1]
-        d = self.r.get(sensorid, None)
+            portid = p[1]
+        d = self.r.get(portid, None)
         if d is None:
             if DEBUG:
-                print('Device #{} not found'.format(sensorid))
+                print('Device #{} not found'.format(portid))
             msg.bad_sensor_id()
             return None
         if withclass is None:
             return d
         if not isinstance(d, withclass):
             if DEBUG:
-                print('Found ID #{} but wrong class {} (expected {})'.format(sensorid, d.__class__, withclass))
+                print('Found ID #{} but wrong class {} (expected {})'.format(portid, d.__class__, withclass))
             msg.bad_sensor_type(sensortype)
             return None
         return d

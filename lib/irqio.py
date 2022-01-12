@@ -14,8 +14,8 @@ import utime
 import sensors
 
 class IRQIO(sensors.Sensor):
-    def __init__(self, sensorid, pinid, trigger=None, pullup=True):
-        super().__init__(self, sensorid, pinid, poll_intervall_in_ms=10)
+    def __init__(self, portid, pinid, trigger=None, pullup=True):
+        super().__init__(self, portid, pinid, poll_intervall_in_ms=10)
         # typically buttons or motions sensors have very short running handlers
         self.is_fast = True
         if trigger is None:
@@ -30,9 +30,9 @@ class IRQIO(sensors.Sensor):
             pullupmode = machine.Pin.PULL_UP
         else:
             pullupmode = pullup
-        self.sensorid = sensorid
+        self.portid = portid
         self.pin = machine.Pin(pinid, machine.Pin.IN, pullupmode)
-        self._repr = '{} #{} {}'.format(self.__class__.__name__, self.sensorid, self.pin)
+        self._repr = '{} #{} {}'.format(self.__class__.__name__, self.portid, self.pin)
         self.callback = None
         self.pinvalue = self.pin.value()
         self.last_irq = utime.ticks_ms()

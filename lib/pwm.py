@@ -377,8 +377,8 @@ class _badPWMClass: # used to avoid the need of error catching in CAN callbacks
 
 _dummyPWM = _badPWMClass()
 
-# return a PWM for the sensorid.
-# If sensorid >0x7f a list of PWMs (which bit position is set in sensorid) will be returned
+# return a PWM for the portid.
+# If portid >0x7f a list of PWMs (which bit position is set in portid) will be returned
 def _getpwm(msg):
     if msg.payload[1] & 0x80 == 0:
         sensor = board.SENSORSs.find(msg, (PWM, List), 0xa0)

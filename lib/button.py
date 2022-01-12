@@ -22,9 +22,9 @@ STATE_AR_ARM = const(1)
 STATE_AR_ACTIVE = const(2)
 
 class Button(irqio.IRQIO):
-    def __init__(self, sensorid, pinid):
-        super().__init__(sensorid, pinid)
-        self.msg = can.makemessage(canid.BUTTON_PRESSED, 5, sensorid=self.sensorid)
+    def __init__(self, portid, pinid):
+        super().__init__(portid, pinid)
+        self.msg = can.makemessage(canid.BUTTON_PRESSED, 5, portid=self.portid)
         self.debounce_ms = 20
         self.pwm = None
         self.state = 0

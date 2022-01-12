@@ -13,9 +13,9 @@ import can
 import canid
 
 class Motionsensor(irqio.IRQIO):
-    def __init__(self, sensorid, pinid, pullup=None):
-        super().__init__(sensorid, pinid, pullup=pullup)
-        self.msg = can.makemessage(canid.SENSOR_MOTION, 5, sensorid=sensorid)
+    def __init__(self, portid, pinid, pullup=None):
+        super().__init__(portid, pinid, pullup=pullup)
+        self.msg = can.makemessage(canid.SENSOR_MOTION, 5, portid=portid)
 
     def __repr__(self):
         return '<{}>'.format(self._repr)

@@ -62,24 +62,24 @@ board.BACKGROUND_RUNNERS.append(board.WD.watchdog_task())
 
 
 class Sensor:
-    def __init__(self, name, sensorid, pin, poll_intervall_in_ms, background_task=None) -> None:
+    def __init__(self, name, portid, pin, poll_intervall_in_ms, background_task=None) -> None:
         # pylint: disable=redefined-outer-name
         self.name = name
-        self.sensorid = sensorid
+        self.portid = portid
         self.pin = pin
         if poll_intervall_in_ms is None:
             poll_intervall_in_ms = poll_5_minutes
         self.poll_intervall_in_ms = poll_intervall_in_ms
         # TODO: do we really need fast? Go and write your own async() if needed.
         self.is_fast = False # can interrupt PWM dimming
-        board.SENSORSs.register(sensorid, self)
+        board.SENSORSs.register(portid, self)
         if background_task is None:
             background_task = self.sensor_task()
         board.BACKGROUND_RUNNERS.append(background_task)
 
     def __repr__(self) -> str:
-        if isinstance(self.sensorid, int):
-            ids = hex(self.sensorid)
+        if isinstance(self.portid, int):
+            ids = hex(self.portid)
         else:
             ids = 'None'
         return '<{}:{}.{}>'.format(self.__class__.__name__, ids, self.pin)
@@ -108,11 +108,11 @@ class Sensor:
 
 class DHT(Sensor):
     """Temperature sensor"""
-    def __init__(self, sensorid, pin, poll_intervall_in_ms=poll_5_minutes):
-        super().__init__('DHT', sensorid, pin, poll_intervall_in_ms)
+    def __init__(self, portid, pin, poll_intervall_in_ms=poll_5_minutes):
+        super().__init__('DHT', portid, pin, poll_intervall_in_ms)
         self.dht = dht.DHT22(machine.Pin(pin))
         self.msg = can.makemessage(canid.DATALOGGER_AM2302, 7)
-        self.msg.setsender(self.sensorid)
+        self.msg.setsender(self.portid)
 
     def proclaim(self):
         super().proclaim()
@@ -121,8 +121,8 @@ class DHT(Sensor):
     #    asyncio.run(self.sensor_task())
 
     def run(self):
-        #print('Measure {}'.format(self.sensorid))
-        # self.msg.setsender(self.sensorid)
+        #print('Measure {}'.format(self.portid))
+        # self.msg.setsender(self.portid)
         # if board.CAN is None:
         #     return
         self.dht.measure()
@@ -144,8 +144,8 @@ class DHT(Sensor):
 
 class Brightness(Sensor):
     """Analog brighness sensors, 0 is dark, 0xff is maximum brightness"""
-    def __init__(self, sensorid, pin, poll_intervall_in_ms=poll_5_minutes):
-        super().__init__('Brightness', sensorid, pin, poll_intervall_in_ms)
+    def __init__(self, portid, pin, poll_intervall_in_ms=poll_5_minutes):
+        super().__init__('Brightness', portid, pin, poll_intervall_in_ms)
         self.adc = machine.ADC(machine.Pin(pin))
         self.adc.width(machine.ADC.WIDTH_9BIT)
         self.last_read = 0
