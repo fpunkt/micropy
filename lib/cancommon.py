@@ -267,6 +267,7 @@ def dispatch_incomming_message():
                 if board.DEBUG:
                     print('Bad number of args {}, expected {}..{}'.format(len(payload), minargs, maxargs))
                 static_incomming_message.bad_number_of_args(minargs, maxargs)
+                return
             # run the callback
             try:
                 callback(static_incomming_message)
