@@ -20,11 +20,12 @@ class Motionsensor(irqio.IRQIO):
     def __repr__(self):
         return '<{}>'.format(self._repr)
 
-    def poll(self):
-        if not super().poll():
+    def run(self):
+        if not super().run():
+            # no change
             return False
         if board.CAN is not None:
-            self.msg.payload[3] = self.state
+            self.msg.payload[3] = self.pinvalue
             self.msg.payload[4] = 1
             self.msg.send()
         # self.event.clear()
