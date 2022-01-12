@@ -125,7 +125,7 @@ func main() {
 		}
 		relp := file
 		if currentdir != "" {
-			relp, err = filepath.Rel(file, currentdir)
+			relp, err = filepath.Rel(currentdir, file)
 			if err != nil {
 				relp = file
 			}
