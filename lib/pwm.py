@@ -285,6 +285,8 @@ class List(PWM):
 
 board.PWMs = List(0xff) # Create a (dynamic) list that includes ALL PWMs
 
+eod_callbacks = []
+
 
 async def _next_dim_step_task():
     # set all dimto values to current values, otherwise we can't initialize PWM values for poweron
@@ -305,6 +307,7 @@ async def _next_dim_step_task():
     # dimdelay = max(1, 1100 // pwm_freq)
 
     dimdelay_when_dimming = max(1, 1000 // pwm_freq)
+    was_dimming = False
     while True:
         #if isdimming:
         #    if dimsteps == 0:
@@ -317,6 +320,14 @@ async def _next_dim_step_task():
                 p.run_next_dimstep()
         # ask other async tasks to delay their execution to ensure smooth and uniterrupted dimming
         board.PWM_IS_DIMMING = isdimming
+        if isdimming:
+            was_dimming = True
+        else:
+            if was_dimming:
+                for cb in eod_callbacks:
+                    cb()
+                was_dimming = False
+
 
         #if not isdimming and dimsteps > 1:
         #    # finished dimming
@@ -385,7 +396,7 @@ def _getpwm(msg):
         i += 1
     return pwms
 
-can.register(pwmcode.SET_INTENSITY, 4, 4, lambda msg: _getpwm(msg).dimi16(msg.u16(2)))
+can.register(pwmcode.SET_INTENSITY16, 4, 4, lambda msg: _getpwm(msg).dimi16(msg.u16(2)))
 can.register(pwmcode.ON, 2, 2, lambda msg: _getpwm(msg).on())
 can.register(pwmcode.OFF, 2, 2, lambda msg: _getpwm(msg).off())
 can.register(pwmcode.TOGGLE, 2, 2, lambda msg: _getpwm(msg).toggle())
