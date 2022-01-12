@@ -1,0 +1,42 @@
+device = "eg.wz.schrank"
+#canid = 0x338
+canid = 0x10
+
+[led.wand]
+name = "Lampe auf dem Schrank"
+port = 1
+# default = 50
+
+[led.salzlampe]
+name = "Salzlampe"
+port = 2
+# default = 50
+
+[led.lichterkette]
+name = "Weihnachtslichterkette"
+port = 3
+# default = 30
+
+[rgb.rgb]
+name = "Farbige Lichterkette"
+port = 4
+
+# 2 * motionsensor
+
+[button.button1]
+port = 0x0a
+
+[button.button2]
+port = 0x0b
+
+[am2302.temperature]
+name = "Wohnzimmerschrank"
+port = 0x09
+
+
+[dependencies]
+libfiles = ["board.py", "boot.py", "button.py", "can.py", "cancodes.py", "cancommon.py",
+    "canconf.py", "canerror.py", "canesp32.py", "canid.py", "caninfo.py", "irqio.py",
+    "motionsensor.py", "net.py", "pwm.py", "pwmcode.py", "sensors.py",
+    "rgb.py"
+]
