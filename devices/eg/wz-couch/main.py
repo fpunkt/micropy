@@ -1,6 +1,6 @@
 """
-WZ count
-    # 2 PWM connected AUX-1 4P on beta board
+WZ couch
+    // 2 PWM connected AUX-1 4P on beta board
     7 PWM connected to ML-10
         1: Wandlampe
         2: rote Lampe
@@ -21,7 +21,7 @@ WZ count
 
 import board
 board.LOCATION = 'wz-couch'
-board.DEBUG = True
+# board.DEBUG = True
 board.CANID = 0x368
 
 if board.DEBUG is True:
@@ -45,6 +45,8 @@ import uasyncio as asyncio
 if board.CAN and board.DEBUG:
     board.CAN.cancommon.send_wlan_connected()
 
+# TODO: change DC/DC driver from PWM to PIN, make it "auto on/off" with PWM
+
 p1 = pwm.PWM(1, bconf.ML10_PWM_1)
 p2 = pwm.PWM(2, bconf.ML10_PWM_2)
 p3 = pwm.PWM(3, bconf.ML10_PWM_3)
@@ -59,8 +61,8 @@ p8 = pwm.PWM(8, bconf.ML10_PWM_8)
 # pl = pwm.List(0x20, p1, p2)
 
 
-b1 = button.Button(10, bconf.AUX3_WHITE)
-b2 = button.Button(11, bconf.AUX3_YELLOW)
+b1 = button.Button(10, bconf.AUX3_YELLOW)
+b2 = button.Button(11, bconf.AUX3_WHITE)
 
 if board.DEBUG:
     b1.callback = lambda b: print('Button pressed: {}'.format(b))
