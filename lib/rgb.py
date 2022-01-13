@@ -47,7 +47,7 @@ class RGB:
         # self.bv = 0
         # self.gv = 0
         self.can_message_pending = False
-        pwm.eod_callbacks.append(self.send_status_to_can_if_needed)
+       #  pwm.eod_callbacks.append(self.send_status_to_can_if_needed)
 
     def send_status_to_can_if_needed(self):
         if not self.can_message_pending:
@@ -68,13 +68,14 @@ class RGB:
         if board.DEBUG:
             print('seti10 {}, {}, {}'.format(r, g, b))
         self.seti_no_can_message(r, g, b)
-        self._send_to_can()
+        self.send_status_to_can(r, g, b)
+        #self._send_to_can()
 
     # def seti16(self, r, g, b):
     #     """Set raw integer duty from 0 .. 0xffff and send status to CAN"""
     #     self.seti10(_rshift(r), _rshift(g), _rshift(b))
 
-    def dimi10(self, r, g, b):
+    def dimi10xxx(self, r, g, b):
         """dim in raw units"""
         if board.DEBUG:
             print('dim10 {}, {}, {}'.format(r, g, b))
@@ -85,15 +86,24 @@ class RGB:
         else:
             self._send_to_can()
 
+    def dimi10(self, r, g, b):
+        """dim in raw units"""
+        if board.DEBUG:
+            print('dim10 {}, {}, {}'.format(r, g, b))
+        self.r.dimi(r)
+        self.g.dimi(g)
+        self.b.dimi(b)
+        self.send_status_to_can(r, g, b)
+
     def dimi16(self, r, g, b):
         """dim in 16-bit units"""
         #self.send_status_to_can(r, g, b) # send even the device is still working
         self.dimi10(_rshift(r), _rshift(g), _rshift(b))
 
     def _send_to_can(self):
-        self._send_status_to_can(self.r.ival, self.g.ival, self.b.ival)
+        self.send_status_to_can(self.r.ival, self.g.ival, self.b.ival)
 
-    def _send_status_to_can(self, r, g, b):
+    def send_status_to_can(self, r, g, b):
         # Message format is
         #  senderid/16
         #  portid/8
