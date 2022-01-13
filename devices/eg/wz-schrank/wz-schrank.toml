@@ -3,7 +3,7 @@ canid = 0x338
 # canid = 0x10
 
 [led.wand]
-name = "Lampe auf dem Schrank"
+name = "Lampe Schrank"
 port = 1
 # default = 50
 
@@ -13,7 +13,7 @@ port = 2
 # default = 50
 
 [led.lichterkette]
-name = "Weihnachtslichterkette"
+name = "Lichterkette Schrank"
 port = 3
 # default = 30
 
@@ -28,11 +28,11 @@ port = 9
 # 2 * motionsensor
 
 [motionsensor.directiondoor]
-name = "Schrank Richtung WZ Tür"
+name = "Schrank Tür"
 port = 0x10
 
 [motionsensor.directionessz]
-name = "Schrank Richtung Esszimmer"
+name = "Schrank Esszimmer"
 port = 0x11
 
 
