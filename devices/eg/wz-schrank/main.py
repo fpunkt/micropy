@@ -22,7 +22,7 @@ WZ Schrank
 
 import board
 board.LOCATION = 'wz-schrank'
-# board.DEBUG = True
+#board.DEBUG = True
 board.CANID = 0x338
 
 if board.DEBUG is True:
