@@ -95,6 +95,9 @@ def dingdonghandler(msg):
 
 can.register(0x30, 1, 2, dingdonghandler)
 
+# TODO: install default can-handler that - if not overwritten - raises an error if no other handler
+# was called
+
 
 def r():
     board.restart()
