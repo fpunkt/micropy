@@ -36,7 +36,7 @@ name = "Schrank Esszimmer"
 port = 0x11
 
 
-[am2302.temperature]
+[am2302.schrank]
 name = "Wohnzimmerschrank"
 port = 0x20
 

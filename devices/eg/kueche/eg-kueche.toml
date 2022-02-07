@@ -34,15 +34,15 @@ port = 6
 name = "Spüle"
 port = 7
 
-[button.buttonright]
+[button.right]
 port = 10
 
 [button.center]
 port = 11
 
-[button.buttonleft]
+[button.left]
 port = 12
 
-[am2302.temperaturekueche]
+[am2302.kueche]
 port = 0x30
 name = "Küche"

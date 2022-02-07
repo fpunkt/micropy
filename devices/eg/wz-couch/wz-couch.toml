@@ -37,12 +37,12 @@ port = 7
 # name = "Not connected (no FET)"
 # port = 8
 
-[button.button1]
+[button.b1]
 port = 0x0a
 
-[button.button2]
+[button.b2]
 port = 0x0b
 
-[am2302.temperature]
+[am2302.couch]
 name = "Unter der Couch"
 port = 0x14
