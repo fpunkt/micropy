@@ -27,11 +27,11 @@ port = 9
 
 # 2 * motionsensor
 
-[motionsensor.directiondoor]
+[motionsensor.dirdoor]
 name = "Schrank Tür"
 port = 0x10
 
-[motionsensor.directionessz]
+[motionsensor.diressz]
 name = "Schrank Esszimmer"
 port = 0x11
 
