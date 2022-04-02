@@ -29,6 +29,7 @@ import (
 	"fmt"
 	"math/rand"
 	"os"
+	"os/exec"
 	"strings"
 
 	"github.com/spf13/pflag"
@@ -77,14 +78,35 @@ func pad() {
 	}
 }
 
+func decode(fname string) {
+	mod := strings.TrimSuffix(fname, ".py")
+	cmd := fmt.Sprintf("import %s; print(%s.s(0), %s.s(32))", mod, mod, mod)
+	log.Debug().Str("cmd", cmd).Msg("Going to run python command")
+	out, err := exec.Command("python3", "-c", cmd).Output()
+	if err != nil {
+		log.Fatal().Err(err).Str("cmd", cmd).Msg("Cannot run python")
+	}
+	fmt.Println(string(out))
+}
+
 func main() {
 	pflag.CountVarP(&verbose, "verbose", "v", "verbose messages")
 	outputFile := pflag.StringP("output", "o", "", "Output file for generated python code")
+	decodeFlag := pflag.BoolP("decode", "d", false, "Decode given python file")
 	writeMain := pflag.BoolP("main", "m", false, "Create main-function for testing python code")
 	pflag.Parse()
 
 	log.Logger = zlog.New()
 	zlog.SetLevel(verbose)
+
+	if *decodeFlag {
+		mod := "c"
+		if pflag.NArg() == 1 {
+			mod = pflag.Arg(0)
+		}
+		decode(mod)
+		return
+	}
 
 	buffer.WriteByte(byte(len(offsets)))
 	for _, o := range offsets {
