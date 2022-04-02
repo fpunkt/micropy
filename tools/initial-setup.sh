@@ -67,7 +67,7 @@ upload $libdir/c.mpy
 # ampy -p $serial put $libdir/net.py
 # ampy -p $serial put $libdir/board.py
 
-echo "# Network stuff copied to board. Now start a terminal (FLTerm on macOS, tio on linux) and run"
+echo "# Network stuff copied to board. Now start a terminal (gterm or FLTerm on macOS, tio on linux) and run"
 echo "#"
 echo "import net"
 echo "net.start_wlan(32)"
