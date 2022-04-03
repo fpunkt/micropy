@@ -177,8 +177,10 @@ class PWM:
     def dimi(self, value):
         """dim in raw units, return False if value is directly set, return True otherwise (dimming)"""
         value = valid(value)
-        if value == self.ival and value == self.pwm.duty():
-            return False
+        #if value == self.ival and value == self.pwm.duty():
+        #    # still report value
+        #    self.send_status_to_can()
+        #    return False
         if self.dimtovalue < -10:
             self.seti(value)
             return False
