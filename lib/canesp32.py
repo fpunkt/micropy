@@ -53,7 +53,13 @@ async def _poll_CAN():
             cancommon.static_incomming_message.canid = cid
             cancommon.static_incomming_message.payload = payload
             cancommon.dispatch_incomming_message()
+            # eat all pending messages - ensure that we do not miss one
+            # should not result in blocking other tasks because a message
+            # takes about 1ms and we are most likely faster in processing
+            # the messages (especially if not for us)
+            continue
         else:
+            board.good_time_for_gc()
             # good time for GC?
             pass
         await asyncio.sleep_ms(board.CANPOLLTIME_MS)
