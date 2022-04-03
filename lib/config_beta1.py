@@ -1,5 +1,7 @@
 """
-Sample board from EDAC (footprint not correct)
+First ESP32 board from EasyEDA
+2 x ML10 connector
+4 x Grove connector
 """
 
 # pylint: disable=import-error, missing-docstring, redefined-builtin, too-many-arguments
@@ -33,6 +35,17 @@ ML10_PWM_5 = const(5)
 ML10_PWM_6 = const(18)
 ML10_PWM_7 = const(19)
 ML10_PWM_8 = const(21)
+
+
+# 2nd ML10 connector
+ML10_1 = const(12)
+ML10_2 = const(13)
+ML10_3 = const(14)
+ML10_4 = const(25)
+ML10_5 = const(26)
+ML10_6 = const(27)
+ML10_7 = const(33)
+ML10_8 = const(34)
 
 
 if board.CANID is not None:
