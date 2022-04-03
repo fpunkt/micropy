@@ -77,6 +77,9 @@ class Button(irqio.IRQIO):
             else:
                 return False
 
+        if self.pwm is None:
+            return False
+
         # autorepeat is active, do next step
         self.pwm.disable_dimming()
         ival = self.pwm.ival
