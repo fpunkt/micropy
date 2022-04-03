@@ -221,6 +221,19 @@ def send_wlan_connected(ip=None):
         if board.DEBUG:
             print('** ERROR: Cannot send WLAN IP for {}'.format(ip))
 
+
+async def _report_net_status():
+    while True:
+        await asyncio.sleep(600) # report each 10 minutes
+        try:
+            ip = net.wlan_ip()
+            if ip is not None:
+                send_wlan_connected(ip)
+        except:
+            pass
+
+board.BACKGROUND_RUNNERS.append(_report_net_status())
+
 def _connect_to_wlan(m):
     if len(m.payload) == 2:
         b = m.payload[1]
