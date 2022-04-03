@@ -82,9 +82,6 @@ def can_callback(msg):
     global message_counter
     message_counter += 1
     # print("GOT CAN message #{:4d}: {}".format(message_counter, msg))
-    if pwm.handle_can_message(msg):
-        # print('Message handled by PWM')
-        return
     if len(msg.payload) > 3 and msg.payload[0] == 0x11:
         count = 100*(msg.payload[1]<<8 + msg.payload[2])
         print("DOING SOME STUPID LOOPING", count)
