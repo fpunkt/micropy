@@ -54,8 +54,9 @@ def start_wlan(base=0):
     # need some sleep, otherwise screen disconnects right away (gets reset??)
     wlan.active(True)       # activate the interface
     time.sleep(1)
-    wlan.scan()             # scan for access points
-    time.sleep(1)
+    # TODO: why do we scan for access points?
+    #wlan.scan()             # scan for access points
+    #time.sleep(1)
     # pylint: disable=no-member
     s, p = c.s(base)
 #    if DEBUG:
@@ -112,3 +113,4 @@ def start_repl(password='x'):
 
 def stop_repl():
     webrepl.stop()
+
