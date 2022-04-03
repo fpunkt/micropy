@@ -67,6 +67,8 @@ class Message:
         self.bad_parameter_value(1, 0xff, 0)
 
     def unknown_command(self):
+        if board.DEBUG:
+            print('# Error: unknown CAN command {}'.format(self))
         c = 0
         if len(self.payload) > 0:
             c = self.payload[0]
@@ -265,7 +267,10 @@ def subscribe(callback, canid=None):
     cid==id subscribes to messages with the given ID"""
     global _callback, _subscribed_to_canid
     _callback = callback
-    _subscribed_to_canid = canid
+    if canid is None:
+        _subscribed_to_canid = board.CANID
+    else:
+        _subscribed_to_canid = canid
 
 
 def dispatch_incomming_message():
@@ -288,9 +293,9 @@ def dispatch_incomming_message():
                 if board.DEBUG:
                     print('Callback raised error: {}'.format(e))
             return True
-        if _callback is None:
-            return False
-        if _subscribed_to_canid is True or _subscribed_to_canid == board.CANID:
-            _callback(static_incomming_message)
-            return True
+    if _callback is None:
+        return False
+    if _subscribed_to_canid is True or _subscribed_to_canid == static_incomming_message.canid:
+        _callback(static_incomming_message)
+        return True
     return False
