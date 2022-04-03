@@ -3,6 +3,7 @@ package main
 import (
 	"bytes"
 	"fmt"
+	"io/fs"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -107,10 +108,37 @@ func main() {
 	log.Info().Int("nfiles", len(changed)).Str("host", ipstring).Msg("Uploading files")
 	currentdir, _ := os.Getwd()
 
+	// augment changed files by command line arguments
+	if pflag.NArg() > 0 {
+		project, _ := os.ReadDir(".")
+		lib, _ := os.ReadDir(libdir)
+
+		ff := func(f string, dir []fs.DirEntry) string {
+			for _, d := range dir {
+				if strings.HasPrefix(d.Name(), f) {
+					return d.Name()
+				}
+			}
+			return ""
+		}
+		for _, f := range pflag.Args() {
+			if s := ff(f, project); s != "" {
+				fmt.Printf("Got %q for %q\n", s, f)
+				changed = append(changed, s)
+			}
+			if s := ff(f, lib); s != "" {
+				fmt.Printf("Got %q for %q\n", s, f)
+				changed = append(changed, s)
+			}
+		}
+	}
+
+	//fmt.Println(changed)
+
 	for _, file := range changed {
 		s, err := os.Stat(file)
 		if err != nil {
-			log.Fatal().Err(err).Msg("Fatal error")
+			log.Fatal().Err(err).Msg("Cannot stat file")
 		}
 		//fmt.Printf("%20s: %s - %s - %T\n", file, s.ModTime(), lastupload, s.ModTime().Before(lastupload))
 		// HUH? We already checked that?
@@ -118,6 +146,7 @@ func main() {
 			continue
 		}
 		relp := file
+		//fmt.Printf("relp=%s, cd=%s\n", relp, currentdir)
 		if currentdir != "" {
 			relp, err = filepath.Rel(currentdir, file)
 			if err != nil {
