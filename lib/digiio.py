@@ -20,3 +20,10 @@ class DigitalOut:
         else:
             self.pin.off()
 
+class DigitalIn:
+    def __init__(self, portid, pinid) -> None:
+        self.pin = machine.Pin(pinid, machine.Pin.IN)
+        board.SENSORSs.register(portid, self)
+
+    def read(self): self.pin.value()
+    def value(self): self.pin.value()
