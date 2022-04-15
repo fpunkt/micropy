@@ -1,0 +1,26 @@
+device = "eg.wz.roof"
+canid = 0x358
+room = "Wohnzimmer"
+
+[led.mid]
+name = "Decke (Mitte)"
+port = 2
+
+[led.couch]
+name = "Decke (Couch)"
+port = 1
+
+[led.win]
+name = "Decke (Fenster)"
+port = 3
+
+[led.tvlight]
+name = "Fernsehlampe"
+port = 4
+
+[button.left]
+port = 0x21
+
+[button.right]
+port = 0x20
+

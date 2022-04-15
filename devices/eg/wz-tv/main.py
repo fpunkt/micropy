@@ -25,8 +25,8 @@ Groove
 
 import board
 board.LOCATION = 'wztv'
-board.DEBUG = True
-board.CANID = 0x120
+# board.DEBUG = True
+board.CANID = 0x358
 
 if board.DEBUG is True:
     # board.CANID = 0x10
@@ -51,40 +51,56 @@ import motionsensor
 if board.CAN and board.DEBUG:
     board.CAN.cancommon.send_wlan_connected()
 
-p0 = pwm.PWM(1, bconf.ML10_PWM_1)
-p1 = pwm.PWM(2, bconf.ML10_PWM_2)
-p2 = pwm.PWM(3, bconf.ML10_PWM_3)
-p3 = pwm.PWM(4, bconf.ML10_PWM_4)
-p4 = pwm.PWM(5, bconf.ML10_PWM_5)
-p5 = pwm.PWM(6, bconf.ML10_PWM_6)
-p6 = pwm.PWM(7, bconf.ML10_PWM_7)
-p7 = pwm.PWM(8, bconf.ML10_PWM_8)
+# BAD PWM backplane
+# p0 = pwm.PWM(1, bconf.ML10_PWM_1)
+# p1 = pwm.PWM(2, bconf.ML10_PWM_2)
+# p2 = pwm.PWM(3, bconf.ML10_PWM_3)
+# p3 = pwm.PWM(4, bconf.ML10_PWM_4)
+# p4 = pwm.PWM(5, bconf.ML10_PWM_5)
+# p5 = pwm.PWM(6, bconf.ML10_PWM_6)
+# p6 = pwm.PWM(7, bconf.ML10_PWM_7)
+# p7 = pwm.PWM(8, bconf.ML10_PWM_8)
+
+p4 = pwm.PWM(4, bconf.ML10_PWM_1)
+p5 = pwm.PWM(5, bconf.ML10_PWM_2)
+p3 = pwm.PWM(3, bconf.ML10_PWM_3)
+p6 = pwm.PWM(6, bconf.ML10_PWM_4)
+p2 = pwm.PWM(2, bconf.ML10_PWM_5)
+p7 = pwm.PWM(7, bconf.ML10_PWM_6)
+p1 = pwm.PWM(1, bconf.ML10_PWM_7)
+p8 = pwm.PWM(8, bconf.ML10_PWM_8)
+
+proof = pwm.List(9, p1, p2, p3)
+
 
 # PINs on left side (buttons, thermometer and motionsensors)
 # 13, 12, 14, 27, 26, 25, 33
-b1 = button.Button(0x20, bconf.RJ12_1_WHITE_INPUT_ONLY)
-b2 = button.Button(0x21, bconf.RJ12_1_GREEN_INPUT_ONLY)
+# b1 = button.Button(0x20, bconf.RJ12_1_WHITE_INPUT_ONLY)
+# b2 = button.Button(0x21, bconf.RJ12_1_GREEN_INPUT_ONLY)
+b1 = button.Button(0x20, bconf.RJ12_1_YELLOW)
+b1.pwm = proof
 
-def _motion_callback(x):
-    if board.DEBUG:
-        print('Motion detected on {}'.format(x))
+b2 = button.Button(0x21, bconf.RJ12_1_BLUE)
 
-m1 = motionsensor.Motionsensor(0x30, bconf.AUX1_WHITE)
-m1.callback = _motion_callback
+
+#def _motion_callback(x):
+#    if board.DEBUG:
+#        print('Motion detected on {}'.format(x))
+
+# temperature = sensors.DHT(0x40, bconf.AUX1_YELLOW, poll_intervall_in_ms=1*30*1000)
+# m1 = motionsensor.Motionsensor(0x30, bconf.AUX1_WHITE)
+# m1.callback = _motion_callback
 
 
 def cb(but):
     board.PRINT('got event from button {}', but)
 
-b1.callback = cb
-b2.callback = cb
+# b1.callback = cb
+# b2.callback = cb
 
 # pl1.toggle_mode = 1
 
 
-#
-# temperature = sensors.DHT(0x30, 33, poll_intervall_in_ms=5*60*1000)
-temperature = sensors.DHT(0x40, bconf.AUX1_YELLOW, poll_intervall_in_ms=1*30*1000)
 
 message_counter = 0
 
