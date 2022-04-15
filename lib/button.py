@@ -55,7 +55,8 @@ class Button(irqio.IRQIO):
         if changed:
             if self.pinvalue == 1:
                 # button released
-                self.pwm.enable_dimming()
+                if self.pwm is not None:
+                    self.pwm.enable_dimming()
                 return self._pressed()
             # button pressed
             self.autorepeat_last_action_timestamp = utime.ticks_ms()
