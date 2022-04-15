@@ -241,6 +241,14 @@ class List(PWM):
         for p in self.pwms:
             p.dimi(value)
 
+    def seti(self, value):
+        for p in self.pwms:
+            p.seti(value)
+
+    def enable_dimming(self):
+        for p in self.pwms:
+            p.enable_dimming()
+
     def on(self):
         # print('pwm.List #{self.id} on')
         for p in self.pwms:
