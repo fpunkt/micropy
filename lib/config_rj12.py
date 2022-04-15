@@ -16,8 +16,8 @@ import board
 # The on-chip LED
 board.LED = board.Led(2)
 
-RJ12_1_WHITE_INPUT_ONLY = const(39)
-RJ12_1_GREEN_INPUT_ONLY = const(36)
+RJ12_1_WHITE_INPUT_ONLY_NO_PULLUP = const(39)
+RJ12_1_GREEN_INPUT_ONLY_NO_PULLUP = const(36)
 RJ12_1_YELLOW = const(23)
 RJ12_1_BLUE = const(22)
 
