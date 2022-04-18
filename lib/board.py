@@ -18,6 +18,11 @@ DEBUG = False
 # CANID of the application. Set in main.py
 CANID = None
 
+CPU_ID = 1              # ESP32 per default
+BOARD_ID = 0            # PCB version, overwritten in bconf
+PERIPH_ID = 0           # PCB version, overwritten in main.py (or by including other .py files)
+
+
 
 PINGTIME = 300
 MEMSTATTIME = 300

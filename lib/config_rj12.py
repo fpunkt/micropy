@@ -13,6 +13,8 @@ if 0 == 1:
 
 import board
 
+board.BOARD_ID = 2
+
 # The on-chip LED
 board.LED = board.Led(2)
 

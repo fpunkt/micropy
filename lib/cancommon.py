@@ -161,6 +161,15 @@ def _identify(packetid):
                 0xa0, # Application type and Version - make this the library version
                 serial[-2], serial[-1]]) # CPU serial
 
+def sendconfig():
+    if board.CAN and board.CANID:
+        board.CAN.write(canid.CONFIG_INFO, [board.CANID >>8, board.CANID & 0xff,
+            board.CPU_ID,
+            board.BOARD_ID,
+            board.PERIPH_ID,
+        ])
+
+
 
 def run_gc():
     global _gc_counter # pylint: disable=global-statement
@@ -255,6 +264,7 @@ register(canconf.WEBREPL_START, 1, 1, lambda _: net.start_repl())
 register(canconf.WEBREPL_STOP, 1, 1, lambda _: net.stop_repl())
 register(canconf.SEND_FREEMEM, 1, 1, lambda _: _send_memstat())
 register(canconf.ENABLE_WATCHDOG, 1, 1, lambda _: board.WD.enable())
+register(canconf.SEND_INFO)
 
 
 _callback = None
