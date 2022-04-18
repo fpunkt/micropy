@@ -18,6 +18,23 @@ port = 3
 name = "Fernsehlampe"
 port = 4
 
+[led.xmas]
+name = "Weihnachtsstern"
+port = 5
+
+[led.spare]
+name = "Spare"
+port = 6
+
+[led.candle]
+name = "1900 K LED Streifen"
+port = 7
+
+[led.entrance]
+name = "Wohnzimmertür (2400 K)"
+port = 8
+
+
 [button.left]
 port = 0x21
 
