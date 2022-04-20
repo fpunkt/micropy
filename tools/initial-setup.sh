@@ -61,7 +61,7 @@ upload()
 
 
 upload $libdir/net.mpy
-upload $libdir/c.mpy
+upload $libdir/../tools/c.mpy
 # upload $libdir/board.py
 # ampy -p $serial put /usr/local/etc/secrets.py
 # ampy -p $serial put $libdir/net.py
