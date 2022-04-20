@@ -107,7 +107,13 @@ class Sensor:
 
 
 class DHT(Sensor):
-    """Temperature sensor"""
+    """Temperature sensor
+    3 to 5V power and I/O
+    2.5mA max current use during conversion (while requesting data)
+    Good for 0-100% humidity readings with 2-5% accuracy
+    Good for -40 to 80°C temperature readings ±0.5°C accuracy
+    No more than 0.5 Hz sampling rate (once every 2 seconds)
+    """
     def __init__(self, portid, pin, poll_intervall_in_ms=poll_5_minutes):
         super().__init__('DHT', portid, pin, poll_intervall_in_ms)
         self.dht = dht.DHT22(machine.Pin(pin))
@@ -116,9 +122,6 @@ class DHT(Sensor):
 
     def proclaim(self):
         super().proclaim()
-
-    #async def dht_task(self):
-    #    asyncio.run(self.sensor_task())
 
     def run(self):
         #print('Measure {}'.format(self.portid))
@@ -133,6 +136,41 @@ class DHT(Sensor):
         t = (self.dht.buf[2] & 0x7F) << 8 | self.dht.buf[3]
         if self.dht.buf[2] & 0x80:
             t = -t
+        if board.CAN is not None:
+            payload = self.msg.payload
+            payload[3] = h >> 8
+            payload[4] = h & 0xff
+            payload[5] = t >> 8
+            payload[6] = t & 0xff
+            self.msg.send()
+
+class DHT11(Sensor):
+    """
+    3 to 5V power and I/O
+    2.5mA max current use during conversion (while requesting data)
+    Good for 20-80% humidity readings with 5% accuracy
+    Good for 0-50°C temperature readings ±2°C accuracy
+    """
+    def __init__(self, portid, pin, poll_intervall_in_ms=poll_5_minutes):
+        super().__init__('DHT11', portid, pin, poll_intervall_in_ms)
+        self.dht = dht.DHT11(machine.Pin(pin))
+        self.msg = can.makemessage(canid.DATALOGGER_AM2302, 7)
+        self.msg.setsender(self.portid)
+
+    def proclaim(self):
+        super().proclaim()
+
+    def run(self):
+        #print('Measure {}'.format(self.portid))
+        # self.msg.setsender(self.portid)
+        # if board.CAN is None:
+        #     return
+        self.dht.measure()
+        # t = int(10*self.dht.temperature()+0.5)
+        # h = int(10*self.dht.humidity()+0.5)
+        # decode ourself to avoid malloc
+        h = 10 * self.dht.buf[0]
+        t = 10 * self.dht.buf[2]
         if board.CAN is not None:
             payload = self.msg.payload
             payload[3] = h >> 8
