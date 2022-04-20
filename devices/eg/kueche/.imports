@@ -3,6 +3,8 @@ boot.py
 button.py
 can.py
 canconf.py
+cancommon.py
+canesp32.py
 canerror.py
 canid.py
 irqio.py
@@ -11,3 +13,4 @@ net.py
 pwm.py
 pwmcode.py
 sensors.py
+config_pwmbank_1_0.py
