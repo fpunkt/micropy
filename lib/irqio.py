@@ -30,13 +30,13 @@ class IRQIO(sensors.Sensor):
             pullupmode = machine.Pin.PULL_UP
         else:
             pullupmode = pullup
+        # TODO: should have been initialized by super()
         self.portid = portid
         self.pin = machine.Pin(pinid, machine.Pin.IN, pullupmode)
         self._repr = '{} #{} {}'.format(self.__class__.__name__, self.portid, self.pin)
         self.callback = None
         self.pinvalue = self.pin.value()
         self.last_irq = utime.ticks_ms()
-        self.last_run = self.last_irq
         self.last_value = 0
         self.pin.irq(trigger=trigger, handler=self._irq_handler)
         self.debounce_ms = 1
