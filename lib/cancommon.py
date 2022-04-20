@@ -88,7 +88,7 @@ Badmessage = Message(0x777, [1, 2, 3, 4])
 
 
 
-# cache message, only update payload. OK since with asyncio the will be no raceing
+# cache message, only update payload. OK since with asyncio there will be no raceing
 _errormessage = Message(canid.ERROR_MESSAGE, [])
 
 def errormessage(payload):
@@ -264,7 +264,7 @@ register(canconf.WEBREPL_START, 1, 1, lambda _: net.start_repl())
 register(canconf.WEBREPL_STOP, 1, 1, lambda _: net.stop_repl())
 register(canconf.SEND_FREEMEM, 1, 1, lambda _: _send_memstat())
 register(canconf.ENABLE_WATCHDOG, 1, 1, lambda _: board.WD.enable())
-register(canconf.SEND_INFO)
+register(canconf.SEND_INFO, 1, 1, lambda _: sendconfig())
 
 
 _callback = None
