@@ -13,7 +13,7 @@ To update run
 
 import board
 board.LOCATION = 'kueche'
-board.DEBUG = True
+# board.DEBUG = True
 board.CANID = 0x350
 
 if board.DEBUG is True:
@@ -83,12 +83,12 @@ b3 = button.Button(0x12, bconf.RJ12_2_YELLOW)
 # b2 = button.Button(0x11, bconf.RJ12_1_BLUE)
 # b3 = button.Button(0x12, bconf.RJ12_1_GREEN_INPUT_ONLY_NO_PULLUP)
 
-async def pbv():
-    while True:
-        print('b1={}, b2={}, b3={}'.format(b1.pin.value(), b2.pin.value(), b3.pin.value()))
-        await asyncio.sleep_ms(500)
-
-board.BACKGROUND_RUNNERS.append(pbv())
+# async def pbv():
+#     while True:
+#         print('b1={}, b2={}, b3={}'.format(b1.pin.value(), b2.pin.value(), b3.pin.value()))
+#         await asyncio.sleep_ms(500)
+#
+# board.BACKGROUND_RUNNERS.append(pbv())
 
 def _motion_callback(x):
     if board.DEBUG:
