@@ -22,6 +22,7 @@ var libdir, ipstring string
 var options = struct {
 	verbose int
 	dryrun  bool
+	force   bool
 }{}
 
 const (
@@ -36,6 +37,7 @@ func main() {
 	// }
 	pflag.CountVarP(&options.verbose, "verbose", "v", "verbose messages")
 	pflag.BoolVarP(&options.dryrun, "dryrun", "d", false, "compile but don't upload file")
+	pflag.BoolVarP(&options.force, "force", "f", false, "Force upload of all files (ignore .lastsync)")
 	pflag.Parse()
 
 	log.Logger = zlog.New()
@@ -77,10 +79,11 @@ func main() {
 	}
 
 	var lastupload time.Time
-	if s, err := os.Stat(lastsyncfile); err == nil {
-		lastupload = s.ModTime()
+	if !options.force {
+		if s, err := os.Stat(lastsyncfile); err == nil {
+			lastupload = s.ModTime()
+		}
 	}
-
 	//var changed []string
 
 	changed := compileFiles(libdir, dependencies, lastupload)
