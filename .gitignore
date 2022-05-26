@@ -7,3 +7,4 @@ run.py
 __pycache__
 devices/eg/mqttlights/c.py
 bin/upload
+.vscode
