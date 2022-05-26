@@ -3,7 +3,7 @@ Kueche main.py
 
 To update run
 
-../../../webrepl/webrepl_cli.py -p x main.py 192.168.178.156:
+../../../webrepl/webrepl_cli.py -p x main.py 192.168.178.161:
 
 
 3 buttons
@@ -13,7 +13,7 @@ To update run
 
 import board
 board.LOCATION = 'kueche'
-# board.DEBUG = True
+#board.DEBUG = True
 board.CANID = 0x350
 
 if board.DEBUG is True:
@@ -50,28 +50,28 @@ if 0 == 1:
 _defi1 = const(800)
 _defi2 = const(1000)
 
-p8 = pwm.PWM(8, bconf.ML10_PWM_8) # Dunsthaube warm
+p8 = pwm.PWM(8, bconf.ML10_PWM_8)
 p8.lastintensity = _defi1
 
 # PIN 2 is the on-PCB LED
-p1 = pwm.PWM(1, bconf.ML10_PWM_1) # Fenster
+p1 = pwm.PWM(1, bconf.ML10_PWM_1)
 p1.lastintensity = _defi1
 
-p2 = pwm.PWM(2, bconf.ML10_PWM_2) # Dunsthaube kalt
+p2 = pwm.PWM(2, bconf.ML10_PWM_2)
 p2.lastintensity = _defi1
 
-p3 = pwm.PWM(3, bconf.ML10_PWM_3) # Arbeitsplatte warm
+p3 = pwm.PWM(3, bconf.ML10_PWM_3)
 p3.lastintensity = _defi2
 
-p4 = pwm.PWM(4, bconf.ML10_PWM_4) # Arbeitsplatte kalt
+p4 = pwm.PWM(4, bconf.ML10_PWM_4)
 p4.lastintensity = _defi2
 
-p5 = pwm.PWM(5, bconf.ML10_PWM_5) # NC
+p5 = pwm.PWM(5, bconf.ML10_PWM_5)
 
-p6 = pwm.PWM(6, bconf.ML10_PWM_6) # # Brotdose
+p6 = pwm.PWM(6, bconf.ML10_PWM_6)
 p6.lastintensity = _defi1
 
-p7 = pwm.PWM(7, bconf.ML10_PWM_7) # Spüle
+p7 = pwm.PWM(7, bconf.ML10_PWM_7)
 p7.lastintensity = _defi1
 
 # PINs on left side (buttons, thermometer and motionsensors)
@@ -100,43 +100,43 @@ m1 = motionsensor.Motionsensor(0x20, bconf.AUX1_WHITE, pullup=None)
 m2 = motionsensor.Motionsensor(0x21, bconf.AUX1_YELLOW, pullup=None)
 m2.callback = _motion_callback
 
-def cb(but):
-    board.PRINT('got event from button {}', but)
+# def cb(but):
+#     board.PRINT('got event from button {}', but)
+# 
+# b1.callback = cb
+# b2.callback = cb
 
-b1.callback = cb
-b2.callback = cb
-
-pl1 = pwm.List(None, p8, p1, p4)
-pl2 = pwm.List(None, p8, p1, p2, p3, p4, p6)
-pl3 = pwm.List(None, p8, p1, p2, p3, p4, p6, p7)
+pl1 = pwm.List(None, p1, p2, p3, p4, p5)
+pl2 = pwm.List(None, p1, p2, p3, p4, p5, p7)
+pl3 = pwm.List(None, p1, p2, p3, p4, p5, p6, p7)
 # pl1.toggle_mode = 1
 
 b1.pwm = pl1
-b2.pwm = pl3
-b3.pwm = pl2
+b2.pwm = pl2
+b3.pwm = pl3
 
 #
 temperature = sensors.DHT11(0x30, bconf.AUX2_WHITE, poll_intervall_in_ms=5*60*1000)
 
 message_counter = 0
 
-def can_callback(msg):
-    # pylint: disable=global-statement
-    global message_counter
-    message_counter += 1
-    # print("GOT CAN message #{:4d}: {}".format(message_counter, msg))
-
-    if len(msg.payload) > 3 and msg.payload[0] == 0x11:
-        count = 10*((msg.payload[1]<<8) + msg.payload[2])
-        print("DOING SOME STUPID LOOPING", count, msg.payload)
-        while count > 0:
-            count -= 1
-        print("DONE with stupid looping")
-        return
-    msg.unknown_command()
-
-
-can.subscribe(can_callback)
+# def can_callback(msg):
+#     # pylint: disable=global-statement
+#     global message_counter
+#     message_counter += 1
+#     # print("GOT CAN message #{:4d}: {}".format(message_counter, msg))
+# 
+#     if len(msg.payload) > 3 and msg.payload[0] == 0x11:
+#         count = 10*((msg.payload[1]<<8) + msg.payload[2])
+#         print("DOING SOME STUPID LOOPING", count, msg.payload)
+#         while count > 0:
+#             count -= 1
+#         print("DONE with stupid looping")
+#         return
+#     msg.unknown_command()
+# 
+# 
+# can.subscribe(can_callback)
 
 def r():
     board.run()

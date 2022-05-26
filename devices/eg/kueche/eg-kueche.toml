@@ -2,29 +2,33 @@ device = "eg.kueche.fridge"
 canid = 0x350
 room = "Küche"
 
-[led.arbeitsplattewarm]
-name = "Arbeitsplatte (warm)"
-port = 3
+#[led.arbeitsplattewarm]
+#name = "Abzugshaube (kalt)"
+##name = "Arbeitsplatte (warm)"
+#port = 3 # 0
 
-[led.arbeitsplattecold]
+#[led.window]
+[led.worktopcold]
 name = "Arbeitsplatte (kalt)"
-port = 4
+port = 1
 
 [led.hoodwarm]
 name = "Abzugshaube (warm)"
 port = 2
 
+#[led.hoodcold]
 [led.hoodcold]
 name = "Abzugshaube (kalt)"
-port = 5
+port = 3
 
-[led.notconnected1]
-name = "NC"
-port = 8
-
-[led.window]
+#[led.arbeitsplattecold]
+[led.coffee]
 name = "Kaffeemühle"
-port = 1
+port = 4
+
+[led.worktopwarm]
+name = "Arbeitsplatte (warm)"
+port = 5
 
 [led.corner]
 name = "Eckschrank"
@@ -33,6 +37,10 @@ port = 6
 [led.sink]
 name = "Spüle"
 port = 7
+
+[led.NC]
+name = "not connected"
+port = 8
 
 [button.right]
 port = 0x10
