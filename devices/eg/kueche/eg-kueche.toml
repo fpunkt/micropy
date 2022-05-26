@@ -4,27 +4,27 @@ room = "Küche"
 
 [led.arbeitsplattewarm]
 name = "Arbeitsplatte (warm)"
-port = 3 # 0
+port = 3
 
 [led.arbeitsplattecold]
 name = "Arbeitsplatte (kalt)"
-port = 4 # 1
+port = 4
 
 [led.hoodwarm]
 name = "Abzugshaube (warm)"
-port = 2 # 2
+port = 2
 
 [led.hoodcold]
 name = "Abzugshaube (kalt)"
-port = 8 # 3
+port = 5
 
 [led.notconnected1]
 name = "NC"
-port = 5
+port = 8
 
 [led.window]
 name = "Kaffeemühle"
-port = 1 # 4
+port = 1
 
 [led.corner]
 name = "Eckschrank"
@@ -47,10 +47,10 @@ port = 0x12
 port = 0x30
 name = "Küche"
 
-[motion.fridge]
+[motionsensor.fridge]
 name = "Durchgang"
 port = 0x20
 
-[motion.corner]
+[motionsensor.corner]
 name = "Ecke"
 port = 0x21
