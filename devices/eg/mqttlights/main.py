@@ -1,5 +1,10 @@
 """
-MQTT client with some PWMs connected
+CAN over WLAN client with some PWMs connected
+
+source ../../../tools/alias.sh
+
+
+
 """
 
 # pylint: disable=import-error, wrong-import-order
@@ -8,8 +13,11 @@ MQTT client with some PWMs connected
 
 import board
 board.LOCATION = 'eg/xmasvorne'
-board.DEBUG = True
+# board.DEBUG = True
 board.CANID = 0x140
+
+board.LED = board.Led(2, 0)
+
 
 if board.DEBUG is True:
     print("This is {}, CANID {:03x}".format(board.LOCATION, 0 if board.CANID is None else board.CANID))
@@ -18,6 +26,11 @@ if board.DEBUG is True:
     import net
     net.LED = board.LED
     net.start_wlan()
+    net.start_repl()
+else:
+    import net
+    net.LED = board.LED
+    net.start_wlan(0)
     net.start_repl()
 
 import gc
@@ -33,16 +46,9 @@ print('# loading button')
 import button
 print('# loading asyncio')
 import uasyncio as asyncio
-print('# loading fsmqtt')
-import fsmqtt
 
-import machine
-
-from umqttsimple import MQTTClient
-mqttclient = MQTTClient(board.LOCATION, fsmqtt.secrets.mqtt_server)
-import fsmqtt
-fsmqtt.connect(mqttclient, board.LOCATION)
-
+import can
+board.CAN = can
 
 print("mem: ", gc.mem_free())
 gc.collect()
@@ -61,6 +67,16 @@ p3 = pwm.PWM(3, 13)
 p1.seti(1023)
 p2.seti(1023)
 p3.seti(1023)
+
+t1 = sensors.DHT(0x30, 5, poll_intervall_in_ms=5000 if board.DEBUG else None)
+t2 = sensors.DHT(0x31, 4, poll_intervall_in_ms=7000 if board.DEBUG else None)
+
+can.init()
+
+print('can.canoverlan._sock is {}'.format(can.canoverlan._sock))
+
+if can.canoverlan._sock is None:
+    raise RuntimeError("Cannot start CAN")
 
 
 if False: # some buttons for debugging

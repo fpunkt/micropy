@@ -18,6 +18,11 @@ DEBUG = False
 # CANID of the application. Set in main.py
 CANID = None
 
+CPU_ID = 1              # ESP32 per default
+BOARD_ID = 0            # PCB version, overwritten in bconf
+PERIPH_ID = 0           # PCB version, overwritten in main.py (or by including other .py files)
+
+
 
 PINGTIME = 300
 MEMSTATTIME = 300
@@ -31,14 +36,15 @@ def PRINT(formatstring, *args):
 
 class Led:
     """On/Off LED"""
-    def __init__(self, pin):
+    def __init__(self, pin, onvalue=1):
         self.led = machine.Pin(pin, mode=machine.Pin.OUT)
+        self.onvalue = onvalue
     def on(self):
         """turn LED on"""
-        self.led.value(1)
+        self.led.value(self.onvalue)
     def off(self):
         """turn LED off"""
-        self.led.value(0)
+        self.led.value(1-self.onvalue)
 
 
 class RegisteredSensorIDs:
@@ -46,42 +52,42 @@ class RegisteredSensorIDs:
     def __init__(self):
         self.r = dict()
 
-    def register(self, sensorid, sensor):
-        if sensorid is None:
+    def register(self, portid, sensor):
+        if portid is None:
             return
-        if self.get_sensor(sensorid):
-            raise RuntimeError("id #{} is already registered as {} ({})".format(sensorid, self.r[sensorid], sensor))
-        self.r[sensorid] = sensor
+        if self.get_sensor(portid):
+            raise RuntimeError("id #{} is already registered as {} ({})".format(portid, self.r[portid], sensor))
+        self.r[portid] = sensor
 
     def dump(self):
         for i, v in self.r:
             print("ID {:2d} = {}".format(i, v))
 
-    def get_sensor(self, sensorid):
-        return self.r.get(sensorid, None)
+    def get_sensor(self, portid):
+        return self.r.get(portid, None)
 
     def find(self, msg, withclass, sensortype=0xfe):
         """Find a registered sensor ID that is provided as 2nd value in the CAN payload.
         The sensor should have one of the classes in withclass (or None if you don't care).
         If the sensor is not found the function returns and raises an error on
-        CAN/mqtt bus.
+        CAN bus.
         The optional sensortype is used in the errormessage.
         """
         p = msg.payload
-        sensorid = 0xff
+        portid = 0xff
         if len(p) > 1:
-            sensorid = p[1]
-        d = self.r.get(sensorid, None)
+            portid = p[1]
+        d = self.r.get(portid, None)
         if d is None:
             if DEBUG:
-                print('Device #{} not found'.format(sensorid))
+                print('Device #{} not found'.format(portid))
             msg.bad_sensor_id()
             return None
         if withclass is None:
             return d
         if not isinstance(d, withclass):
             if DEBUG:
-                print('Found ID #{} but wrong class {} (expected {})'.format(sensorid, d.__class__, withclass))
+                print('Found ID #{} but wrong class {} (expected {})'.format(portid, d.__class__, withclass))
             msg.bad_sensor_type(sensortype)
             return None
         return d
@@ -91,11 +97,10 @@ class RegisteredSensorIDs:
 
 # Provide global variables that allow functions to access all devices when they have
 # included board.py
-# This allows e.g. sensors to use serve MQTT and CAN even if one of these backends
+# This allows e.g. sensors to use serve CAN even if the backend
 # has not been initialized.
 
-# The on-chip LED
-LED = Led(2)
+
 
 # Sensors will be set by sensors.py and will provide funtions
 # register and find.
@@ -131,13 +136,6 @@ LOCATION = "unknown"
 # The actual value is set when can.py is loaded/initialized
 CAN = None
 
-# class _dummyMqtt:
-#     def publish_sensor(self, sensortype, sensorid, payload):
-#         """publish a sensor message"""
-
-# MQTT connection, set by main.py if applicable
-MQTT = None
-
 # the global watchdog
 WD = None
 
@@ -167,4 +165,7 @@ def run():
         f()
     # run GC once to supress memory messages after startup (because gc will be triggered after initialization ...)
     gc.collect()
+    asyncio.run(arun())
+
+def restart():
     asyncio.run(arun())

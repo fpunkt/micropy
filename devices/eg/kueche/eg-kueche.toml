@@ -1,0 +1,64 @@
+device = "eg.kueche.fridge"
+canid = 0x350
+room = "Küche"
+
+#[led.arbeitsplattewarm]
+#name = "Abzugshaube (kalt)"
+##name = "Arbeitsplatte (warm)"
+#port = 3 # 0
+
+#[led.window]
+[led.worktopcold]
+name = "Arbeitsplatte (kalt)"
+port = 1
+
+[led.hoodwarm]
+name = "Abzugshaube (warm)"
+port = 2
+
+#[led.hoodcold]
+[led.hoodcold]
+name = "Abzugshaube (kalt)"
+port = 3
+
+#[led.arbeitsplattecold]
+[led.coffee]
+name = "Kaffeemühle"
+port = 4
+
+[led.worktopwarm]
+name = "Arbeitsplatte (warm)"
+port = 5
+
+[led.corner]
+name = "Eckschrank"
+port = 6
+
+[led.sink]
+name = "Spüle"
+port = 7
+
+[led.NC]
+name = "not connected"
+port = 8
+
+[button.right]
+port = 0x10
+
+[button.center]
+port = 0x11
+
+[button.left]
+port = 0x12
+
+[am2302.kueche]
+port = 0x30
+name = "Küche"
+
+[motionsensor.fridge]
+name = "Durchgang"
+port = 0x20
+
+[motionsensor.corner]
+name = "Ecke"
+port = 0x21

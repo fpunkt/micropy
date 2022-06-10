@@ -39,28 +39,13 @@ echo "# syncing $nfiles files to $ip"
 
 for f in $files; do
     # echo "# file: $f"
-    if [ "$f" = "./secrets.py" ]; then
-        echo "# ignoring secrets"
+    cfile=`$bindir/mpycompile.sh $f`
+    if [ $? -ne 0 ]; then
         continue
     fi
-    if [ "$f" = "secrets.py" ]; then
-        echo "# ignoring secrets"
-        continue
-    fi
-    if [ `basename $f` = "main.py" ]; then
-        compiled=$f
-    else
-        mpy-cross $f
-        #compiled=`basename $f .py`.mpy
-        compiled=`echo $f| sed s/py$/mpy/`
-    fi
-    #echo $compiled
-    if [ ! -f $compiled ]; then
-        echo "# WARNING: cannot compile $f"
-        compiled=$f
-    fi
-    echo "# $compiled"
-    $bindir/../webrepl/webrepl_cli.py -p x $compiled $ip: >/dev/null
+    echo "# $cfile"
+#    continue
+    $bindir/../webrepl/webrepl_cli.py -p x $cfile $ip: >/dev/null
     if [ $? -ne 0 ]; then
         echo "ERROR transfering $compiled"
         exit 1
@@ -68,5 +53,6 @@ for f in $files; do
 #    let "count++"
 done
 
+# exit 0
 touch .lastsync
 #echo "# done syncing $count files"

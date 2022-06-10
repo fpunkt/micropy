@@ -5,3 +5,6 @@ run.py
 *.mpy
 *.pyc
 __pycache__
+devices/eg/mqttlights/c.py
+bin/upload
+.vscode
