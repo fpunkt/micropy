@@ -7,8 +7,12 @@ if [ ! -f $mp/tools/alias.sh ]; then
     exit 1
 fi
 
-alias sync=$mp/bin/sync.sh
-alias ampyput=$mp/bin/ampyput.sh
+PATH=$mp/bin:$PATH
+
+# alias sync=$mp/bin/sync.sh
+# alias ampyput=$mp/bin/ampyput.sh
 
 PS1="(mpy) \u\$ "
-echo "# Aliases set up"
+# echo "# Aliases set up"
+echo "# run sync [files]       to copy files over wlan"
+echo "# run ampyput file       to copy files over USB"

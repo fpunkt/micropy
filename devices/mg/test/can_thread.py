@@ -1,1 +1,0 @@
-../../../lib/can_thread.py

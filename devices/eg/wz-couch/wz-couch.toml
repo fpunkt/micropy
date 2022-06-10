@@ -1,0 +1,48 @@
+device = "eg.wz.couch"
+canid = 0x368
+
+[led.wandleuchte]
+name = "Wandleuchte"
+port = 1
+# default = 50
+
+[led.redlight]
+name = "Rote Lampe"
+port = 2
+# default = 50
+
+[led.xmaslight]
+name = "Weihnachtslichterkette Fensterbank"
+port = 3
+# default = 30
+
+[led.vitrine]
+name = "Vitrine"
+port = 5
+
+[led.readinglight]
+name = "Leselampe"
+port = 4
+
+# TODO: implement switch
+[light.xmasdcdc]
+name = "DC/DC for Xmastree"
+port = 6
+
+[led.xmastree]
+name = "Weihnachtsbaum"
+port = 7
+
+# [led.ncxmaspwm]
+# name = "Not connected (no FET)"
+# port = 8
+
+[button.b1]
+port = 0x0a
+
+[button.b2]
+port = 0x0b
+
+[am2302.couch]
+name = "Unter der Couch"
+port = 0x14

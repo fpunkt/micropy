@@ -22,9 +22,9 @@ STATE_AR_ARM = const(1)
 STATE_AR_ACTIVE = const(2)
 
 class Button(irqio.IRQIO):
-    def __init__(self, sensorid, pinid):
-        super().__init__(sensorid, pinid)
-        self.msg = can.makemessage(canid.BUTTON_PRESSED, 5, sensorid=self.sensorid)
+    def __init__(self, portid, pinid):
+        super().__init__(portid, pinid)
+        self.msg = can.makemessage(canid.BUTTON_PRESSED, 5, portid=self.portid)
         self.debounce_ms = 20
         self.pwm = None
         self.state = 0
@@ -55,7 +55,8 @@ class Button(irqio.IRQIO):
         if changed:
             if self.pinvalue == 1:
                 # button released
-                self.pwm.enable_dimming()
+                if self.pwm is not None:
+                    self.pwm.enable_dimming()
                 return self._pressed()
             # button pressed
             self.autorepeat_last_action_timestamp = utime.ticks_ms()
@@ -76,6 +77,9 @@ class Button(irqio.IRQIO):
                 # return True
             else:
                 return False
+
+        if self.pwm is None:
+            return False
 
         # autorepeat is active, do next step
         self.pwm.disable_dimming()

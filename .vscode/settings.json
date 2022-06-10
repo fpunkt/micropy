@@ -3,9 +3,11 @@
     "restructuredtext.languageServer.disabled": true,
     "python.analysis.extraPaths": [
         "${workspaceFolder}/mupystubs",
-        //"./mupystubs",
-        //"./mupystubs",
+        "./lib"
     ],
+    "files.exclude": {
+        "**/*.mpy": true
+    },
     //"python.analysis.diagnosticSeverityOverrides": {
     //    "reportMissingImports": "none"
     //}
