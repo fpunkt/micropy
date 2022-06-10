@@ -1,5 +1,7 @@
 #! /bin/sh
 
+bindir=`dirname $0`
+
 case "$OSTYPE" in
   solaris*) echo "SOLARIS" ;;
   darwin*)  lookfor='/dev/tty.usb*' ;;
@@ -23,8 +25,13 @@ echo "# Using $serial"
 
 upload()
 {
-    echo "# uploading $1"
-    ampy -p $serial put $1
+    cfile=`$bindir/mpycompile.sh $f`
+    if [ $? -ne 0 ]; then
+        exit
+    fi
+
+    echo "# uploading $cfile"
+    ampy -p $serial put $cfile
 }
 
 for f in $*; do

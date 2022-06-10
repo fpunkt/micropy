@@ -1,0 +1,1 @@
+../../../lib/config_rj12.py

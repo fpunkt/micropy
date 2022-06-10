@@ -29,10 +29,10 @@ class Message:
     def unknown_command(self):
         pass
 
-def makemessage(cid, size, sensorid=None):
+def makemessage(cid, size, portid=None):
     m = Message(cid, [0]*size)
-    if sensorid is not None:
-        m.setsender(sensorid)
+    if portid is not None:
+        m.setsender(portid)
     return m
 
 Badmessage = Message(0x777, [1, 2, 3, 4])
