@@ -25,14 +25,20 @@ makemessage = cancommon.makemessage
 net.DEBUG = board.DEBUG
 net.LED = board.LED
 
-# def read():
-#     raise RuntimeError('CAN backend not loaded')
-#
-# def write(message):
-#     raise RuntimeError('CAN backend not loaded')
-#
-# def init(*args):
-#     raise RuntimeError('CAN backend not loaded')
+def simplefilter(id):
+    """Set hardware CAN filter to this address. Ignore (almost all) other addresses"""
+    pass
+
+def reset():
+    """Reset CAN interface"""
+    pass
+
+def read():
+    raise RuntimeError('CAN backend not loaded')
+def write(message):
+    raise RuntimeError('CAN backend not loaded')
+def init(*args):
+    raise RuntimeError('CAN backend not loaded')
 
 if sys.platform == 'esp32':
     # print('# loading ESP32 CAN')
@@ -40,6 +46,8 @@ if sys.platform == 'esp32':
     read = canesp32.read
     write = canesp32.write
     init = canesp32.init
+    simplefilter = canesp32.setsimplefilter
+    reset = canesp32.reset
 
 if sys.platform == 'esp8266':
     import canoverlan
