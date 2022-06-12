@@ -16,8 +16,6 @@ This file is loaded after boot.py
 # pylint: disable=unused-import
 
 import board
-import button
-import motionsensor
 
 board.LOCATION = 'debug'
 board.DEBUG = True
@@ -97,6 +95,8 @@ def can_callback(msg):
 
 can.subscribe(can_callback)
 
+def r():
+    board.restart()
 
 if 1 == 1: # pylint: disable=comparison-with-itself
     board.run()

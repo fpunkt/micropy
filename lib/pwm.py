@@ -248,8 +248,8 @@ class PWM:
 
 class List(PWM):
     def __init__(self, pwmid, *args):
+        self.pwms = list(args) # need to initialize here in case __repr__() is called
         super().__init__(pwmid, None)
-        self.pwms = list(args)
         self.toggle_mode = 0
         self.dimtovalue = -99
 
@@ -319,9 +319,6 @@ class List(PWM):
     def mqtt_callback(self, topic, msg):
         for p in self.pwms:
             p.mqtt_callback(topic, msg)
-
-
-board.PWMs = List(0xff) # Create a (dynamic) list that includes ALL PWMs
 
 
 board.PWMs = List(0xff) # Create a (dynamic) list that includes ALL PWMs

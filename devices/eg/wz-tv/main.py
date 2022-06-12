@@ -25,7 +25,7 @@ Groove
 
 import board
 board.LOCATION = 'wztv'
-# board.DEBUG = True
+board.DEBUG = True
 board.CANID = 0x358
 
 if board.DEBUG is True:
