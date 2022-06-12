@@ -23,7 +23,6 @@ p
 # pylint: disable=too-many-instance-attributes, global-statement
 
 import machine
-import utime
 import uasyncio as asyncio
 import board
 import can

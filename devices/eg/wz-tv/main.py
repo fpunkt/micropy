@@ -101,9 +101,7 @@ def cb(but):
 # pl1.toggle_mode = 1
 
 
-
 message_counter = 0
-
 
 def can_callback(msg):
     # pylint: disable=global-statement
@@ -116,10 +114,36 @@ def can_callback(msg):
             count -= 1
         print("DONE with stupid looping")
         return
+    print('Got CAN message: {}'.format(msg))
     msg.unknown_command()
 
 
 can.subscribe(can_callback)
+can.simplefilter(board.CANID)
+
+import time
+c = board.CAN.canesp32._hw_interface
+
+def sf(bank, mode, value, mask):
+    c.setfilter(bank, mode, (value, mask))
+    m0 = None
+    lastprint = time.time()
+    nextprint = 2
+    while True:
+        if c.any():
+            print('{}: {}'.format(now, c.recv()))
+            lastprint = time.time()
+            continue
+
+        now = time.time()
+        if now-lastprint > 5:
+            m = c.info()
+            print('{}: {}'.format(now, m))
+            lastprint = now
+
+        time.sleep(.1)
+
+
 
 def r():
     board.restart()

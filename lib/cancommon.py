@@ -72,7 +72,7 @@ class Message:
         c = 0
         if len(self.payload) > 0:
             c = self.payload[0]
-        errormessage([canerror.CAN_UNKNOWN_COMMAND, c])
+        errormessage([canerror.UNKNOWN_COMMAND, c])
 
 
 def makemessage(cid, size, portid=None):
@@ -252,7 +252,6 @@ def _connect_to_wlan(m):
         b = 0
     send_wlan_connected(net.start_wlan(b))
 
-# TODO: provide parameter to CONNECT to select network
 register(canconf.WLAN_CONNECT, 1, 2, lambda m: _connect_to_wlan(m))
 register(canconf.WLAN_HOTSPOT, 1, 1, lambda _: send_wlan_connected(net.start_hotspot()))
 register(canconf.WLAN_STOP, 1, 1, lambda _: net.stop_wlan())
