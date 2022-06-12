@@ -8,6 +8,14 @@ import machine
 import net
 import utime
 
+# last upload time
+try:
+    import lup
+    _lastupload = lup.T
+except:
+    _lastupload = 0
+
+
 class Message:
     """A CAN message"""
     def __init__(self, cid, payload):
@@ -161,14 +169,33 @@ def _identify(packetid):
                 0xa0, # Application type and Version - make this the library version
                 serial[-2], serial[-1]]) # CPU serial
 
-def sendconfig():
-    if board.CAN and board.CANID:
+def sendlup():
+    board.CAN.write(canid.CONFIG_INFO, [board.CANID >>8, board.CANID & 0xff,
+        1,
+        (_lastupload >> 24) & 0xff,
+        (_lastupload >> 16) & 0xff,
+        (_lastupload >>  8) & 0xff,
+        (_lastupload >>  0) & 0xff,
+         ])
+
+def sendconfig(m):
+    if not (board.CAN and board.CANID):
+        return
+    l = len(m.payload)
+    if l == 1 or (l == 2 and m.payload[1] == 0):
         board.CAN.write(canid.CONFIG_INFO, [board.CANID >>8, board.CANID & 0xff,
+            0,
             board.CPU_ID,
             board.BOARD_ID,
             board.PERIPH_ID,
         ])
+        return
+    c = m.payload[1]
+    if c == 1:
+        sendlup()
+        return
 
+    m.bad_parameter_value(1, 0, 1)
 
 
 def run_gc():
@@ -263,7 +290,7 @@ register(canconf.WEBREPL_START, 1, 1, lambda _: net.start_repl())
 register(canconf.WEBREPL_STOP, 1, 1, lambda _: net.stop_repl())
 register(canconf.SEND_FREEMEM, 1, 1, lambda _: _send_memstat())
 register(canconf.ENABLE_WATCHDOG, 1, 1, lambda _: board.WD.enable())
-register(canconf.SEND_INFO, 1, 1, lambda _: sendconfig())
+register(canconf.SEND_INFO, 1, 2, sendconfig)
 
 
 _callback = None
