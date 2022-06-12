@@ -98,8 +98,6 @@ def cb(but):
 # b1.callback = cb
 # b2.callback = cb
 
-# pl1.toggle_mode = 1
-
 
 message_counter = 0
 
