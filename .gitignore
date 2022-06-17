@@ -9,3 +9,4 @@ devices/eg/mqttlights/c.py
 bin/upload
 .vscode
 mupystubs/lup.py
+lup.py
