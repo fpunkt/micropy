@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"fmt"
 	"io/fs"
+	"net"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -122,11 +123,11 @@ func main() {
 			files = append(files, lastuploadfile)
 		}
 	}
-	if b, err := os.ReadFile(lastuploadfile); err != nil {
-		log.Error().Err(err).Str("file", lastuploadfile).Msg("Cannot read file")
-	} else {
-		fmt.Printf("lup: %q\n", string(b))
-	}
+	//	if b, err := os.ReadFile(lastuploadfile); err != nil {
+	//		log.Error().Err(err).Str("file", lastuploadfile).Msg("Cannot read file")
+	//	} else {
+	//		fmt.Printf("lup: %q\n", string(b))
+	//	}
 
 	files = compileFiles(".", files, lastupload)
 	changed = append(changed, files...)
@@ -136,7 +137,17 @@ func main() {
 		return
 	}
 
-	log.Info().Int("nfiles", len(changed)).Str("host", ipstring).Msg("Uploading files")
+	iplogger := log.With().Str("host", ipstring).Logger()
+	if addr, err := net.LookupIP(ipstring); err != nil {
+		iplogger.Error().Err(err).Msg("Cannot lookup IP for host")
+	} else {
+		fmt.Printf("%T %v\n", addr[0], addr)
+		iplogger = iplogger.With().Str("ip4", addr[0].String()).Logger()
+		if len(addr) > 1 {
+			iplogger = iplogger.With().Str("ip6", addr[1].String()).Logger()
+		}
+	}
+	iplogger.Info().Int("nfiles", len(changed)).Msg("Uploading files")
 	currentdir, _ := os.Getwd()
 
 	// augment changed files by command line arguments
