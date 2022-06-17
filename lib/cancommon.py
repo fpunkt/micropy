@@ -279,9 +279,13 @@ def _connect_to_wlan(m):
         b = 0
     send_wlan_connected(net.start_wlan(b))
 
+def _disconnect_wlan(_):
+    net.stop_wlan()
+    send_wlan_connected(("0.0.0.0", None))
+
 register(canconf.WLAN_CONNECT, 1, 2, lambda m: _connect_to_wlan(m))
 register(canconf.WLAN_HOTSPOT, 1, 1, lambda _: send_wlan_connected(net.start_hotspot()))
-register(canconf.WLAN_STOP, 1, 1, lambda _: net.stop_wlan())
+register(canconf.WLAN_STOP, 1, 1, _disconnect_wlan)
 register(canconf.SEND_PING, 1, 1, lambda _: _send_ping())
 register(canconf.SOFT_RESET, 1, 1, lambda _: machine.soft_reset())
 register(canconf.HARD_RESET, 1, 1, lambda _: machine.reset())
