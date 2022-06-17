@@ -141,7 +141,6 @@ func main() {
 	if addr, err := net.LookupIP(ipstring); err != nil {
 		iplogger.Error().Err(err).Msg("Cannot lookup IP for host")
 	} else {
-		fmt.Printf("%T %v\n", addr[0], addr)
 		iplogger = iplogger.With().Str("ip4", addr[0].String()).Logger()
 		if len(addr) > 1 {
 			iplogger = iplogger.With().Str("ip6", addr[1].String()).Logger()
