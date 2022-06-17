@@ -78,7 +78,7 @@ proof = pwm.List(9, p1, p2, p3)
 # b1 = button.Button(0x20, bconf.RJ12_1_WHITE_INPUT_ONLY)
 # b2 = button.Button(0x21, bconf.RJ12_1_GREEN_INPUT_ONLY)
 b1 = button.Button(0x20, bconf.RJ12_1_YELLOW)
-b1.pwm = proof
+# b1.pwm = proof
 
 b2 = button.Button(0x21, bconf.RJ12_1_BLUE)
 
