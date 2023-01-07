@@ -69,6 +69,7 @@ def start_wlan(base=0):
         time.sleep(1)
     if not wlan.isconnected():
         print('ERROR: cannot connect to WLAN.')
+        wlan.active(False)
         return None
     cfg = wlan.ifconfig()
     if LED:
@@ -114,3 +115,6 @@ def start_repl(password='x'):
 def stop_repl():
     webrepl.stop()
 
+def net(base=0):
+    start_wlan(base)
+    start_repl()
