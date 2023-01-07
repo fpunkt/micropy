@@ -19,15 +19,24 @@ if [ 1 -ne $nusb ]; then
     exit 1
 fi
 
+if [ -f firmware/bootloader.bin ]; then
+  cd firmware
+fi
+
 echo "# Using $serial"
 # esptool.py esp32 -p /dev/ttyUSB0 -b 460800 --before=default_reset --after=hard_reset write_flash --flash_mode dio --flash_freq 40m --flash_size 4MB 0x1000 bootloader.bin 0x10000 micropython-can.bin.bin 0x8000 partition-table.bin
 
 esptool.py --port $serial erase_flash
 
-esptool.py  -p $serial -b 460800 --before=default_reset --after=hard_reset write_flash --flash_mode dio --flash_freq 40m --flash_size 4MB \
-    0x1000 bootloader.bin \
-    0x10000 micropython.bin \
-    0x8000 partition-table.bin
+flashsize=4MB
+flashsize=detect
 
+esptool.py  -p $serial -b 460800 \
+    --before=default_reset --after=hard_reset \
+    --chip esp32 write_flash --flash_mode dio --flash_freq 40m \
+    --flash_size $flashsize \
+    0x1000 bootloader.bin \
+    0x8000 partition-table.bin \
+    0x10000 micropython.bin
 
 echo "# Firmware updated, see tools/initial-setup.sh to start the network"
