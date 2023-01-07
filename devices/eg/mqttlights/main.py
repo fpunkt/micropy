@@ -34,25 +34,35 @@ else:
     net.start_repl()
 
 import gc
-gc.collect()
+def mem(msg):
+    m1 = gc.mem_free()
+    gc.collect()
+    if msg != "":
+        print('# loading ', msg, ', free mem: ', gc.mem_free(), ' / ', m1)
+    else:
+        print("mem: ", gc.mem_free())
 
-print('# loading bconf')
-#import bconf
-print('# loading sensors')
-import sensors
-print('# loading pwm')
-import pwm
-print('# loading button')
-import button
-print('# loading asyncio')
+mem('asyncio')
 import uasyncio as asyncio
 
+# mem('bconf')
+# import bconf
+
+mem('sensors')
+import sensors
+
+mem('pwm')
+import pwm
+
+# mem('button')
+# import button
+
+import canoverlan
+canoverlan.GLOBALS.brokerip = '192.168.178.5'
 import can
 board.CAN = can
 
-print("mem: ", gc.mem_free())
-gc.collect()
-print("mem: ", gc.mem_free())
+mem('')
 
 #p1 = pwm.PWM(1, 14)
 #p2 = pwm.PWM(2, 12)
@@ -68,8 +78,8 @@ p1.seti(1023)
 p2.seti(1023)
 p3.seti(1023)
 
-t1 = sensors.DHT(0x30, 5, poll_intervall_in_ms=5000 if board.DEBUG else None)
-t2 = sensors.DHT(0x31, 4, poll_intervall_in_ms=7000 if board.DEBUG else None)
+#t1 = sensors.DHT(0x30, 5, poll_intervall_in_ms=5000 if board.DEBUG else None)
+temperature = sensors.DHT(0x31, 5, poll_intervall_in_ms=7000 if board.DEBUG else None)
 
 can.init()
 
