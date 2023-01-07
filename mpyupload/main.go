@@ -11,9 +11,9 @@ import (
 	"strings"
 	"time"
 
+	"github.com/fpunkt/zlog"
 	"github.com/rs/zerolog/log"
 	"github.com/spf13/pflag"
-	"gitlab.com/fpunkts/zlog"
 
 	toml "github.com/pelletier/go-toml"
 )
@@ -43,8 +43,7 @@ func main() {
 	pflag.BoolVarP(&options.omitlastupload, "omitlastupload", "l", false, "Don't generate and copy the lastcompiled file")
 	pflag.Parse()
 
-	log.Logger = zlog.New()
-	zlog.SetLevel(options.verbose)
+	zlog.InitL(options.verbose)
 	starttime := time.Now()
 
 	dependencies, err := readDependencies()
