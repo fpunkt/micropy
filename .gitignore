@@ -10,3 +10,4 @@ bin/upload
 .vscode
 mupystubs/lup.py
 lup.py
+firmware/bbb/
