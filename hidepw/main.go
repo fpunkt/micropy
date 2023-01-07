@@ -34,8 +34,8 @@ import (
 
 	"github.com/spf13/pflag"
 
+	"github.com/fpunkt/zlog"
 	"github.com/rs/zerolog/log"
-	"gitlab.com/fpunkts/zlog"
 )
 
 const blockSize = 32 // max size for 2 strings
@@ -94,10 +94,12 @@ func main() {
 	outputFile := pflag.StringP("output", "o", "", "Output file for generated python code")
 	decodeFlag := pflag.BoolP("decode", "d", false, "Decode given python file")
 	writeMain := pflag.BoolP("main", "m", false, "Create main-function for testing python code")
+	pflag.Usage = func() {
+		fmt.Println("hallo")
+	}
 	pflag.Parse()
 
-	log.Logger = zlog.New()
-	zlog.SetLevel(verbose)
+	zlog.InitL(verbose)
 
 	if *decodeFlag {
 		mod := "c"
