@@ -9,6 +9,7 @@
 # esptool.py --port /dev/tty.usbserial-22310 --baud 460800 write_flash --flash_size=detect 0 esp8266-20210902-v1.17.bin
 #
 # esptool.py --port /dev/ttyUSB0 --baud 460800 write_flash --flash_size=detect 0 esp8266-20170108-v1.8.7.bin
+# esptool.py --port /dev/tty.usbserial-213440  --baud 460800 --before=default_reset write_flash --flash_mode dio --flash_freq 40m --flash_size=detect 0 ~/Downloads/esp8266-20220618-v1.19.1.bin
 #
 # onetime
 #
