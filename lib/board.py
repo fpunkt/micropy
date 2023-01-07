@@ -168,4 +168,5 @@ def run():
     asyncio.run(arun())
 
 def restart():
-    asyncio.run(arun())
+    gc.collect()
+    asyncio.get_event_loop().run_forever()
