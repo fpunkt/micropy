@@ -44,11 +44,29 @@ import sensors
 import pwm
 import uasyncio as asyncio
 import tsl2561
+import motionsensor
+import irqio
+import canid
 
 if board.CAN and board.DEBUG:
     board.CAN.cancommon.send_wlan_connected()
 
-t = tsl2561.TSL2561(0x30, bconf.ML10_2, bconf.ML10_3, 2000)
+# ML10_6 OK for DHT
+dht = sensors.DHT(0x20, bconf.ML10_6, poll_intervall_in_ms=5000 if board.DEBUG else sensors.minutes(5))
+#
+# SDA=ML10_1, SCL=ML10_2 is OK for I2C
+t = tsl2561.TSL2561(0x30, sda=bconf.ML10_1, scl=bconf.ML10_2, poll_intervall_in_ms=2000)
+#
+# ML10_4 and 5 are OK for Montionsensor
+m1 = motionsensor.Motionsensor(0x10, bconf.ML10_4)
+m2 = motionsensor.Motionsensor(0x11, bconf.ML10_5)
+
+#m3 = motionsensor.Motionsensor(0x15, bconf.RJ12_CENTER_1_WHITE)
+#m4 = motionsensor.Motionsensor(0x16, bconf.RJ12_CENTER_4_GREEN)
+#
+#doorbell = irqio.IRQIO(0x17, bconf.RJ12_CENTER_5_YELLOW_ML10_3, canid=canid.SENSOR_DOORBELL_PUSHED)
+#lightswitchoverwrite = irqio.IRQIO(0x18, bconf.RJ12_CENTER_6_BLUE_INPUT_ONLY, canid=canid.SENSOR_LIGHTSWITCH_OVERRIDE)
+
 
 p1 = pwm.PWM(1, bconf.ML10_PWM_1)
 p2 = pwm.PWM(2, bconf.ML10_PWM_2)
@@ -57,7 +75,9 @@ p4 = pwm.PWM(4, bconf.ML10_PWM_4)
 p5 = pwm.PWM(5, bconf.ML10_PWM_5)
 p6 = pwm.PWM(6, bconf.ML10_PWM_6)
 p7 = pwm.PWM(7, bconf.ML10_PWM_7)
-p8 = pwm.PWM(8, bconf.ML10_PWM_8)
+#p8 = pwm.PWM(8, bconf.ML10_PWM_8)
+
+
 
 
 #def can_callback(msg):
@@ -65,7 +85,6 @@ p8 = pwm.PWM(8, bconf.ML10_PWM_8)
 
 # can.subscribe(can_callback)
 
-dht = sensors.DHT(20, bconf.ML10_1, poll_intervall_in_ms=5000 if board.DEBUG else sensors.minutes(5))
 
 def r():
     board.restart()
