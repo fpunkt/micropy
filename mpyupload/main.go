@@ -21,10 +21,10 @@ import (
 var libdir, ipstring string
 
 var options = struct {
-	verbose        int
-	dryrun         bool
-	force          bool
-	omitlastupload bool
+	verbose int
+	dryrun  bool
+	force   bool
+	nolup   bool
 }{}
 
 const (
@@ -40,7 +40,7 @@ func main() {
 	pflag.CountVarP(&options.verbose, "verbose", "v", "verbose messages")
 	pflag.BoolVarP(&options.dryrun, "dryrun", "d", false, "compile but don't upload file")
 	pflag.BoolVarP(&options.force, "force", "f", false, "Force upload of all files (ignore .lastsync)")
-	pflag.BoolVarP(&options.omitlastupload, "omitlastupload", "l", false, "Don't generate and copy the lastcompiled file")
+	pflag.BoolVarP(&options.nolup, "no-lup", "l", false, "Don't overwrite lup.py file (copy last upload date to ESP)")
 	pflag.Parse()
 
 	zlog.InitL(options.verbose)
@@ -102,24 +102,26 @@ func main() {
 			files = append(files, fname)
 		}
 	}
-	const lastuploadfile = "lup.py"
-	if fd, err := os.Create(lastuploadfile); err != nil {
-		log.Error().Err(err).Str("file", lastuploadfile).Msg("Cannot create file last upload file")
-	} else {
-		fmt.Fprintf(fd, "T = %d\n", time.Now().Unix())
-		fd.Close()
-		log.Info().Str("file", lastuploadfile).Msg("File created")
-		defer os.Remove(lastuploadfile)
-		// append file if not already included in list (might be leftover from failed run before)
-		doapp := true
-		for _, s := range files {
-			if s == lastuploadfile {
-				doapp = false
-				break
+	if !options.nolup {
+		const lastuploadfile = "lup.py"
+		if fd, err := os.Create(lastuploadfile); err != nil {
+			log.Error().Err(err).Str("file", lastuploadfile).Msg("Cannot create file last upload file")
+		} else {
+			fmt.Fprintf(fd, "T = %d\n", time.Now().Unix())
+			fd.Close()
+			log.Info().Str("file", lastuploadfile).Msg("File created")
+			defer os.Remove(lastuploadfile)
+			// append file if not already included in list (might be leftover from failed run before)
+			doapp := true
+			for _, s := range files {
+				if s == lastuploadfile {
+					doapp = false
+					break
+				}
 			}
-		}
-		if doapp {
-			files = append(files, lastuploadfile)
+			if doapp {
+				files = append(files, lastuploadfile)
+			}
 		}
 	}
 	//	if b, err := os.ReadFile(lastuploadfile); err != nil {
