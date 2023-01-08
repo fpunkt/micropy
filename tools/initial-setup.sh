@@ -27,6 +27,16 @@ libdir=$mydir/../lib
 echo $mydir $libdir
 # serial=/dev/tty.usbserial-22310
 
+NC='\033[0m' # No Color
+
+green() {
+  echo "\033[0;32m$*${NC}" >&2
+}
+
+red() {
+  echo "\033[0;31m$*${NC}" >&2
+}
+
 case "$OSTYPE" in
   solaris*) echo "SOLARIS" ;;
   darwin*)  lookfor='/dev/tty.usb*' ;;
@@ -42,11 +52,11 @@ serial=`ls -1 $lookfor`
 nusb=`echo $serial |wc -l`
 
 if [ 1 -ne $nusb ]; then
-    echo "** ERROR: cannot find USB device in $lookfor"
+    red "** ERROR: cannot find USB device in $lookfor"
     exit 1
 fi
 
-echo "# Using $serial"
+green "# Using $serial"
 
 #
 # secrets file contains
@@ -56,7 +66,7 @@ echo "# Using $serial"
 
 upload()
 {
-    echo "# uploading $1"
+    green "# uploading $1"
     ampy -p $serial put $1
 }
 
@@ -68,10 +78,9 @@ upload $libdir/../tools/c.mpy
 # ampy -p $serial put $libdir/net.py
 # ampy -p $serial put $libdir/board.py
 
-echo "# Network stuff copied to board. Now start a terminal (gterm or FLTerm on macOS, tio on linux) and run"
-echo "#"
+green "# Network stuff copied to board. Now start a terminal (gterm or FLTerm on macOS, tio on linux) and run"
+green "#"
 echo "import net"
-echo "net.start_wlan(32)"
-echo "net.start_repl()"
-echo "#"
-echo "# After this you can use the bin/upload.sh script to upload all files needed for your project"
+echo "net.net()"
+green "#"
+green "# After this you can use the bin/upload.sh script to upload all files needed for your project"
