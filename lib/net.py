@@ -116,5 +116,6 @@ def stop_repl():
     webrepl.stop()
 
 def net(base=0):
-    start_wlan(base)
+    ip = start_wlan(base)
+    print("# Connected to ", ip[0])
     start_repl()
