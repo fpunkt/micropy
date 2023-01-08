@@ -1,1 +1,1 @@
-../../../lib/config_beta1.py
+../../../lib/config_rj12.py
