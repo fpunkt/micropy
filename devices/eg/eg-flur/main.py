@@ -51,6 +51,7 @@ import canid
 if board.CAN and board.DEBUG:
     board.CAN.cancommon.send_wlan_connected()
 
+##### ML10 connector - devices are mounted on a connector board (small PCB with ML10 plug)
 # ML10_6 OK for DHT
 dht = sensors.DHT(0x20, bconf.ML10_6, poll_intervall_in_ms=5000 if board.DEBUG else sensors.minutes(5))
 #
@@ -61,10 +62,12 @@ t = tsl2561.TSL2561(0x30, sda=bconf.ML10_1, scl=bconf.ML10_2, poll_intervall_in_
 m1 = motionsensor.Motionsensor(0x10, bconf.ML10_4)
 m2 = motionsensor.Motionsensor(0x11, bconf.ML10_5)
 
+
+##### under the roof connection - connected via RJ12 to terminal block
 #m3 = motionsensor.Motionsensor(0x15, bconf.RJ12_CENTER_1_WHITE)
-#m4 = motionsensor.Motionsensor(0x16, bconf.RJ12_CENTER_4_GREEN)
+#m4 = motionsensor.Motionsensor(0x16, bconf.RJ12_CENTER_5_YELLOW_ML10_3)
 #
-#doorbell = irqio.IRQIO(0x17, bconf.RJ12_CENTER_5_YELLOW_ML10_3, canid=canid.SENSOR_DOORBELL_PUSHED)
+#doorbell = irqio.IRQIO(0x17, bconf.RJ12_CENTER_6_BLUE_INPUT_ONLY, canid=canid.SENSOR_DOORBELL_PUSHED)
 #lightswitchoverwrite = irqio.IRQIO(0x18, bconf.RJ12_CENTER_6_BLUE_INPUT_ONLY, canid=canid.SENSOR_LIGHTSWITCH_OVERRIDE)
 
 
