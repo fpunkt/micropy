@@ -128,10 +128,23 @@ def _send_ping():
 async def _ping_job():
     while True:
         if board.CAN is not None:
-            _send_ping()
+            try:
+                _send_ping()
+            except Exception as e:
+                if board.DEBUG:
+                    print('Cannot send ping: {}'.format(e))
         await asyncio.sleep(board.PINGTIME)
 
 board.BACKGROUND_RUNNERS.append(_ping_job())
+
+def _send_ping_or_change_rate(m):
+    if len(m.payload) == 1:
+        _send_ping()
+        return
+    t = m.payload[1]
+    if len(m.payload) == 3:
+        t = (t << 8) + m.payload[2]
+    board.PINGTIME = t
 
 
 _memstat_message = Message(canid.MEMORY_STATUS, [board.CANID >> 8, board.CANID & 0xff, 0, 0, 0, 0, 0, 0])
@@ -209,8 +222,9 @@ def run_gc():
         start = utime.ticks_ms()
         gc.collect()
         newfree = gc.mem_free() # pylint: disable=no-member
-        print('GC collected {} bytes in {} ms, free={}'.format(
-            newfree-free, utime.ticks_diff(utime.ticks_ms(), start), newfree))
+        if board.DEBUG:
+            print('GC run {} collected {} bytes in {} ms, free={}'.format(
+                _gc_counter, newfree-free, utime.ticks_diff(utime.ticks_ms(), start), newfree))
     _send_memstat()
 
 board.run_gc = run_gc
@@ -286,7 +300,7 @@ def _disconnect_wlan(_):
 register(canconf.WLAN_CONNECT, 1, 2, lambda m: _connect_to_wlan(m))
 register(canconf.WLAN_HOTSPOT, 1, 1, lambda _: send_wlan_connected(net.start_hotspot()))
 register(canconf.WLAN_STOP, 1, 1, _disconnect_wlan)
-register(canconf.SEND_PING, 1, 1, lambda _: _send_ping())
+register(canconf.SEND_PING, 1, 3, lambda m: _send_ping_or_change_rate(m))
 register(canconf.SOFT_RESET, 1, 1, lambda _: machine.soft_reset())
 register(canconf.HARD_RESET, 1, 1, lambda _: machine.reset())
 register(canconf.INDENTIFY, 1, 1, lambda _: board.CAN.identify())
