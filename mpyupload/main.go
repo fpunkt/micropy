@@ -8,6 +8,7 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"regexp"
 	"strings"
 	"time"
 
@@ -44,11 +45,25 @@ func main() {
 	pflag.Parse()
 
 	zlog.InitL(options.verbose)
+
+	//if err := os.Chdir("../devices/test/pingmachine/"); err != nil {
+	//	log.Fatal().Err(err).Send()
+	//}
+
 	starttime := time.Now()
 
 	dependencies, err := readDependencies()
+	if err != nil {
+		log.Fatal().Err(err).Msg("Cannot read dependencies")
+	}
+	// cleanup - remove empty lines and duplicates
 
-	log.Trace().Int("dependencies", len(dependencies)).Msg("Loaded dependencies")
+	//fmt.Printf("dependencies: %v\n", dependencies)
+	//if err == nil {
+	//	os.Exit(0)
+	//}
+
+	log.Trace().Int("dependencies", len(dependencies)).Strs("imports", dependencies).Msg("Loaded dependencies")
 
 	if err != nil {
 		log.Fatal().Err(err).Msg("Fatal error")
@@ -241,19 +256,6 @@ func locateLibdir() string {
 		log.Fatal().Msg("Cannot find libdir")
 	}
 	return libdir
-	//	execdir, err := os.Executable()
-	//	if err != nil {
-	//		log.Fatal().Err(err).Msg("Fatal error")
-	//	}
-	//
-	//	if strings.HasPrefix(execdir, "/var/") {
-	//		bindir = os.ExpandEnv("${HOME}/Projects/fpunkts/micropy/bin")
-	//	} else {
-	//		bindir = filepath.Dir(execdir)
-	//	}
-	//
-	//	libdir = filepath.Clean(bindir + "/../lib")
-
 }
 
 func upload(fname string) {
@@ -375,37 +377,144 @@ func compile(fname string) (string, time.Time) {
 }
 
 func readDependencies() ([]string, error) {
-	if _, err := os.Stat(importfile); err != nil {
-		return readTOML()
+	if fname := findToml(); fname != "" {
+		if _, err := os.Stat(importfile); err != nil {
+			return readTOML(fname)
+		}
 	}
-	b, err := os.ReadFile(importfile)
-	if err != nil {
-		return nil, err
+	if _, err := os.Stat(importfile); err == nil {
+		log.Debug().Str("file", importfile).Msg("Reading dependencies from dependencies input file")
+		b, err := os.ReadFile(importfile)
+		if err != nil {
+			return nil, err
+		}
+		return strings.Split(string(b), "\n"), nil
+	}
+	log.Debug().Str("file", importfile).Msg("Scanning files for dependencies")
+	return parsePythonfiles()
+}
+
+type importpath map[string]string
+
+func parsePythonfiles() ([]string, error) {
+	seen := importpath{}
+
+	mainfiles := dirtomap(".")
+	libdir := locateLibdir()
+	libfiles := dirtomap(libdir)
+
+	for mainfile := range mainfiles {
+		recursiveScanImports(mainfile, libdir, mainfiles, libfiles, seen)
 	}
 
-	// split string into lines
+	delete(seen, "main")
+
 	var out []string
-	for _, line := range strings.Split(string(b), "\n") {
-		if line != "" {
-			out = append(out, line)
-		}
+	for _, k := range seen {
+		out = append(out, k)
 	}
 	return out, nil
 }
 
-func readTOML() ([]string, error) {
-	tomlfiles, err := filepath.Glob("*.toml")
+func recursiveScanImports(importname, libdir string, mainfiles, libfiles, seen importpath) {
+	if _, ok := seen[importname]; ok {
+		return
+	}
+	log.Trace().Str("file", importname).Msg("Scanning file")
+	var path string
+	var ok bool
+	if path, ok = mainfiles[importname]; ok {
+		log.Trace().Str("import", importname).Msg("Found mainfile")
+	} else if path, ok = libfiles[importname]; ok {
+		log.Trace().Str("import", importname).Msg("Found libfile")
+	} else {
+		log.Trace().Str("import", importname).Msg("Not found, assuming system file")
+		return
+	}
+	seen[importname] = importname + ".py"
+	imports := findImportsInPythonfile(path)
+	for _, f := range imports {
+		log.Trace().Str("import", f).Msg("Nested import")
+		recursiveScanImports(f, libdir, mainfiles, libfiles, seen)
+	}
+}
+
+func dirtomap(path string) importpath {
+	files, err := os.ReadDir(path)
 	if err != nil {
-		return nil, err
+		log.Fatal().Err(err).Str("path", path).Msg("Cannot read directory")
 	}
-	if len(tomlfiles) != 1 {
-		s := "none"
-		if len(tomlfiles) > 1 {
-			s = fmt.Sprintf("%d (%v)", len(tomlfiles), tomlfiles)
+	m := importpath{}
+	if path == "." || path == "./" {
+		path = ""
+	} else {
+		if !strings.HasSuffix(path, "/") {
+			path += "/"
 		}
-		return nil, fmt.Errorf("need %s or exactly one .toml file, found %s", importfile, s)
 	}
-	config, err := toml.LoadFile(tomlfiles[0])
+
+	for _, f := range files {
+		fname := f.Name()
+		if s, err := filepath.EvalSymlinks(fname); err == nil {
+			//fmt.Printf("Found Symlink: %s -> %s\n", fname, s)
+			fname = filepath.Base(s)
+		}
+		lower := strings.ToLower(fname)
+		if !strings.HasSuffix(lower, ".py") {
+			log.Trace().Str("path", f.Name()).Msg("Skipping non-python file")
+			continue
+		}
+		importname := strings.TrimSuffix(lower, ".py")
+		m[importname] = path + f.Name()
+	}
+	return m
+}
+
+func findImportsInPythonfile(fname string) []string {
+	txt, err := os.ReadFile(fname)
+	if err != nil {
+		log.Fatal().Err(err).Str("fname", fname).Msg("Cannot read file")
+	}
+	//	rx := regexp.MustCompile(`^import\s+([^#].*).*`)
+	rx := regexp.MustCompile(`import\s+([^#].*).*`)
+	m := rx.FindAllStringSubmatch(string(txt), -1)
+	if len(m) == 0 {
+		log.Trace().Str("file", fname).Msg("No imports")
+		return nil
+	}
+	var ff []string
+	for _, f := range m {
+		if len(f) != 2 {
+			log.Warn().Int("n", len(f)).Strs("matches", f).Msg("Found")
+			continue
+		}
+		ff = append(ff, f[1])
+	}
+	return ff
+}
+
+func findToml() string {
+	tomlfiles, err := filepath.Glob("*.toml")
+	if len(tomlfiles) == 0 || err != nil {
+		return ""
+	}
+	if len(tomlfiles) == 1 {
+		return tomlfiles[0]
+	}
+
+	log.Warn().Int("nfiles", len(tomlfiles)).Msg("Need exactly one toml file, found more")
+	return ""
+	//		s := "none"
+	//		if len(tomlfiles) > 1 {
+	//			s = fmt.Sprintf("%d (%v)", len(tomlfiles), tomlfiles)
+	//		}
+	//		return nil, fmt.Errorf("need %s or exactly one .toml file, found %s", importfile, s)
+
+}
+
+func readTOML(fname string) ([]string, error) {
+	log.Debug().Str("file", fname).Msg("Reading dependencies from TOML input file")
+	config, err := toml.LoadFile(fname)
 	if err != nil {
 		return nil, err
 	}
