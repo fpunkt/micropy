@@ -19,6 +19,7 @@ import dht
 import board
 import can
 import canid
+import canerror
 import uasyncio as asyncio
 try:
     import fsmqtt
@@ -139,7 +140,11 @@ class DHT(Sensor):
         # self.msg.setsender(self.portid)
         # if board.CAN is None:
         #     return
-        self.dht.measure()
+        try:
+            self.dht.measure()
+        except:
+            can.cancommon.errormessage([canerror.SENSOR_DISABLED, self.portid])
+            raise
         # t = int(10*self.dht.temperature()+0.5)
         # h = int(10*self.dht.humidity()+0.5)
         # decode ourself to avoid malloc
@@ -176,7 +181,11 @@ class DHT11(Sensor):
         # self.msg.setsender(self.portid)
         # if board.CAN is None:
         #     return
-        self.dht.measure()
+        try:
+            self.dht.measure()
+        except:
+            can.cancommon.errormessage([canerror.SENSOR_DISABLED, self.portid])
+            raise
         # t = int(10*self.dht.temperature()+0.5)
         # h = int(10*self.dht.humidity()+0.5)
         # decode ourself to avoid malloc
