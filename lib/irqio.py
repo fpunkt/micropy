@@ -12,9 +12,11 @@ import utime
 # import micropython
 # import uasyncio as asyncio
 import sensors
+import can
+import board
 
 class IRQIO(sensors.Sensor):
-    def __init__(self, portid, pinid, trigger=None, pullup=True):
+    def __init__(self, portid, pinid, trigger=None, pullup=True, canid=0, debounce_ms=1):
         super().__init__(self, portid, pinid, poll_intervall_in_ms=10)
         # typically buttons or motions sensors have very short running handlers
         self.is_fast = True
@@ -37,9 +39,20 @@ class IRQIO(sensors.Sensor):
         self.callback = None
         self.pinvalue = self.pin.value()
         self.last_irq = utime.ticks_ms()
+        self.last_run_ticks = self.last_irq
+        self.last_run_before_ms = 0
         self.last_value = 0
         self.pin.irq(trigger=trigger, handler=self._irq_handler)
-        self.debounce_ms = 1
+        self.debounce_ms = debounce_ms
+        self.msg = None
+        if canid != 0:
+            self.msg = can.makemessage(canid, 5, portid=portid)
+
+    def sendmessage(self):
+        if board.CAN is not None and self.msg is not None:
+            self.msg.payload[3] = self.pinvalue
+            self.msg.payload[4] = 1
+            self.msg.send()
 
     def run(self):
         now = utime.ticks_ms()
@@ -51,6 +64,8 @@ class IRQIO(sensors.Sensor):
         if pv == self.pinvalue:
             # no change
             return False
+        self.last_run_before_ms = utime.ticks_diff(now, self.last_run_ticks)
+        self.last_run_ticks = now
         self.pinvalue = pv
         if self.callback is not None:
             self.callback(self) # pylint: disable=not-callable

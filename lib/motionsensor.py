@@ -16,9 +16,8 @@ import utime
 
 class Motionsensor(irqio.IRQIO):
     def __init__(self, portid, pinid, pullup=None):
-        super().__init__(portid, pinid, pullup=pullup)
-        self.msg = can.makemessage(canid.SENSOR_MOTION, 5, portid=portid)
-        self.last_run = utime.ticks_ms()
+        super().__init__(portid, pinid, pullup=pullup, canid=canid.SENSOR_MOTION)
+        #self.msg = can.makemessage(canid.SENSOR_MOTION, 5, portid=portid)
         self.fastcount = 0
 
     def __repr__(self):
@@ -41,23 +40,21 @@ class Motionsensor(irqio.IRQIO):
             # no change
             return False
 
-        now = utime.ticks_ms()
-        if utime.ticks_diff(now, self.last_run) < 50:
+        if self.last_run_ticks < 50:
             # comming fast ..
             if self.fastcount > 10:
                 # events are comming too fast
                 self.disable()
                 return False
             self.fastcount += 1
-            self.last_run = now
             return False
 
-        self.last_run = now
         self.fastcount = 0
+        self.sendmessage()
 
-        if board.CAN is not None:
-            self.msg.payload[3] = self.pinvalue
-            self.msg.payload[4] = 1
-            self.msg.send()
+        #if board.CAN is not None:
+        #    self.msg.payload[3] = self.pinvalue
+        #    self.msg.payload[4] = 1
+        #    self.msg.send()
         # self.event.clear()
         return True
