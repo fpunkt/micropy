@@ -12,7 +12,7 @@ esac
 
 serial=`ls -1 $lookfor`
 flashsize=4MB
-flashsize=detect
+#flashsize=detect
 chip=esp32
 
 ORANGE='\033[0;33m'

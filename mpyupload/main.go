@@ -26,6 +26,7 @@ var options = struct {
 	dryrun  bool
 	force   bool
 	nolup   bool
+	ip      string
 }{}
 
 const (
@@ -42,6 +43,7 @@ func main() {
 	pflag.BoolVarP(&options.dryrun, "dryrun", "d", false, "compile but don't upload file")
 	pflag.BoolVarP(&options.force, "force", "f", false, "Force upload of all files (ignore .lastsync)")
 	pflag.BoolVarP(&options.nolup, "no-lup", "l", false, "Don't overwrite lup.py file (copy last upload date to ESP)")
+	pflag.StringVarP(&options.ip, "ip", "i", "", "IP to use, ignore .espip file")
 	pflag.Parse()
 
 	zlog.InitL(options.verbose)
@@ -57,6 +59,14 @@ func main() {
 		log.Fatal().Err(err).Msg("Cannot read dependencies")
 	}
 	// cleanup - remove empty lines and duplicates
+	var dd []string
+	for _, d := range dependencies {
+		if d == "" || options.nolup && d == "lup.py" {
+			continue
+		}
+		dd = append(dd, d)
+	}
+	dependencies = dd
 
 	//fmt.Printf("dependencies: %v\n", dependencies)
 	//if err == nil {
@@ -69,10 +79,21 @@ func main() {
 		log.Fatal().Err(err).Msg("Fatal error")
 	}
 
-	if ips, err := os.ReadFile(ipfile); err != nil {
-		log.Fatal().Err(err).Msg("Fatal error")
+	if options.ip == "" {
+		if ips, err := os.ReadFile(ipfile); err != nil {
+			log.Fatal().Err(err).Msg("Fatal error")
+		} else {
+			ipstring = strings.TrimSpace(string(ips))
+		}
 	} else {
-		ipstring = strings.TrimSpace(string(ips))
+		switch len(strings.Split(options.ip, ".")) {
+		case 1:
+			ipstring = "192.168.178." + options.ip
+		case 3:
+			ipstring = options.ip
+		default:
+			log.Fatal().Str("ip", options.ip).Msg("Bad IP string")
+		}
 	}
 
 	libdir = locateLibdir()

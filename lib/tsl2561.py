@@ -54,10 +54,16 @@ class TSL2561(sensors.Sensor):
         self._tint = i+1
 
     def run(self):
-        l = self.t.read(raw=False)
-        r = self.t.read(raw=True, autogain=True)
-        lo = self.t.lux_orig(r)
-        la = self.t.lux_ada(r)
+        try:
+            l = self.t.read(raw=False)
+            r = self.t.read(raw=True, autogain=True)
+            lo = self.t.lux_orig(r)
+            la = self.t.lux_ada(r)
+        except Exception as e:
+            if board.DEBUG:
+                print('Read error on TLS2561: {}'.format(e))
+            self.read_error()
+            return
         self.count += 1
         print('{:5d} L = {} / lo = {} / la = {} --  {} g={}'.format(self.count, l, lo, la, r, self.t._gain))
         if board.CAN is not None:

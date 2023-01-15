@@ -22,11 +22,15 @@ CPU_ID = 1              # ESP32 per default
 BOARD_ID = 0            # PCB version, overwritten in bconf
 PERIPH_ID = 0           # PCB version, overwritten in main.py (or by including other .py files)
 
-
+RESET_ON_HARD_ERRORS = False # mainly CAN Errors
+ENABLE_WATCHDOG_AFTER_SECONDS = 120
 
 PINGTIME = 300
 MEMSTATTIME = 300
 CANPOLLTIME_MS = 5
+
+CAN_MESSAGES_RECEIVED = 0
+CAN_MESSAGES_SEND = 0
 
 def PRINT(formatstring, *args):
     if not DEBUG:
@@ -137,7 +141,11 @@ LOCATION = "unknown"
 CAN = None
 
 # the global watchdog
-WD = None
+class _dummy_watchdoc():
+    def enable(self): pass
+    def trigger(self): pass
+
+WD = _dummy_watchdoc()
 
 run_gc = None
 
@@ -145,6 +153,13 @@ def good_time_for_gc():
     # pylint: disable=no-member
     if run_gc and gc.mem_free() < 6000:
         run_gc() # pylint: disable=not-callable
+
+async def _enable_watchdog():
+    await asyncio.sleep(ENABLE_WATCHDOG_AFTER_SECONDS)
+    if ENABLE_WATCHDOG_AFTER_SECONDS == 0:
+        return
+    WD.enable()
+
 
 # Run async processes
 

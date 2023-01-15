@@ -15,7 +15,7 @@ import canerror
 import utime
 
 class Motionsensor(irqio.IRQIO):
-    def __init__(self, portid, pinid, pullup=None):
+    def __init__(self, portid, pinid, pullup=True):
         super().__init__(portid, pinid, pullup=pullup, canid=canid.SENSOR_MOTION)
         #self.msg = can.makemessage(canid.SENSOR_MOTION, 5, portid=portid)
         self.fastcount = 0

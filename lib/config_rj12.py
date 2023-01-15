@@ -26,7 +26,7 @@ RJ12_EDGE_6_BLUE = const(22)
 RJ12_CENTER_1_WHITE = const(27)
 RJ12_CENTER_4_GREEN_ML10_7 = const(33)
 RJ12_CENTER_5_YELLOW_ML10_3 = const(14)
-RJ12_CENTER_6_BLUE_INPUT_ONLY = const(34)
+RJ12_CENTER_6_BLUE_INPUT_ONLY_NO_PULLUP = const(34)
 
 AUX1_YELLOW = const(13)
 AUX1_WHITE = const(12)
@@ -43,6 +43,10 @@ ML10_PWM_6 = const(18)
 ML10_PWM_7 = const(19)
 ML10_PWM_8 = const(21)
 
+# From https://docs.espressif.com/projects/esp-idf/en/latest/esp32/api-reference/peripherals/sd_pullup_requirements.html#sd-pull-up-no-pull-ups
+# WROOVER board
+#
+
 # 2nd ML10 connector
 ML10_1 = const(12)
 ML10_2 = const(13)
@@ -51,7 +55,7 @@ ML10_4 = const(25)
 ML10_5 = const(26)
 ML10_6 = const(27)
 ML10_7 = const(33)
-ML10_8 = const(34)
+ML10_8_INPUT_ONLY = const(34)
 
 
 if board.CANID is not None:

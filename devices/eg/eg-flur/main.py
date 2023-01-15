@@ -6,15 +6,15 @@ EG flur
         1 x DC/DC ??
         1 x 9V spots
 
-    Under Roof Connected
-        2 x Motion
+    In der Zwischendecke angeschlossen
+        2 x Motion              - Eingangstür und auf dem Schrank, Kabel liegt unter der Decke
         1 x Dindong
-        1 x light on
+        1 x light on            - am PCB
 
-    Via ML-10
-        1 AM2320
-        2 I2C lines for light sensor
-        2 x Motion
+    Via ML-10 - ein ML-10 Kabel wird rausgeführt und ein PCB hängt (sichtbar) an der Decke
+        1 AM2320                - Unter der Decke wäre blöd ...
+        2 I2C for light sensor  - Unter der Decke wäre blöd ...
+        2 x Motion              - Richtung Treppe und WZ Tür
 
 """
 
@@ -52,15 +52,47 @@ if board.CAN and board.DEBUG:
     board.CAN.cancommon.send_wlan_connected()
 
 ##### ML10 connector - devices are mounted on a connector board (small PCB with ML10 plug)
-# ML10_6 OK for DHT
-dht = sensors.DHT(0x20, bconf.ML10_6, poll_intervall_in_ms=5000 if board.DEBUG else sensors.minutes(5))
+
+#brightness = tsl2561.TSL2561(0x30, sda=bconf.ML10_3, scl=bconf.ML10_2, poll_intervall_in_ms=2000)
+brightness = tsl2561.TSL2561(0x30, sda=bconf.ML10_4, scl=bconf.ML10_2, poll_intervall_in_ms=2000)
+dht = sensors.DHT(0x20, bconf.ML10_5, poll_intervall_in_ms=5000 if board.DEBUG else sensors.minutes(5))
+
+m1 = motionsensor.Motionsensor(0x10, bconf.ML10_6)
+#m2 = motionsensor.Motionsensor(0x11, bconf.ML10_7)
+m2 = motionsensor.Motionsensor(0x11, bconf.ML10_8_INPUT_ONLY)
+
+
 #
-# SDA=ML10_1, SCL=ML10_2 is OK for I2C
-t = tsl2561.TSL2561(0x30, sda=bconf.ML10_1, scl=bconf.ML10_2, poll_intervall_in_ms=2000)
+# OK, however ML10_1 (pin 12) might prevent from flashing
+#t = tsl2561.TSL2561(0x30, sda=bconf.ML10_1, scl=bconf.ML10_2, poll_intervall_in_ms=2000)
+
+
+#t = tsl2561.TSL2561(0x30, sda=bconf.ML10_4, scl=bconf.ML10_2, poll_intervall_in_ms=2000)
+#Read error on TLS2561: [Errno 19] ENODEV
+#t = tsl2561.TSL2561(0x30, sda=bconf.ML10_2, scl=bconf.ML10_3, poll_intervall_in_ms=2000)
+
+# Read error on TLS2561: [Errno 19] ENODEV
+# t = tsl2561.TSL2561(0x30, sda=bconf.ML10_4, scl=bconf.ML10_3, poll_intervall_in_ms=2000)
+# t = tsl2561.TSL2561(0x30, sda=bconf.ML10_3, scl=bconf.ML10_4, poll_intervall_in_ms=2000)
+
+#E ML10_8 (1074903) gpio: io_num=34 can only be input
+#t = tsl2561.TSL2561(0x30, sda=bconf.ML10_7, scl=bconf.ML10_8, poll_intervall_in_ms=2000)
+
+# Sensor Read Error on 0x30
+#t = tsl2561.TSL2561(0x30, sda=bconf.ML10_3, scl=bconf.ML10_4, poll_intervall_in_ms=2000)
+
+# Read error on TLS2561: [Errno 19] ENODEV
+#t = tsl2561.TSL2561(0x30, sda=bconf.ML10_7, scl=bconf.ML10_6, poll_intervall_in_ms=2000)
+
+# GPIO output gpio_num error
+#t = tsl2561.TSL2561(0x30, sda=bconf.ML10_8, scl=bconf.ML10_2, poll_intervall_in_ms=2000)
+
+#t = tsl2561.TSL2561(0x30, sda=bconf.ML10_2, scl=bconf.ML10_8, poll_intervall_in_ms=2000)
 #
 # ML10_4 and 5 are OK for Montionsensor
-m1 = motionsensor.Motionsensor(0x10, bconf.ML10_4)
-m2 = motionsensor.Motionsensor(0x11, bconf.ML10_5)
+#m1 = motionsensor.Motionsensor(0x10, bconf.ML10_2_INPUT_ONLY)
+# m1 = motionsensor.Motionsensor(0x10, bconf.ML10_4)
+# m2 = motionsensor.Motionsensor(0x11, bconf.ML10_5)
 
 
 ##### under the roof connection - connected via RJ12 to terminal block

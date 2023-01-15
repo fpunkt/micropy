@@ -29,29 +29,37 @@ def init(self, rx=33, tx=32, baudrate=125, mode=machine.CAN.NORMAL):
     _hw_interface = machine.CAN(0, mode=mode, baudrate=baudrate, rx_io=rx, tx_io=tx, rx_queue=10, tx_queue=8)
     cancommon.send_poweron()
 
-def _send(cid, payload):
+def _send_without_reset(cid, payload):
     """Send packet"""
-    try:
-        _hw_interface.send(payload, cid, timeout=1)
-        return True
-
-    except Exception as e: # pylint: disable=bare-except, broad-except
-        if board.DEBUG:
-            print("Cannot send CAN message, going to reset: ", e)
-        # somehow this seems to be needed to allow going on
-        _hw_interface.restart()
-       # _hw_interface.clear_tx_queue()
-        return False
-
-def write(cid, payload):
     tryagain = 3
     while tryagain > 0:
-        if _send(cid, payload):
-            return
-        tryagain -= 1
+        try:
+            _hw_interface.send(payload, cid, timeout=1)
+            board.WD.trigger()
+            board.CAN_MESSAGES_SEND += 1
+            return True
+        except Exception as e: # pylint: disable=bare-except, broad-except
+            if board.DEBUG:
+                print("Cannot send CAN message, going to reset: ", e)
+            # Bus is running at 125 kHz - typical CAN packet (8 bytes payload plus offset) takes less than 1ms
+            # 1 ms sleep should be sufficient to send messages. If this fails several times there seems to be an
+            # issue with the CAN system
+            utime.sleep_ms(1)
+            tryagain -= 1
 
-_messages_seen_since_last_check = 0
-# _last_can_message = utime.time()
+def _send_with_reset_bus_if_needed(cid, payload):
+    if _send_without_reset(cid, payload):
+        return True
+    # try this as a last resort
+    _hw_interface.restart()
+    # _hw_interface.clear_tx_queue()
+    return _send_without_reset(cid, payload)
+
+
+def write(cid, payload):
+    if _send_without_reset(cid, payload):
+        return
+    # what now? Reset the system?
 
 _currentfilter = None
 
@@ -78,14 +86,13 @@ _static_message = [0, 0, 0, memoryview(bytearray(8))]
 #
 
 async def _poll_CAN():
-    global _messages_seen_since_last_check
     # CAN initialized ?
     while _hw_interface is None:
         await asyncio.sleep_ms(5000)
 
     while True:
         if  _hw_interface.any():
-            _messages_seen_since_last_check += 1
+            board.CAN_MESSAGES_RECEIVED += 1
 #            print('juhu, got message')
 
             if False:
@@ -114,16 +121,18 @@ async def _poll_CAN():
 
 board.BACKGROUND_RUNNERS.append(_poll_CAN())
 
-async def _monitor_can_bus_activity():
-    global _messages_seen_since_last_check
-    while True:
-        await asyncio.sleep(20)
-        if board.DEBUG:
-            print('# Checking for CAN activity: ')
-        if _hw_interface is None:
-            continue
-        if _messages_seen_since_last_check > 0:
-            _messages_seen_since_last_check = 0
-            continue
-        # restart CAN bus
+# Since we can set a CAN input filter it is not obvious that we receive messages on a regular basis.
+# Can't use for Watchdog
 
+# async def _monitor_can_bus_activity():
+#     global _messages_seen_since_last_check
+#     while True:
+#         await asyncio.sleep(20)
+#         if board.DEBUG:
+#             print('# Checking for CAN activity: ')
+#         if _hw_interface is None:
+#             continue
+#         if _messages_seen_since_last_check > 0:
+#             _messages_seen_since_last_check = 0
+#             continue
+#         restart CAN bus here

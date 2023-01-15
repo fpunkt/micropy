@@ -102,6 +102,12 @@ class Sensor:
     def run(self): # pylint: disable=no-self-use
         return None
 
+    def read_error(self):
+        can.cancommon.errormessage([canerror.SENSOR_READ_ERROR, self.portid])
+
+    def disabled_error(self):
+        can.errormessage([canerror.SENSOR_DISABLED, self.portid])
+
     async def sensor_task(self):
         self.proclaim()
         while True:
@@ -136,17 +142,11 @@ class DHT(Sensor):
         super().proclaim()
 
     def run(self):
-        #print('Measure {}'.format(self.portid))
-        # self.msg.setsender(self.portid)
-        # if board.CAN is None:
-        #     return
         try:
             self.dht.measure()
         except:
-            can.cancommon.errormessage([canerror.SENSOR_DISABLED, self.portid])
+            self.read_error()
             raise
-        # t = int(10*self.dht.temperature()+0.5)
-        # h = int(10*self.dht.humidity()+0.5)
         # decode ourself to avoid malloc
         h = self.dht.buf[0] << 8 | self.dht.buf[1]
         t = (self.dht.buf[2] & 0x7F) << 8 | self.dht.buf[3]
@@ -177,17 +177,11 @@ class DHT11(Sensor):
         super().proclaim()
 
     def run(self):
-        #print('Measure {}'.format(self.portid))
-        # self.msg.setsender(self.portid)
-        # if board.CAN is None:
-        #     return
         try:
             self.dht.measure()
         except:
-            can.cancommon.errormessage([canerror.SENSOR_DISABLED, self.portid])
+            self.read_error()
             raise
-        # t = int(10*self.dht.temperature()+0.5)
-        # h = int(10*self.dht.humidity()+0.5)
         # decode ourself to avoid malloc
         h = 10 * self.dht.buf[0]
         t = 10 * self.dht.buf[2]
@@ -200,7 +194,7 @@ class DHT11(Sensor):
             self.msg.send()
 
 
-class Brightness(Sensor):
+class AnalogBrightness(Sensor):
     """Analog brighness sensors, 0 is dark, 0xff is maximum brightness"""
     def __init__(self, portid, pin, poll_intervall_in_ms=poll_5_minutes):
         super().__init__('Brightness', portid, pin, poll_intervall_in_ms)
