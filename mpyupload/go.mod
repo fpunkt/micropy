@@ -3,7 +3,7 @@ module mpyupload
 go 1.17
 
 // replace gitlab.com/fpunkts/zlog => ../../../fpunkts/zlog
-replace github.com/fpunkt/zlog => ../../../github.com/fpunkt/zlog
+replace github.com/fpunkt/zlog => ../../../../github.com/fpunkt/zlog
 
 require (
 	github.com/fpunkt/zlog v0.0.0-00010101000000-000000000000
