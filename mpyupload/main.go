@@ -22,11 +22,12 @@ import (
 var libdir, ipstring string
 
 var options = struct {
-	verbose int
-	dryrun  bool
-	force   bool
-	nolup   bool
-	ip      string
+	verbose     int
+	dryrun      bool
+	force       bool
+	nolup       bool
+	ip          string
+	initialBoot bool
 }{}
 
 const (
@@ -36,15 +37,19 @@ const (
 )
 
 func main() {
-	// if err := os.Chdir(os.ExpandEnv("${HOME}/Projects/fpunkts/micropy/devices/test/pwm")); err != nil {
-	// 	log.Fatal().Err(err).Msg("Fatal error")
-	// }
 	pflag.CountVarP(&options.verbose, "verbose", "v", "verbose messages")
 	pflag.BoolVarP(&options.dryrun, "dryrun", "d", false, "compile but don't upload file")
 	pflag.BoolVarP(&options.force, "force", "f", false, "Force upload of all files (ignore .lastsync)")
 	pflag.BoolVarP(&options.nolup, "no-lup", "l", false, "Don't overwrite lup.py file (copy last upload date to ESP)")
+	pflag.BoolVarP(&options.initialBoot, "initial-setup", "b", false, "Initial setup after firmware upgrade")
 	pflag.StringVarP(&options.ip, "ip", "i", "", "IP to use, ignore .espip file")
 	pflag.Parse()
+
+	if options.initialBoot {
+		fmt.Println("For initial setup see     tools/initial-setup.sh")
+		fmt.Println("  (basically: use ampy to upload net.mpy and c.mpy)")
+		os.Exit(0)
+	}
 
 	zlog.InitL(options.verbose)
 
