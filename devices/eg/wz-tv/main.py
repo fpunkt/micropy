@@ -51,6 +51,10 @@ import motionsensor
 if board.CAN and board.DEBUG:
     board.CAN.cancommon.send_wlan_connected()
 
+if 0 == 1:
+    # make pylint think that it knows about 'const' variable
+    const = lambda x: x
+
 # BAD PWM backplane
 # p0 = pwm.PWM(1, bconf.ML10_PWM_1)
 # p1 = pwm.PWM(2, bconf.ML10_PWM_2)
@@ -77,11 +81,14 @@ proof = pwm.List(9, p1, p2, p3)
 # 13, 12, 14, 27, 26, 25, 33
 # b1 = button.Button(0x20, bconf.RJ12_1_WHITE_INPUT_ONLY)
 # b2 = button.Button(0x21, bconf.RJ12_1_GREEN_INPUT_ONLY)
-b1 = button.Button(0x20, bconf.RJ12_1_YELLOW)
-# b1.pwm = proof
+#b1 = button.Button(0x20, bconf.RJ12_EDGE_5_YELLOW)
+#b2 = button.Button(0x21, bconf.RJ12_EDGE_6_BLUE)
+b1 = button.Button(0x20, bconf.RJ12_CENTER_5_YELLOW_ML10_3)
+b2 = button.Button(0x21, bconf.RJ12_CENTER_6_BLUE_INPUT_ONLY_NO_PULLUP)
 
-b2 = button.Button(0x21, bconf.RJ12_1_BLUE)
 
+
+b1.pwm = proof
 
 #def _motion_callback(x):
 #    if board.DEBUG:
@@ -92,8 +99,8 @@ b2 = button.Button(0x21, bconf.RJ12_1_BLUE)
 # m1.callback = _motion_callback
 
 
-def cb(but):
-    board.PRINT('got event from button {}', but)
+#def cb(but):
+#    board.PRINT('got event from button {}', but)
 
 # b1.callback = cb
 # b2.callback = cb
