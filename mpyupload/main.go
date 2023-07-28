@@ -28,6 +28,8 @@ var options = struct {
 	nolup       bool
 	ip          string
 	initialBoot bool
+	reboot      int
+	cansrv      string
 }{}
 
 const (
@@ -42,7 +44,9 @@ func main() {
 	pflag.BoolVarP(&options.force, "force", "f", false, "Force upload of all files (ignore .lastsync)")
 	pflag.BoolVarP(&options.nolup, "no-lup", "l", false, "Don't overwrite lup.py file (copy last upload date to ESP)")
 	pflag.BoolVarP(&options.initialBoot, "initial-setup", "b", false, "Initial setup after firmware upgrade")
+	pflag.IntVarP(&options.reboot, "reboot", "r", 0, "Reboot after uploading file ()")
 	pflag.StringVarP(&options.ip, "ip", "i", "", "IP to use, ignore .espip file")
+	pflag.StringVarP(&options.cansrv, "canserver", "C", "", "canserver used to send reset command")
 	pflag.Parse()
 
 	if options.initialBoot {
@@ -253,9 +257,24 @@ func main() {
 		run("touch " + lastsyncfile)
 	}
 
-	//	fmt.Println(lines(string(dependencies)))
-	//	fmt.Println(changed)
+	if options.reboot > 0 {
+		reboot(options.reboot)
+	}
+}
 
+func reboot(canid int) {
+	l := log.Info()
+	cmd := []string{}
+	if options.cansrv != "" {
+		cmd = append(cmd, "-C")
+		cmd = append(cmd, options.cansrv)
+		l = l.Str("cansrv", options.cansrv)
+	}
+	cmd = append(cmd, "reset", "-c", fmt.Sprint(canid))
+	l.Str("canid", fmt.Sprintf("0x%03x", canid)).Msg("Sending reboot")
+	if err := exec.Command("cantool", cmd...).Run(); err != nil {
+		log.Error().Err(err).Msg("Cannot reset device")
+	}
 }
 
 func locateLibdir() string {
