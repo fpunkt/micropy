@@ -17,7 +17,8 @@ import board
 
 class IRQIO(sensors.Sensor):
     def __init__(self, portid, pinid, trigger=None, pullup=True, canid=0, debounce_ms=1):
-        super().__init__(self, portid, pinid, poll_intervall_in_ms=10)
+        pullupmode = machine.Pin.PULL_UP if pullup is True else pullup
+        super().__init__(self, portid, machine.Pin(pinid, machine.Pin.IN, pullupmode), poll_intervall_in_ms=10)
         # typically buttons or motions sensors have very short running handlers
         self.is_fast = True
         if trigger is None:
@@ -28,13 +29,6 @@ class IRQIO(sensors.Sensor):
             trigger = machine.Pin.IRQ_FALLING
         else:
             raise ValueError('trigger needs to be one of None, rise or fall, found {}'.format(trigger))
-        if pullup is True:
-            pullupmode = machine.Pin.PULL_UP
-        else:
-            pullupmode = pullup
-        # TODO: should have been initialized by super()
-        self.portid = portid
-        self.pin = machine.Pin(pinid, machine.Pin.IN, pullupmode)
         self._repr = '{} #{} {}'.format(self.__class__.__name__, self.portid, self.pin)
         self.callback = None
         self.pinvalue = self.pin.value()
