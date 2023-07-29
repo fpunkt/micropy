@@ -55,16 +55,6 @@ if 0 == 1:
     # make pylint think that it knows about 'const' variable
     const = lambda x: x
 
-# BAD PWM backplane
-# p0 = pwm.PWM(1, bconf.ML10_PWM_1)
-# p1 = pwm.PWM(2, bconf.ML10_PWM_2)
-# p2 = pwm.PWM(3, bconf.ML10_PWM_3)
-# p3 = pwm.PWM(4, bconf.ML10_PWM_4)
-# p4 = pwm.PWM(5, bconf.ML10_PWM_5)
-# p5 = pwm.PWM(6, bconf.ML10_PWM_6)
-# p6 = pwm.PWM(7, bconf.ML10_PWM_7)
-# p7 = pwm.PWM(8, bconf.ML10_PWM_8)
-
 p4 = pwm.PWM(4, bconf.ML10_PWM_1)
 p5 = pwm.PWM(5, bconf.ML10_PWM_2)
 p3 = pwm.PWM(3, bconf.ML10_PWM_3)
@@ -77,14 +67,14 @@ p8 = pwm.PWM(8, bconf.ML10_PWM_8)
 proof = pwm.List(9, p1, p2, p3)
 
 
-# PINs on left side (buttons, thermometer and motionsensors)
-# 13, 12, 14, 27, 26, 25, 33
-# b1 = button.Button(0x20, bconf.RJ12_1_WHITE_INPUT_ONLY)
-# b2 = button.Button(0x21, bconf.RJ12_1_GREEN_INPUT_ONLY)
+# NOTE: the RJ12 connector on the edge of the PCB does not seem to work as input, even with
+# external pull-ups the buttons do not work. Not clear whether this is related to the PINs (unlikely)
+# or whether the ESP#10 is damaged.
+
 #b1 = button.Button(0x20, bconf.RJ12_EDGE_5_YELLOW)
 #b2 = button.Button(0x21, bconf.RJ12_EDGE_6_BLUE)
-b1 = button.Button(0x20, bconf.RJ12_CENTER_5_YELLOW_ML10_3)
-b2 = button.Button(0x21, bconf.RJ12_CENTER_6_BLUE_INPUT_ONLY_NO_PULLUP)
+b1 = button.Button(0x20, bconf.RJ12_CENTER_6_BLUE_INPUT_ONLY_NO_PULLUP)
+b2 = button.Button(0x21, bconf.RJ12_CENTER_5_YELLOW_ML10_3)
 
 
 
