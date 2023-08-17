@@ -3,7 +3,7 @@ package main
 import (
 	"bytes"
 	"fmt"
-	"io/fs"
+	"io"
 	"net"
 	"os"
 	"os/exec"
@@ -15,11 +15,10 @@ import (
 	"github.com/fpunkt/zlog"
 	"github.com/rs/zerolog/log"
 	"github.com/spf13/pflag"
-
-	toml "github.com/pelletier/go-toml"
+	"golang.org/x/exp/maps"
 )
 
-var libdir, ipstring string
+var ipstring string
 
 var options = struct {
 	verbose     int
@@ -30,6 +29,9 @@ var options = struct {
 	initialBoot bool
 	reboot      int
 	cansrv      string
+	igoredfiles []string
+	libdir      string
+	builddir    string
 }{}
 
 const (
@@ -46,8 +48,22 @@ func main() {
 	pflag.BoolVarP(&options.initialBoot, "initial-setup", "b", false, "Initial setup after firmware upgrade")
 	pflag.IntVarP(&options.reboot, "reboot", "r", 0, "Reboot after uploading file ()")
 	pflag.StringVarP(&options.ip, "ip", "i", "", "IP to use, ignore .espip file")
+	pflag.StringVarP(&options.libdir, "libdir", "L", "", "Specify library directory, leave empty for auto detection")
+	pflag.StringVarP(&options.builddir, "build-dir", "B", ".build", "Directory for compiler output files")
 	pflag.StringVarP(&options.cansrv, "canserver", "C", "", "canserver used to send reset command")
+	pflag.StringSliceVarP(&options.igoredfiles, "ignore-files", "I", []string{
+		"c.py",
+	}, "Ingore directories when seraching for dependencies")
 	pflag.Parse()
+
+	if options.builddir != "" && !strings.HasSuffix(options.builddir, "/") {
+		options.builddir = options.builddir + "/"
+	}
+	if !options.dryrun && options.builddir != "" {
+		if err := os.MkdirAll(options.builddir, 0700); err != nil {
+			log.Fatal().Str("path", options.builddir).Msg("Cannot create build directory")
+		}
+	}
 
 	if options.initialBoot {
 		fmt.Println("For initial setup see     tools/initial-setup.sh")
@@ -57,32 +73,34 @@ func main() {
 
 	zlog.InitL(options.verbose)
 
-	//if err := os.Chdir("../devices/test/pingmachine/"); err != nil {
-	//	log.Fatal().Err(err).Send()
-	//}
-
 	starttime := time.Now()
 
-	dependencies, err := readDependencies()
+	if options.libdir == "" {
+		options.libdir = locateLibdir()
+	}
+
+	if !options.nolup {
+		const ll = "lup"
+		const lastuploadfile = ll + ".py"
+		if fd, err := os.Create(lastuploadfile); err != nil {
+			log.Error().Err(err).Str("file", lastuploadfile).Msg("Cannot create file last upload file")
+		} else {
+			fmt.Fprintf(fd, "T = %d\n", time.Now().Unix())
+			fd.Close()
+			log.Info().Str("file", lastuploadfile).Msg("File created")
+			defer os.Remove(lastuploadfile)
+			defer os.Remove(ll + ".mpy")
+		}
+	}
+
+	dependencies, err := parsePythonfiles()
+	// the main.py file must not be compiled
+	mainfile := dependencies["main"]
+	delete(dependencies, "main")
+
 	if err != nil {
 		log.Fatal().Err(err).Msg("Cannot read dependencies")
 	}
-	// cleanup - remove empty lines and duplicates
-	var dd []string
-	for _, d := range dependencies {
-		if d == "" || options.nolup && d == "lup.py" {
-			continue
-		}
-		dd = append(dd, d)
-	}
-	dependencies = dd
-
-	//fmt.Printf("dependencies: %v\n", dependencies)
-	//if err == nil {
-	//	os.Exit(0)
-	//}
-
-	log.Trace().Int("dependencies", len(dependencies)).Strs("imports", dependencies).Msg("Loaded dependencies")
 
 	if err != nil {
 		log.Fatal().Err(err).Msg("Fatal error")
@@ -105,26 +123,6 @@ func main() {
 		}
 	}
 
-	libdir = locateLibdir()
-	//bindir = filepath.Clean(libdir + "../bin/")
-	log.Trace().
-		Str("libdir", libdir).
-		//Str("bindir", bindir).
-		Msg("Located libdir")
-	//fmt.Printf("bindir = %s, libdir = %s\n", bindir, libdir)
-
-	here, err := os.Getwd()
-	if err != nil {
-		log.Fatal().Err(err).Msg("Fatal error")
-	}
-	if err := os.Chdir(libdir); err != nil {
-		log.Fatal().Err(err).Msg("Fatal error")
-	}
-
-	if err := os.Chdir(here); err != nil {
-		log.Fatal().Err(err).Msg("Fatal error")
-	}
-
 	var lastupload time.Time
 	if !options.force {
 		if s, err := os.Stat(lastsyncfile); err == nil {
@@ -133,53 +131,18 @@ func main() {
 	}
 	//var changed []string
 
-	changed := compileFiles(libdir, dependencies, lastupload)
+	if options.verbose > 3 {
+		dependencies.dump(os.Stdout)
+	}
+	changed := compileFiles(dependencies, lastupload, pflag.Args())
 
-	// check files in current directory
-	direntries, err := os.ReadDir(".")
-	if err != nil {
-		log.Fatal().Err(err).Msg("Fatal error")
+	if lastupload.IsZero() || mainfile.mtime.After(lastupload) {
+		mainfile.compilename = mainfile.fullname
+		changed = append(changed, mainfile)
 	}
-	var files []string
-	for _, f := range direntries {
-		fname := f.Name()
-		if strings.HasSuffix(fname, ".py") {
-			files = append(files, fname)
-		}
-	}
-	if !options.nolup {
-		const lastuploadfile = "lup.py"
-		if fd, err := os.Create(lastuploadfile); err != nil {
-			log.Error().Err(err).Str("file", lastuploadfile).Msg("Cannot create file last upload file")
-		} else {
-			fmt.Fprintf(fd, "T = %d\n", time.Now().Unix())
-			fd.Close()
-			log.Info().Str("file", lastuploadfile).Msg("File created")
-			defer os.Remove(lastuploadfile)
-			// append file if not already included in list (might be leftover from failed run before)
-			doapp := true
-			for _, s := range files {
-				if s == lastuploadfile {
-					doapp = false
-					break
-				}
-			}
-			if doapp {
-				files = append(files, lastuploadfile)
-			}
-		}
-	}
-	//	if b, err := os.ReadFile(lastuploadfile); err != nil {
-	//		log.Error().Err(err).Str("file", lastuploadfile).Msg("Cannot read file")
-	//	} else {
-	//		fmt.Printf("lup: %q\n", string(b))
-	//	}
-
-	files = compileFiles(".", files, lastupload)
-	changed = append(changed, files...)
 
 	if len(changed) == 0 {
-		fmt.Printf("# no files to upload since %s\n", lastupload.String())
+		log.Info().Str("lastupload", lastupload.String()).Msg("# no files to upload since")
 		return
 	}
 
@@ -193,58 +156,15 @@ func main() {
 		}
 	}
 	iplogger.Info().Int("nfiles", len(changed)).Msg("Uploading files")
-	currentdir, _ := os.Getwd()
-
-	// augment changed files by command line arguments
-	if pflag.NArg() > 0 {
-		project, _ := os.ReadDir(".")
-		lib, _ := os.ReadDir(libdir)
-
-		ff := func(f string, dir []fs.DirEntry) string {
-			for _, d := range dir {
-				if strings.HasPrefix(d.Name(), f) {
-					return d.Name()
-				}
-			}
-			return ""
-		}
-		for _, f := range pflag.Args() {
-			if s := ff(f, project); s != "" {
-				fmt.Printf("Got %q for %q\n", s, f)
-				changed = append(changed, s)
-			}
-			if s := ff(f, lib); s != "" {
-				fmt.Printf("Got %q for %q\n", s, f)
-				changed = append(changed, s)
-			}
-		}
-	}
 
 	//fmt.Println(changed)
 
 	for _, file := range changed {
-		s, err := os.Stat(file)
-		if err != nil {
-			log.Fatal().Err(err).Msg("Cannot stat file")
-		}
-		//fmt.Printf("%20s: %s - %s - %T\n", file, s.ModTime(), lastupload, s.ModTime().Before(lastupload))
-		// HUH? We already checked that?
-		if s.ModTime().Before(lastupload) {
-			continue
-		}
-		relp := file
-		//fmt.Printf("relp=%s, cd=%s\n", relp, currentdir)
-		if currentdir != "" {
-			relp, err = filepath.Rel(currentdir, file)
-			if err != nil {
-				relp = file
-			}
-		}
-		log.Info().Str("file", relp).Msg("Uploading file")
+		log.Info().Str("file", file.compilename).Msg("Uploading file")
 		if options.dryrun {
 			log.Debug().Msg("Not Uploading because of dryrun")
 		} else {
-			upload(file)
+			upload(file.compilename)
 		}
 	}
 
@@ -307,7 +227,7 @@ func upload(fname string) {
 	if 1 == 0 {
 		return
 	}
-	_, serr, err := run(libdir + "/../webrepl/webrepl_cli.py -p x " + fname + " " + ipstring + ":")
+	_, serr, err := run(options.libdir + "/../webrepl/webrepl_cli.py -p x " + fname + " " + ipstring + ":")
 	if serr != "" {
 		fmt.Printf("# ERROR - uploading %s: %s\n", fname, serr)
 	}
@@ -316,8 +236,21 @@ func upload(fname string) {
 	}
 }
 
+type file struct {
+	name        string
+	mtime       time.Time // modtime of the sourcefile
+	fullname    string    // follows symlinks
+	importname  string    // striped path and extension
+	compilename string    // importname + .mpy
+	compiletime time.Time
+}
+
 // run shell command, return err, stdout, stderr
 func run(command string) (string, string, error) {
+	if options.dryrun {
+		log.Debug().Str("cmd", command).Msg("dryrun")
+		return "", "", nil
+	}
 	var stdout bytes.Buffer
 	var stderr bytes.Buffer
 	cmd := exec.Command("/bin/sh", "-c", command)
@@ -328,28 +261,41 @@ func run(command string) (string, string, error) {
 }
 
 // compile files in directory if they are newer than timestamp
-func compileFiles(directory string, files []string, timestamp time.Time) []string {
-	var changed []string
-	for _, basename := range files {
-		fullname := filepath.Join(directory, basename)
-		_, err := os.Stat(fullname)
-		if err != nil {
-			log.Fatal().Err(err).Msg("Fatal error")
+func compileFiles(files filemap, timestamp time.Time, force []string) []*file {
+	if len(force) != 0 {
+		log.Fatal().Strs("force", force).Msg("Force not implemented")
+	}
+	var changed []*file
+	for _, f := range files {
+		if _, ok := exclude[f.importname]; ok {
+			log.Trace().Str("file", f.name).Msg("Ignoring file from excludes")
+			continue
 		}
-		//compiled := compile(fullname, timestamp)
-		//s, err := os.Stat(compiled)
-		//if err != nil {
-		//	log.Fatal().Err(err).Msg("Fatal error")
-		//}
-		compiled, newts := compile(fullname)
-		if newts.After(timestamp) {
-			log.Debug().
-				Str("file", filepath.Base(compiled)).
-				Str("last", ts(timestamp)).
-				Str("modtime", ts(newts)).
-				Msg("File has changed since last upload")
-			changed = append(changed, compiled)
+		if timestamp.IsZero() {
+		} else {
+			stat, err := os.Stat(f.compilename)
+			if err == nil && stat.ModTime().After(f.mtime) {
+				log.Trace().Str("file", f.name).Msg("No need to compile because binary is newer")
+				// fmt.Printf("# no need to compile %s\n", fname)
+				f.compiletime = stat.ModTime()
+				continue
+			}
+			var reason string
+			if err != nil {
+				reason = "newfile"
+			} else {
+				reason = "outdated"
+			}
+			log.Info().Str("file", f.fullname).Str("object", f.compilename).Str("reason", reason).Msg("Compiling")
 		}
+		compiled := compile(f)
+
+		log.Debug().
+			Str("file", filepath.Base(compiled.name)).
+			Str("lastupload", ts(timestamp)).
+			Str("modtime", ts(compiled.compiletime)).
+			Msg("File has changed since last upload")
+		changed = append(changed, compiled)
 	}
 	return changed
 }
@@ -360,171 +306,186 @@ var exclude = map[string]struct{}{
 }
 
 func ts(t time.Time) string { return t.Format("2006-01-02 15:04:05") }
-func mustModTime(fname string) time.Time {
-	s, err := os.Stat(fname)
-	if err != nil {
-		log.Fatal().Err(err).Str("file", fname).Msg("Fatal error")
-	}
-	return s.ModTime()
-}
 
-// compile file if outdated
-func compile(fname string) (string, time.Time) {
-	ftime := mustModTime(fname)
-	if _, ok := exclude[filepath.Base(fname)]; ok {
-		log.Trace().Str("file", fname).Msg("Ignoring file from excludes")
-		return fname, ftime
-	}
-	//dir := filepath.Dir(fname)
-	here, err := os.Getwd()
-	if err != nil {
-		log.Fatal().Err(err).Msg("Fatal error")
-	}
-	defer os.Chdir(here)
+//func mustModTime(fname string) time.Time {
+//	s, err := os.Stat(fname)
+//	if err != nil {
+//		log.Fatal().Err(err).Str("file", fname).Msg("Fatal error")
+//	}
+//	return s.ModTime()
+//}
 
-	outfile := strings.TrimSuffix(fname, ".py") + ".mpy"
-	stat, err := os.Stat(outfile)
-	if err == nil {
-		log.Trace().
-			Str("file", filepath.Base(fname)).
-			Str("py", ts(ftime)).
-			Str("mpy", ts(stat.ModTime())).
-			Msg("Compiled file exists")
-	}
-	if err == nil && stat.ModTime().After(ftime) {
-		log.Trace().Str("file", fname).Msg("No need to compile because binary is newer")
-		// fmt.Printf("# no need to compile %s\n", fname)
-		return outfile, stat.ModTime()
-	}
-	log.Info().Str("file", fname).Msg("Compiling")
-	modTime := "new"
-	if stat != nil {
-		ts(stat.ModTime())
-	}
-	log.Trace().
-		Str("file", filepath.Base(fname)).
-		Str("ts", ts(ftime)).
-		Str("mod", modTime).
-		Msg("Compiling")
-	sout, serr, err := run("mpy-cross " + fname)
+// Update f.compiledtime and compile file if non-existing or outdated, return nil when file is OK.
+func compile(f *file) *file {
+	//	log.Trace().
+	//		Str("file", f.name).
+	//		Str("ts", ts(f.mtime)).
+	//		Str("mod", modTime).
+	//		Msg("Compiling")
+	cmd := fmt.Sprintf("mpy-cross -o %s %s", f.compilename, f.fullname)
+	sout, serr, err := run(cmd)
 	if err != nil {
-		log.Fatal().Err(err).Msg("Fatal error")
+		log.Fatal().Err(err).Str("cmd", cmd).Msg("Cannot compile")
 	}
 	if serr != "" {
-		log.Error().Str("err", serr).Str("file", fname).Msg("Compile error")
+		log.Error().Str("err", serr).Str("file", f.name).Msg("Compile error")
 		//fmt.Printf("# ERROR comiling %s: %s\n", fname, serr)
 	}
 	if sout != "" {
-		log.Warn().Str("file", fname).Str("compiler", sout).Msg("Compiler output")
+		log.Warn().Str("file", f.name).Str("compiler", sout).Msg("Compiler output")
 		//fmt.Printf("# comiling %s: %s\n", fname, sout)
 	}
-	return strings.TrimSuffix(fname, ".py") + ".mpy", time.Now()
+	f.compiletime = time.Now()
+	return f
 }
 
-func readDependencies() ([]string, error) {
-	if fname := findToml(); fname != "" {
-		if _, err := os.Stat(importfile); err != nil {
-			return readTOML(fname)
-		}
+//func readDependencies() ([]string, error) {
+//	if fname := findToml(); fname != "" {
+//		if _, err := os.Stat(importfile); err != nil {
+//			dep, err := readTOML(fname)
+//			if err != nil {
+//				log.Error().Err(err).Str("file", fname).Msg("Error in condiguration file")
+//			}
+//			if err == nil && len(dep) > 0 {
+//				return dep, nil
+//			}
+//		}
+//	}
+//	if _, err := os.Stat(importfile); err == nil {
+//		log.Debug().Str("file", importfile).Msg("Reading dependencies from dependencies input file")
+//		b, err := os.ReadFile(importfile)
+//		if err != nil {
+//			return nil, err
+//		}
+//		return strings.Split(string(b), "\n"), nil
+//	}
+//	log.Debug().Str("file", importfile).Msg("Scanning files for dependencies (dependeciy file not found)")
+//	return
+//}
+
+type filemap map[string]*file
+
+func (fm filemap) dump(fd io.Writer) {
+	fmt.Fprintf(fd, "%d entries\n", len(fm))
+	for _, f := range fm {
+		f.dump(fd)
 	}
-	if _, err := os.Stat(importfile); err == nil {
-		log.Debug().Str("file", importfile).Msg("Reading dependencies from dependencies input file")
-		b, err := os.ReadFile(importfile)
-		if err != nil {
-			return nil, err
-		}
-		return strings.Split(string(b), "\n"), nil
-	}
-	log.Debug().Str("file", importfile).Msg("Scanning files for dependencies")
-	return parsePythonfiles()
 }
 
-type importpath map[string]string
+//var ignorefiles = map[string]struct{}{}
 
-func parsePythonfiles() ([]string, error) {
-	seen := importpath{}
+func parsePythonfiles() (filemap, error) {
+	//	for _, ignore := range options.igoredfiles {
+	//		ignorefiles[ignore] = struct{}{}
+	//	}
 
-	mainfiles := dirtomap(".")
-	libdir := locateLibdir()
-	libfiles := dirtomap(libdir)
+	mainfiles := readdir(".")
+	libdir := options.libdir
+	libfiles := readdir(libdir)
+	seen := filemap{}
 
-	for mainfile := range mainfiles {
-		recursiveScanImports(mainfile, libdir, mainfiles, libfiles, seen)
+	for sourcefile := range mainfiles {
+		recursiveScanImports(sourcefile, libdir, mainfiles, libfiles, seen)
 	}
 
-	delete(seen, "main")
-
-	var out []string
-	for _, k := range seen {
-		out = append(out, k)
-	}
-	return out, nil
+	log.Debug().Strs("files", maps.Keys(seen)).Msg("Scanned dependencies")
+	return seen, nil
 }
 
-func recursiveScanImports(importname, libdir string, mainfiles, libfiles, seen importpath) {
+// parse file and all referenced files for import statements, return result in parameter map "seen"
+func recursiveScanImports(importname, libdir string, mainfiles, libfiles, seen filemap) {
 	if _, ok := seen[importname]; ok {
+		log.Trace().Str("file", importname).Msg("Scanning for imports: already seen")
 		return
 	}
-	log.Trace().Str("file", importname).Msg("Scanning file")
-	var path string
+
+	lg := log.Trace().Str("file", importname)
+	var f *file
 	var ok bool
-	if path, ok = mainfiles[importname]; ok {
-		log.Trace().Str("import", importname).Msg("Found mainfile")
-	} else if path, ok = libfiles[importname]; ok {
-		log.Trace().Str("import", importname).Msg("Found libfile")
+	if f, ok = mainfiles[importname]; ok {
+		lg = lg.Str("type", "main")
+	} else if f, ok = libfiles[importname]; ok {
+		lg = lg.Str("type", "lib")
 	} else {
-		log.Trace().Str("import", importname).Msg("Not found, assuming system file")
+		lg.Msg("skippingfile - not found, assuming systemfile")
 		return
 	}
-	seen[importname] = importname + ".py"
-	imports := findImportsInPythonfile(path)
+	lg.Msg("Scanning file")
+	seen[importname] = f
+	imports := f.findImports()
+	log.Trace().Strs("found", imports).Str("file", importname).Msg("Scan Imports")
 	for _, f := range imports {
+		if _, ok := seen[f]; ok {
+			log.Trace().Str("import", f).Msg("Already seen - skipping")
+			//continue
+		}
 		log.Trace().Str("import", f).Msg("Nested import")
 		recursiveScanImports(f, libdir, mainfiles, libfiles, seen)
 	}
 }
 
-func dirtomap(path string) importpath {
+// scan directory for python files
+func readdir(path string) map[string]*file {
+	// not using os.listdir() because we need to resolve symlinks
 	files, err := os.ReadDir(path)
 	if err != nil {
 		log.Fatal().Err(err).Str("path", path).Msg("Cannot read directory")
 	}
-	m := importpath{}
-	if path == "." || path == "./" {
-		path = ""
-	} else {
-		if !strings.HasSuffix(path, "/") {
-			path += "/"
-		}
+	m := map[string]*file{}
+
+	var nicepath string
+	switch {
+	case path == "." || path == "./":
+	case !strings.HasSuffix(path, "/"):
+		nicepath = path + "/"
+	default:
+		nicepath = path
 	}
 
 	for _, f := range files {
 		fname := f.Name()
-		if s, err := filepath.EvalSymlinks(fname); err == nil {
-			//fmt.Printf("Found Symlink: %s -> %s\n", fname, s)
-			fname = filepath.Base(s)
-		}
 		lower := strings.ToLower(fname)
 		if !strings.HasSuffix(lower, ".py") {
-			log.Trace().Str("path", f.Name()).Msg("Skipping non-python file")
+			log.Trace().Str("path", fname).Msg("Skipping non-python file")
 			continue
 		}
 		importname := strings.TrimSuffix(lower, ".py")
-		m[importname] = path + f.Name()
+		cn := options.builddir + importname + ".mpy"
+		ff := file{name: fname, fullname: nicepath + fname, importname: importname, compilename: cn}
+		if info, err := f.Info(); err != nil {
+			log.Error().Err(err).Str("path", fname).Msg("Cannot stat")
+			continue
+		} else {
+			ff.mtime = info.ModTime()
+		}
+		if s, err := filepath.EvalSymlinks(fname); err == nil {
+			log.Trace().Str("file", fname).Str("linkto", s).Msg("Found symlink")
+			// overwrite timestamp with timestamp from symlink
+			i, err := os.Stat(s)
+			if err != nil {
+				log.Error().Err(err).Str("file", fname).Str("link", s).Msg("Cannot read info for symlink")
+			}
+			ff.mtime = i.ModTime()
+			ff.fullname = s
+		}
+		m[ff.importname] = &ff
 	}
+	log.Trace().Str("path", path).Strs("files", maps.Keys(m)).Msg("Read directory")
 	return m
 }
 
-func findImportsInPythonfile(fname string) []string {
-	txt, err := os.ReadFile(fname)
+func (f *file) findImports() []string {
+	txt, err := os.ReadFile(f.fullname)
 	if err != nil {
-		log.Fatal().Err(err).Str("fname", fname).Msg("Cannot read file")
+		s, err := filepath.EvalSymlinks(f.fullname)
+		log.Trace().Err(err).Str("file", f.fullname).Str("linkto", s).Msg("Found symlink")
+		log.Fatal().Err(err).Str("fname", f.fullname).Msg("Cannot read file")
 	}
 	//	rx := regexp.MustCompile(`^import\s+([^#].*).*`)
 	rx := regexp.MustCompile(`import\s+([^#].*).*`)
 	m := rx.FindAllStringSubmatch(string(txt), -1)
 	if len(m) == 0 {
-		log.Trace().Str("file", fname).Msg("No imports")
+		log.Trace().Str("file", f.fullname).Msg("No imports")
 		return nil
 	}
 	var ff []string
@@ -538,48 +499,46 @@ func findImportsInPythonfile(fname string) []string {
 	return ff
 }
 
-func findToml() string {
-	tomlfiles, err := filepath.Glob("*.toml")
-	if len(tomlfiles) == 0 || err != nil {
-		return ""
-	}
-	if len(tomlfiles) == 1 {
-		return tomlfiles[0]
-	}
-
-	log.Warn().Int("nfiles", len(tomlfiles)).Msg("Need exactly one toml file, found more")
-	return ""
-	//		s := "none"
-	//		if len(tomlfiles) > 1 {
-	//			s = fmt.Sprintf("%d (%v)", len(tomlfiles), tomlfiles)
-	//		}
-	//		return nil, fmt.Errorf("need %s or exactly one .toml file, found %s", importfile, s)
-
+func (f *file) dump(fd io.Writer) {
+	fmt.Fprintf(fd, "  n: %s, f: %s, c: %s\n", f.name, f.fullname, f.compilename)
 }
 
-func readTOML(fname string) ([]string, error) {
-	log.Debug().Str("file", fname).Msg("Reading dependencies from TOML input file")
-	config, err := toml.LoadFile(fname)
-	if err != nil {
-		return nil, err
-	}
-	// retrieve data directly
-	imports := config.Get("dependencies.libfiles")
-	if ia, ok := imports.([]interface{}); ok {
-		var out []string
-		for _, i := range ia {
-			if s, ok := i.(string); ok {
-				out = append(out, s)
-			} else {
-				return nil, fmt.Errorf("item is not a string: %T - %v", i, i)
-			}
+//func findToml() string {
+//	tomlfiles, err := filepath.Glob("*.toml")
+//	if len(tomlfiles) == 0 || err != nil {
+//		return ""
+//	}
+//	if len(tomlfiles) == 1 {
+//		return tomlfiles[0]
+//	}
+//
+//	log.Warn().Int("nfiles", len(tomlfiles)).Msg("Need exactly one toml file, found more")
+//	return ""
+//}
 
-		}
-		return out, nil
-	}
-	//if len(imports) == 0 {
-	//	return nil, fmt.Errorf("File %s does not contain a [depencencies.libfiles] section", tomlfiles[0])
-	//}
-	fmt.Printf("imports: %T %v\n", imports, imports)
-	return nil, nil
-}
+//func readTOML(fname string) ([]string, error) {
+//	log.Debug().Str("file", fname).Msg("Reading dependencies from TOML input file")
+//	config, err := toml.LoadFile(fname)
+//	if err != nil {
+//		return nil, err
+//	}
+//	// retrieve data directly
+//	imports := config.Get("dependencies.libfiles")
+//	if ia, ok := imports.([]interface{}); ok {
+//		var out []string
+//		for _, i := range ia {
+//			if s, ok := i.(string); ok {
+//				out = append(out, s)
+//			} else {
+//				return nil, fmt.Errorf("item is not a string: %T - %v", i, i)
+//			}
+//
+//		}
+//		return out, nil
+//	}
+//	//if len(imports) == 0 {
+//	//	return nil, fmt.Errorf("File %s does not contain a [depencencies.libfiles] section", tomlfiles[0])
+//	//}
+//	//fmt.Printf("imports: %T %v\n", imports, imports)
+//	return nil, nil
+//}
