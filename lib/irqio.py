@@ -16,7 +16,7 @@ import can
 import board
 
 class IRQIO(sensors.Sensor):
-    def __init__(self, portid, pinid, trigger=None, pullup=True, canid=0, debounce_ms=1):
+    def __init__(self, portid, pinid, trigger=None, pullup=True, canid=0, debounce_ms=1, inverted=False):
         pullupmode = machine.Pin.PULL_UP if pullup is True else pullup
         super().__init__(self, portid, machine.Pin(pinid, machine.Pin.IN, pullupmode), poll_intervall_in_ms=10)
         # typically buttons or motions sensors have very short running handlers
@@ -32,10 +32,13 @@ class IRQIO(sensors.Sensor):
         self._repr = '{} #{} {}'.format(self.__class__.__name__, self.portid, self.pin)
         self.callback = None
         self.pinvalue = self.pin.value()
+        if inverted:
+            self.pinvalue = 1 - self.pinvalue
         self.last_irq = utime.ticks_ms()
         self.last_run_ticks = self.last_irq
         self.last_run_before_ms = 0
         self.last_value = 0
+        self.inverted = inverted
         self.pin.irq(trigger=trigger, handler=self._irq_handler)
         self.debounce_ms = debounce_ms
         self.msg = None
@@ -55,6 +58,8 @@ class IRQIO(sensors.Sensor):
             # keep on debouncing
             return False
         pv = self.pin.value()
+        if self.inverted:
+            pv = 1 - pv
         if pv == self.pinvalue:
             # no change
             return False
