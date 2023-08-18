@@ -2,6 +2,7 @@ package main
 
 import (
 	"bytes"
+	"errors"
 	"fmt"
 	"io"
 	"net"
@@ -13,6 +14,7 @@ import (
 	"time"
 
 	"github.com/fpunkt/zlog"
+	toml "github.com/pelletier/go-toml/v2"
 	"github.com/rs/zerolog/log"
 	"github.com/spf13/pflag"
 	"golang.org/x/exp/maps"
@@ -27,7 +29,8 @@ var options = struct {
 	nolup       bool
 	ip          string
 	initialBoot bool
-	reboot      int
+	reboot      bool
+	rebootCanID int
 	cansrv      string
 	igoredfiles []string
 	libdir      string
@@ -46,7 +49,8 @@ func main() {
 	pflag.BoolVarP(&options.force, "force", "f", false, "Force upload of all files (ignore .lastsync)")
 	pflag.BoolVarP(&options.nolup, "no-lup", "l", false, "Don't overwrite lup.py file (copy last upload date to ESP)")
 	pflag.BoolVarP(&options.initialBoot, "initial-setup", "b", false, "Initial setup after firmware upgrade")
-	pflag.IntVarP(&options.reboot, "reboot", "r", 0, "Reboot after uploading file ()")
+	pflag.BoolVarP(&options.reboot, "reboot", "r", false, "Reboot after uploading file. CAN ID is taken from TOML config file")
+	pflag.IntVarP(&options.rebootCanID, "reboot-canid", "R", 0, "Reboot after uploading file, canid must be provided as argument")
 	pflag.StringVarP(&options.ip, "ip", "i", "", "IP to use, ignore .espip file")
 	pflag.StringVarP(&options.libdir, "libdir", "L", "", "Specify library directory, leave empty for auto detection")
 	pflag.StringVarP(&options.builddir, "build-dir", "B", ".build", "Directory for compiler output files")
@@ -77,6 +81,11 @@ func main() {
 
 	if options.libdir == "" {
 		options.libdir = locateLibdir()
+	}
+
+	var canid int
+	if options.reboot {
+		canid = getCanIDFromTOML()
 	}
 
 	if !options.nolup {
@@ -177,8 +186,11 @@ func main() {
 		run("touch " + lastsyncfile)
 	}
 
-	if options.reboot > 0 {
-		reboot(options.reboot)
+	switch {
+	case canid > 0:
+		reboot(canid)
+	case options.rebootCanID > 0:
+		reboot(options.rebootCanID)
 	}
 }
 
@@ -503,42 +515,38 @@ func (f *file) dump(fd io.Writer) {
 	fmt.Fprintf(fd, "  n: %s, f: %s, c: %s\n", f.name, f.fullname, f.compilename)
 }
 
-//func findToml() string {
-//	tomlfiles, err := filepath.Glob("*.toml")
-//	if len(tomlfiles) == 0 || err != nil {
-//		return ""
-//	}
-//	if len(tomlfiles) == 1 {
-//		return tomlfiles[0]
-//	}
-//
-//	log.Warn().Int("nfiles", len(tomlfiles)).Msg("Need exactly one toml file, found more")
-//	return ""
-//}
-
-//func readTOML(fname string) ([]string, error) {
-//	log.Debug().Str("file", fname).Msg("Reading dependencies from TOML input file")
-//	config, err := toml.LoadFile(fname)
-//	if err != nil {
-//		return nil, err
-//	}
-//	// retrieve data directly
-//	imports := config.Get("dependencies.libfiles")
-//	if ia, ok := imports.([]interface{}); ok {
-//		var out []string
-//		for _, i := range ia {
-//			if s, ok := i.(string); ok {
-//				out = append(out, s)
-//			} else {
-//				return nil, fmt.Errorf("item is not a string: %T - %v", i, i)
-//			}
-//
-//		}
-//		return out, nil
-//	}
-//	//if len(imports) == 0 {
-//	//	return nil, fmt.Errorf("File %s does not contain a [depencencies.libfiles] section", tomlfiles[0])
-//	//}
-//	//fmt.Printf("imports: %T %v\n", imports, imports)
-//	return nil, nil
-//}
+func getCanIDFromTOML() int {
+	tomlfiles, err := filepath.Glob("*.toml")
+	switch {
+	case err != nil:
+		log.Fatal().Err(err).Msg("Cannot glob for *.toml in current directory")
+	case len(tomlfiles) == 0:
+		log.Fatal().Msg("No .toml file found in current directory")
+	case len(tomlfiles) != 1:
+		log.Fatal().Strs("files", tomlfiles).Int("found", len(tomlfiles)).Msg("Found multiple .toml files, need exactly one")
+	}
+	fname := tomlfiles[0]
+	log.Debug().Str("file", fname).Msg("Reading dependencies from TOML input file")
+	fd, err := os.Open(fname)
+	if err != nil {
+		log.Fatal().Err(err).Str("file", fname).Msg("Cannot open file")
+	}
+	data, err := io.ReadAll(fd)
+	if err != nil {
+		log.Fatal().Err(err).Str("file", fname).Msg("Cannot read file")
+	}
+	cfg := struct {
+		Canid int
+	}{}
+	if err := toml.Unmarshal(data, &cfg); err != nil {
+		l := log.Fatal()
+		var derr *toml.DecodeError
+		if errors.As(err, &derr) {
+			// fmt.Println(derr.String())
+			row, col := derr.Position()
+			l = l.Int("row", row).Int("col", col)
+		}
+		l.Err(err).Str("file", fname).Msg("Cannot parse TOML file")
+	}
+	return cfg.Canid
+}
