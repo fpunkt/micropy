@@ -46,7 +46,7 @@ import sensors
 import pwm
 import button
 import uasyncio as asyncio
-import motionsensor
+import lightswitchoverwrite
 
 if board.CAN and board.DEBUG:
     board.CAN.cancommon.send_wlan_connected()
@@ -54,6 +54,7 @@ if board.CAN and board.DEBUG:
 if 0 == 1:
     # make pylint think that it knows about 'const' variable
     const = lambda x: x
+
 
 p4 = pwm.PWM(4, bconf.ML10_PWM_1)
 p5 = pwm.PWM(5, bconf.ML10_PWM_2)
@@ -66,6 +67,10 @@ p8 = pwm.PWM(8, bconf.ML10_PWM_8)
 
 proof = pwm.List(9, p1, p2, p3)
 
+p20_1 = pwm.PWM(10, bconf.ML10_1)
+p20_2 = pwm.PWM(11, bconf.ML10_2)
+p20_3 = pwm.PWM(12, bconf.ML10_3)
+
 
 # NOTE: the RJ12 connector on the edge of the PCB does not seem to work as input, even with
 # external pull-ups the buttons do not work. Not clear whether this is related to the PINs (unlikely)
@@ -73,9 +78,15 @@ proof = pwm.List(9, p1, p2, p3)
 
 #b1 = button.Button(0x20, bconf.RJ12_EDGE_5_YELLOW)
 #b2 = button.Button(0x21, bconf.RJ12_EDGE_6_BLUE)
-b1 = button.Button(0x20, bconf.RJ12_CENTER_6_BLUE_INPUT_ONLY_NO_PULLUP)
+#b1 = button.Button(0x20, bconf.RJ12_CENTER_6_BLUE_INPUT_ONLY_NO_PULLUP)
+b1 = button.Button(0x20, bconf.RJ12_CENTER_4_GREEN_ML10_7)
 b2 = button.Button(0x21, bconf.RJ12_CENTER_5_YELLOW_ML10_3)
 
+# white has problems, yellow works fine on both AUX connectors
+# lsow = lightswitchoverwrite.LightswitchOverwrite(0x28, bconf.AUX1_WHITE)
+# lsow2 = lightswitchoverwrite.LightswitchOverwrite(0x29, bconf.AUX1_YELLOW)
+# lsow = lightswitchoverwrite.LightswitchOverwrite(0x28, bconf.AUX2_WHITE)
+lsow2 = lightswitchoverwrite.LightswitchOverwrite(0x29, bconf.AUX2_YELLOW)
 
 
 b1.pwm = proof
