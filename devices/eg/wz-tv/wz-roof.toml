@@ -2,37 +2,57 @@ device = "eg.wz.roof"
 canid = 0x358
 room = "Wohnzimmer"
 
-[led.mid]
-name = "Decke (Mitte)"
-port = 2
+# [led.mid]
+# name = "Decke (Mitte)"
+# port = 2
+#
+# [led.couch]
+# name = "Decke (Couch)"
+# port = 1
+#
+# [led.win]
+# name = "Decke (Fenster)"
+# port = 3
 
-[led.couch]
-name = "Decke (Couch)"
+[led.spottv]
+name = "Spot TV"
 port = 1
 
-[led.win]
-name = "Decke (Fenster)"
+[led.spotwz]
+name = "Spot WZ"
+port = 2
+
+[led.spotcenter]
+name = "Spot Center"
 port = 3
 
-[led.tvlight]
-name = "Fernsehlampe"
+[led.spotwand]
+name = "Spot Wand"
 port = 4
+
+[led.spotfenster]
+name = "Spot Fenster"
+port = 5
 
 [led.xmas]
 name = "Weihnachtsstern"
-port = 5
+port = 6 # 5
 
 [led.spare]
 name = "Spare"
-port = 6
+port = 7 # 6
+
+[led.tvlight]
+name = "Fernsehlampe"
+port = 8 # 4
 
 [led.candle]
 name = "1900 K LED Streifen"
-port = 7
+port = 10 # 7
 
 [led.entrance]
 name = "Wohnzimmertür (2400 K)"
-port = 8
+port = 11 # 8
 
 
 [button.left]

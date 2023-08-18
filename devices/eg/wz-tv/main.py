@@ -78,15 +78,15 @@ p20_3 = pwm.PWM(12, bconf.ML10_3)
 
 #b1 = button.Button(0x20, bconf.RJ12_EDGE_5_YELLOW)
 #b2 = button.Button(0x21, bconf.RJ12_EDGE_6_BLUE)
-#b1 = button.Button(0x20, bconf.RJ12_CENTER_6_BLUE_INPUT_ONLY_NO_PULLUP)
-b1 = button.Button(0x20, bconf.RJ12_CENTER_4_GREEN_ML10_7)
+b1 = button.Button(0x20, bconf.RJ12_CENTER_6_BLUE_INPUT_ONLY_NO_PULLUP)
+#b1 = button.Button(0x20, bconf.RJ12_CENTER_4_GREEN_ML10_7)
 b2 = button.Button(0x21, bconf.RJ12_CENTER_5_YELLOW_ML10_3)
 
 # white has problems, yellow works fine on both AUX connectors
 # lsow = lightswitchoverwrite.LightswitchOverwrite(0x28, bconf.AUX1_WHITE)
 # lsow2 = lightswitchoverwrite.LightswitchOverwrite(0x29, bconf.AUX1_YELLOW)
 # lsow = lightswitchoverwrite.LightswitchOverwrite(0x28, bconf.AUX2_WHITE)
-lsow2 = lightswitchoverwrite.LightswitchOverwrite(0x29, bconf.AUX2_YELLOW)
+lsow2 = lightswitchoverwrite.LightswitchOverwrite(0x29, bconf.AUX2_YELLOW, inverted=True)
 
 
 b1.pwm = proof
