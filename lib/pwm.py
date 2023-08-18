@@ -33,8 +33,16 @@ try:
 except:
     fsmqtt = None
 
-dimdelay_ms = 25
-dimdelay_ms = 10
+# dimdelay_inactive_poll_period_ms = 25
+dimdelay_inactive_poll_period_ms = 10
+
+# Minimum step size - dimming takes about 350 ms for dimstep_min=5 and 200 ms for dimstep_min = 10
+dimstep_min = 10
+
+dimstep_max = 100
+
+# Calculate size for next dimstep to 2*val / dimstep_scale
+dimstep_scale = 7
 
 # PWM freq defines the overall frequency of the device in Hz.
 # 100 Hz is a good no-flicker number, but dimming is not as smooth as it could be
@@ -159,10 +167,10 @@ class PWM:
         # try smooth dimming
         self.ival = self.pwm.duty()
         # Picking the correct step size is key for smooth dimming
-        ds = (2*self.ival) // 7
+        ds = (2*self.ival) // dimstep_scale
         #ds = min(50, max(5, ds))
         #ds = min(150, max(5, ds)) # about 350 ms when min step is 5
-        ds = min(150, max(10, ds)) # about 200 ms when min step is 10
+        ds = min(dimstep_max, max(dimstep_min, ds)) # about 200 ms when min step is 10
         remaining_counts = self.dimtovalue - self.ival
         if abs(remaining_counts) <= ds:
             # Accepting the PWM value takes a while, probably until the end of the phase.
@@ -393,7 +401,7 @@ async def _next_dim_step_task():
         #if isdimming:
         #    utime.sleep_ms(dimdelay_when_dimming)
         #    continue
-        await asyncio.sleep_ms(dimdelay_when_dimming if isdimming else dimdelay_ms)
+        await asyncio.sleep_ms(dimdelay_when_dimming if isdimming else dimdelay_inactive_poll_period_ms)
 
 board.BACKGROUND_RUNNERS.append(_next_dim_step_task())
 
