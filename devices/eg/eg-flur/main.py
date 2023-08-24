@@ -33,7 +33,7 @@ if board.DEBUG is True:
 if board.DEBUG is True:
     import net
     net.DEBUG = True
-    net.start_wlan(0)
+    net.start_wlan(32)
     net.start_repl()
 
 import gc
@@ -43,10 +43,15 @@ import machine
 import sensors
 import pwm
 import uasyncio as asyncio
+import i2cdevice
 import tsl2561
 import motionsensor
 import irqio
 import canid
+import bh1750
+import aht
+import lightswitchoverwrite
+from micropython import const
 
 if board.CAN and board.DEBUG:
     board.CAN.cancommon.send_wlan_connected()
@@ -54,12 +59,22 @@ if board.CAN and board.DEBUG:
 ##### ML10 connector - devices are mounted on a connector board (small PCB with ML10 plug)
 
 #brightness = tsl2561.TSL2561(0x30, sda=bconf.ML10_3, scl=bconf.ML10_2, poll_intervall_in_ms=2000)
-brightness = tsl2561.TSL2561(0x30, sda=bconf.ML10_4, scl=bconf.ML10_2, poll_intervall_in_ms=2000)
-dht = sensors.DHT(0x20, bconf.ML10_5, poll_intervall_in_ms=5000 if board.DEBUG else sensors.minutes(5))
+# THIS ONE WORKS FINE: sda=bconf.ML10_4, scl=bconf.ML10_2,
+#brightness = tsl2561.TSL2561(0x30, sda=bconf.ML10_4, scl=bconf.ML10_2, poll_intervall_in_ms=2000)
 
-m1 = motionsensor.Motionsensor(0x10, bconf.ML10_6)
+i2c = i2cdevice.init(sda=bconf.RJ12_CENTER_4_GREEN_ML10_7, scl=bconf.RJ12_CENTER_5_YELLOW_ML10_3)
+# THIS ONE WORKS FINE: sda=bconf.RJ12_CENTER_4_GREEN_ML10_7, scl=bconf.RJ12_CENTER_5_YELLOW_ML10_3
+#brightness = tsl2561.TSL2561(0x30, poll_intervall_in_ms=2000)
+
+b2 = bh1750.BH1750(0x31)
+
+tath = aht.AHT20(0x32, poll_intervall_in_ms=5000)
+
+#dht = sensors.DHT(0x20, bconf.ML10_5, poll_intervall_in_ms=5000 if board.DEBUG else sensors.minutes(5))
+
+#m1 = motionsensor.Motionsensor(0x10, bconf.ML10_6)
 #m2 = motionsensor.Motionsensor(0x11, bconf.ML10_7)
-m2 = motionsensor.Motionsensor(0x11, bconf.ML10_8_INPUT_ONLY)
+#m2 = motionsensor.Motionsensor(0x11, bconf.ML10_8_INPUT_ONLY)
 
 
 #
@@ -98,6 +113,8 @@ m2 = motionsensor.Motionsensor(0x11, bconf.ML10_8_INPUT_ONLY)
 ##### under the roof connection - connected via RJ12 to terminal block
 #m3 = motionsensor.Motionsensor(0x15, bconf.RJ12_CENTER_1_WHITE)
 #m4 = motionsensor.Motionsensor(0x16, bconf.RJ12_CENTER_5_YELLOW_ML10_3)
+m1 = motionsensor.Motionsensor(0x10, bconf.RJ12_CENTER_1_WHITE)
+
 #
 #doorbell = irqio.IRQIO(0x17, bconf.RJ12_CENTER_6_BLUE_INPUT_ONLY, canid=canid.SENSOR_DOORBELL_PUSHED)
 #lightswitchoverwrite = irqio.IRQIO(0x18, bconf.RJ12_CENTER_6_BLUE_INPUT_ONLY, canid=canid.SENSOR_LIGHTSWITCH_OVERRIDE)
@@ -109,8 +126,37 @@ p3 = pwm.PWM(3, bconf.ML10_PWM_3)
 p4 = pwm.PWM(4, bconf.ML10_PWM_4)
 p5 = pwm.PWM(5, bconf.ML10_PWM_5)
 p6 = pwm.PWM(6, bconf.ML10_PWM_6)
-p7 = pwm.PWM(7, bconf.ML10_PWM_7)
-#p8 = pwm.PWM(8, bconf.ML10_PWM_8)
+
+DCDCON_Value = const(1023)
+
+class xPWM(pwm.PWM):
+    """Enable DC/DC converter if one of these PWM is in use"""
+    def seti(self, v):
+        if v > 0:
+            p6.seti(DCDCON_Value)
+        super().seti(v)
+
+p7 = xPWM(7, bconf.ML10_PWM_7)
+p8 = xPWM(8, bconf.ML10_PWM_8)
+
+
+async def poweroff_dcdc():
+    """Turn DC/DC of if p7 and p8 are off - check in background every 60 seconds"""
+    while True:
+        await asyncio.sleep(60)
+        newval = 0
+        if p7.dimtovalue > 0 or p8.dimtovalue > 0 or p7.pwm.duty() > 0 or p8.pwm.duty() > 0:
+            # trust nobody
+            newval = DCDCON_Value
+        print('Checking duty {} / {}, newval={}'.format(p7.pwm.duty(), p8.pwm.duty(), newval))
+        if newval != p6.pwm.duty():
+            p6.seti(newval)
+
+board.BACKGROUND_RUNNERS.append(poweroff_dcdc())
+
+lo1 = lightswitchoverwrite.LightswitchOverwrite(0x20, bconf.AUX1_YELLOW)
+lo2 = lightswitchoverwrite.LightswitchOverwrite(0x21, bconf.AUX1_WHITE)
+
 
 
 
