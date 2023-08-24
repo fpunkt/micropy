@@ -1,1 +1,1 @@
-../../../lib/config_rj12.py
+../../../lib/config_rj12_pwmbank_1_0.py

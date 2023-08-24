@@ -26,8 +26,6 @@ if board.DEBUG is True:
 
 import gc
 import bconf
-import config_pwmbank_1_0
-config_pwmbank_1_0.patch_ml10_1(bconf)
 import can
 import machine
 import sensors
