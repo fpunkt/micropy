@@ -34,11 +34,12 @@ var options = struct {
 	cansrv      string
 	igoredfiles []string
 	libdir      string
+	extlibdir   string
 	builddir    string
 }{}
 
 const (
-	importfile   = ".imports"
+	//importfile   = ".imports"
 	ipfile       = ".espip"
 	lastsyncfile = ".lastsync"
 )
@@ -53,6 +54,7 @@ func main() {
 	pflag.IntVarP(&options.rebootCanID, "reboot-canid", "R", 0, "Reboot after uploading file, canid must be provided as argument")
 	pflag.StringVarP(&options.ip, "ip", "i", "", "IP to use, ignore .espip file")
 	pflag.StringVarP(&options.libdir, "libdir", "L", "", "Specify library directory, leave empty for auto detection")
+	pflag.StringVarP(&options.extlibdir, "external-libdir", "E", "", "Specify external library directory, leave empty for auto detection")
 	pflag.StringVarP(&options.builddir, "build-dir", "B", ".build", "Directory for compiler output files")
 	pflag.StringVarP(&options.cansrv, "canserver", "C", "", "canserver used to send reset command")
 	pflag.StringSliceVarP(&options.igoredfiles, "ignore-files", "I", []string{
@@ -81,6 +83,9 @@ func main() {
 
 	if options.libdir == "" {
 		options.libdir = locateLibdir()
+	}
+	if options.extlibdir == "" {
+		options.extlibdir = filepath.Clean(locateLibdir() + "/../extern")
 	}
 
 	var canid int
@@ -152,7 +157,7 @@ func main() {
 
 	if len(changed) == 0 {
 		log.Info().Str("lastupload", lastupload.String()).Msg("# no files to upload since")
-		return
+		//return
 	}
 
 	iplogger := log.With().Str("host", ipstring).Logger()
@@ -204,6 +209,9 @@ func reboot(canid int) {
 	}
 	cmd = append(cmd, "reset", "-c", fmt.Sprint(canid))
 	l.Str("canid", fmt.Sprintf("0x%03x", canid)).Msg("Sending reboot")
+	if options.verbose > 3 {
+		log.Trace().Str("cmd", strings.Join(cmd, " ")).Msg("Running command")
+	}
 	if err := exec.Command("cantool", cmd...).Run(); err != nil {
 		log.Error().Err(err).Msg("Cannot reset device")
 	}
@@ -391,13 +399,15 @@ func parsePythonfiles() (filemap, error) {
 	//		ignorefiles[ignore] = struct{}{}
 	//	}
 
-	mainfiles := readdir(".")
-	libdir := options.libdir
-	libfiles := readdir(libdir)
+	files := map[string]*file{}
+	readdir(".", files)
+	mainfiles := maps.Keys(files)
+	readdir(options.libdir, files)
+	readdir(options.extlibdir, files)
 	seen := filemap{}
 
-	for sourcefile := range mainfiles {
-		recursiveScanImports(sourcefile, libdir, mainfiles, libfiles, seen)
+	for _, sourcefile := range mainfiles {
+		recursiveScanImports(sourcefile, files, seen)
 	}
 
 	log.Debug().Strs("files", maps.Keys(seen)).Msg("Scanned dependencies")
@@ -405,7 +415,7 @@ func parsePythonfiles() (filemap, error) {
 }
 
 // parse file and all referenced files for import statements, return result in parameter map "seen"
-func recursiveScanImports(importname, libdir string, mainfiles, libfiles, seen filemap) {
+func recursiveScanImports(importname string, files, seen filemap) {
 	if _, ok := seen[importname]; ok {
 		log.Trace().Str("file", importname).Msg("Scanning for imports: already seen")
 		return
@@ -414,10 +424,10 @@ func recursiveScanImports(importname, libdir string, mainfiles, libfiles, seen f
 	lg := log.Trace().Str("file", importname)
 	var f *file
 	var ok bool
-	if f, ok = mainfiles[importname]; ok {
+	if f, ok = files[importname]; ok {
 		lg = lg.Str("type", "main")
-	} else if f, ok = libfiles[importname]; ok {
-		lg = lg.Str("type", "lib")
+		//	} else if f, ok = libfiles[importname]; ok {
+		//		lg = lg.Str("type", "lib")
 	} else {
 		lg.Msg("skippingfile - not found, assuming systemfile")
 		return
@@ -432,18 +442,18 @@ func recursiveScanImports(importname, libdir string, mainfiles, libfiles, seen f
 			//continue
 		}
 		log.Trace().Str("import", f).Msg("Nested import")
-		recursiveScanImports(f, libdir, mainfiles, libfiles, seen)
+		recursiveScanImports(f, files, seen)
 	}
 }
 
 // scan directory for python files
-func readdir(path string) map[string]*file {
+func readdir(path string, filemap map[string]*file) {
 	// not using os.listdir() because we need to resolve symlinks
 	files, err := os.ReadDir(path)
 	if err != nil {
 		log.Fatal().Err(err).Str("path", path).Msg("Cannot read directory")
 	}
-	m := map[string]*file{}
+	//	m := map[string]*file{}
 
 	var nicepath string
 	switch {
@@ -480,10 +490,12 @@ func readdir(path string) map[string]*file {
 			ff.mtime = i.ModTime()
 			ff.fullname = s
 		}
-		m[ff.importname] = &ff
+		if f, ok := filemap[ff.importname]; ok {
+			log.Error().Str("import", ff.importname).Str("source1", f.fullname).Str("source2", ff.fullname).Msg("Import exists in multiple places")
+		}
+		filemap[ff.importname] = &ff
 	}
-	log.Trace().Str("path", path).Strs("files", maps.Keys(m)).Msg("Read directory")
-	return m
+	log.Trace().Str("path", path).Strs("files", maps.Keys(filemap)).Msg("Read directory")
 }
 
 func (f *file) findImports() []string {
