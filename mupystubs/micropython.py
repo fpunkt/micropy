@@ -1,0 +1,2 @@
+
+const = lambda x: x
