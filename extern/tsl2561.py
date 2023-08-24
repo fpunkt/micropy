@@ -18,18 +18,18 @@ import canerror
 import sensors
 
 
+
 class BrightnessTLS2561(sensors.Sensor):
     def __init__(self, portid, pin, i2c, poll_intervall_in_ms=sensors.poll_5_minutes):
         super().__init__('Brightness', portid, pin, poll_intervall_in_ms)
 
 
 class TSL2561(sensors.Sensor):
-    def __init__(self, portid, sda=None, scl=None, poll_intervall_in_ms=2000, tint=101):
+    def __init__(self, portid, poll_intervall_in_ms=2000, tint=101):
         msg = 'Initialize I2C'
         try:
-            i2c = machine.SoftI2C(sda=machine.Pin(sda), scl=machine.Pin(scl))
             msg = 'Initialize TSL2561'
-            self.t = _TSL2561(i2c=i2c)
+            self.t = _TSL2561(i2c=board.I2C)
             msg = 'Setting T_int'
             self.set_tint(101)
             msg = 'Setting gain'
@@ -39,7 +39,7 @@ class TSL2561(sensors.Sensor):
                 print('Cannot initialize TLS2561, failed during {}: {}'.format(msg, e))
             can.errormessage([canerror.SENSOR_DISABLED, portid])
             return
-        super().__init__('TLS2561', portid, sda, poll_intervall_in_ms)
+        super().__init__('TLS2561', portid, board.I2C_SDA_PIN, poll_intervall_in_ms)
         self.msg = can.makemessage(canid.DATALOGGER_BRIGHTNESS_SENSOR_TSL2561, 8)
         self.msg.setsender(self.portid)
         self.count = 0
