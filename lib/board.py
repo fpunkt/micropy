@@ -122,6 +122,10 @@ STARTUP_FUNCTIONS = []
 # BACKGROUND_RUNNERS is a list of all tasks that run (indefinitely) as independent async task
 BACKGROUND_RUNNERS = []
 
+# I2C holds the globally initialized I2C device
+I2C = None
+I2C_SDA_PIN = 0
+
 last_boot_s = utime.time()
 
 def uptime_s():
