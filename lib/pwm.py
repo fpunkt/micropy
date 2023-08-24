@@ -58,7 +58,9 @@ def i16_to_raw(v):
         return 1
     return vv
 
-def valid(i): return min(1023, max(i, 0))
+def valid(i):
+    """Return value in range 0..1023"""
+    return min(1023, max(i, 0))
 
 class PWM:
     """TODO: fix docstring? Wrapper for system PWM, using numbers from 0..1 and provide dimming"""
