@@ -20,9 +20,6 @@ class Motionsensor(irqio.IRQIO):
         #self.msg = can.makemessage(canid.SENSOR_MOTION, 5, portid=portid)
         self.fastcount = 0
 
-    def __repr__(self):
-        return '<{}>'.format(self._repr)
-
     def disable(self):
         self.fastcount = -1
         self.poll_intervall_in_ms = 1000
