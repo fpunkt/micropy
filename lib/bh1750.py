@@ -25,7 +25,7 @@ import bh1750fllrth
 
 
 class BH1750(sensors.Sensor):
-    def __init__(self, portid, address=0x23, poll_intervall_in_ms=2000):
+    def __init__(self, portid, address=0x23, poll_intervall_in_ms=None):
         self.bh1750 = bh1750fllrth.BH1750(address, board.I2C)
         super().__init__('BH1750', portid, board.I2C_SDA_PIN, poll_intervall_in_ms)
         self.msg = can.makemessage(canid.DATALOGGER_BRIGHTNESS_SENSOR_8, 6)
@@ -33,7 +33,7 @@ class BH1750(sensors.Sensor):
 
     def run(self):
         x = self.bh1750.measurement
-        print('BH1750: {:.2f} lux'.format(x))
+        # print('BH1750: {:.2f} lux'.format(x))
         if board.CAN is not None:
             i = int(x)
             payload = self.msg.payload

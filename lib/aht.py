@@ -21,7 +21,7 @@ class _aht(sensors.Sensor):
             raise
         # decode ourself to avoid malloc
         h = int(10*self.aht.H())
-        print('T={} ({}), H={} ({})'.format(t, type(t), h, type(h)))
+        # print('T={} ({}), H={} ({})'.format(t, type(t), h, type(h)))
         if board.CAN is not None:
             payload = self.msg.payload
             payload[3] = h >> 8
