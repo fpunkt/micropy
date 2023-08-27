@@ -22,9 +22,20 @@
 # upip.install("uasyncio")
 #
 #
-mydir=`dirname $0`
-libdir=$mydir/../lib
-echo $mydir $libdir
+
+# comiled file with password - must be in tools directory
+pwname=c.mpy
+
+if [ -f tools/$pwname ]; then
+  tooldir=./tools
+elif [ -f $pwname ]; then
+  # running from tools directory
+  tooldir=.
+fi
+
+pwfile=$tooldir/$pwname
+libdir=$tooldir/../lib/
+# libdir=`realpath $tooldir/../lib/`
 # serial=/dev/tty.usbserial-22310
 
 NC='\033[0m' # No Color
@@ -71,8 +82,24 @@ upload()
 }
 
 
-upload $libdir/net.mpy
-upload $libdir/../tools/c.mpy
+echo "# compiling net.py"
+
+builddir="$tooldir/.build"
+
+net="$libdir/net.py"
+bnet="$builddir/net.mpy"
+rm -f $$bnet
+mkdir -p $builddir
+
+mpy-cross -o $bnet $net
+if [ $? != 0 ]; then
+  red "Cannot compile $net"
+  exit 1
+fi
+
+
+upload $bnet
+upload $pwfile
 # upload $libdir/board.py
 # ampy -p $serial put /usr/local/etc/secrets.py
 # ampy -p $serial put $libdir/net.py
@@ -80,7 +107,6 @@ upload $libdir/../tools/c.mpy
 
 green "# Network stuff copied to board. Now start a terminal (gterm or FLTerm on macOS, tio on linux) and run"
 green "#"
-echo "import net"
-echo "net.net()"
+echo "import net; net.net(32)"
 green "#"
 green "# After this you can use the bin/upload.sh script to upload all files needed for your project"
