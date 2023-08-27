@@ -13,6 +13,7 @@ import utime
 # import uasyncio as asyncio
 import sensors
 import can
+import canerror
 import board
 
 class IRQIO(sensors.Sensor):
@@ -42,17 +43,40 @@ class IRQIO(sensors.Sensor):
         self.inverted = inverted
         self.pin.irq(trigger=trigger, handler=self._irq_handler)
         self.debounce_ms = debounce_ms
+        self.fastcount = 0
+
         self.msg = None
         if canid != 0:
             self.msg = can.makemessage(canid, 5, portid=portid)
 
-    def sendmessage(self):
+    def disable(self):
+        self.fastcount = -1
+        self.poll_intervall_in_ms = 1000
+        can.cancommon.errormessage([canerror.SENSOR_DISABLED, self.portid])
+
+    def enable(self):
+        self.fastcount = 0
+        self.poll_intervall_in_ms = 10
+
+
+    def _sendmessage(self, changed):
         if board.CAN is not None and self.msg is not None:
             self.msg.payload[3] = self.pinvalue
-            self.msg.payload[4] = 1
+            self.msg.payload[4] = changed
             self.msg.send()
 
+    def sendmessage(self):
+        """Called when status has changed"""
+        self._sendmessage(1)
+
+    def statusmessage(self):
+        """Regularily report status with changed flag cleared"""
+        self._sendmessage(0)
+
     def run(self):
+        if self.fastcount < 0:
+            return  False # disabled
+
         now = utime.ticks_ms()
         # print('time since last IRQ: {} ms'.format(utime.ticks_diff(now, self.last_irq)))
         if utime.ticks_diff(now, self.last_irq) < self.debounce_ms:
@@ -65,6 +89,15 @@ class IRQIO(sensors.Sensor):
             # no change
             return False
         self.last_run_before_ms = utime.ticks_diff(now, self.last_run_ticks)
+        if self.last_run_before_ms < 50:
+            # comming fast ..
+            if self.fastcount > 10:
+                # events are comming too fast
+                self.disable()
+                return False
+            self.fastcount += 1
+            return False
+        self.fastcount = 0
         self.last_run_ticks = now
         self.pinvalue = pv
         if self.callback is not None:
