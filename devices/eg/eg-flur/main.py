@@ -63,6 +63,7 @@ import canid
 import bh1750
 import aht
 import lightswitchoverwrite
+import doorbellsensor
 from micropython import const
 
 if board.CAN and board.DEBUG:
@@ -94,7 +95,10 @@ m2 = motionsensor.Motionsensor(0x11, bconf.RJ12_EDGE_6_BLUE)
 m3 = motionsensor.Motionsensor(0x12, bconf.RJ12_EDGE_5_YELLOW)
 
 # Haustür
-# m4 = motionsensor.Motionsensor(0x13, bconf.AUX2_WHITE)
+m4 = motionsensor.Motionsensor(0x13, bconf.AUX2_WHITE)
+
+doorbell = doorbellsensor.DoorbellSensor(0x20, bconf.AUX1_YELLOW)
+lightoverwrite = lightswitchoverwrite.LightswitchOverwrite(0x21, bconf.AUX1_WHITE)
 
 #
 #doorbell = irqio.IRQIO(0x17, bconf.RJ12_CENTER_6_BLUE_INPUT_ONLY, canid=canid.SENSOR_DOORBELL_PUSHED)
@@ -113,11 +117,13 @@ spots_stair = pwm.List(0x0c, p1, p2, p3)
 
 # the 9V block - p6 is driving the DC/DC converter for p7 and p8
 p6 = pwm.PWM(6, bconf.ML10_PWM_6)
+p6.dimtovalue = -99 # don't dim
 DCDCON_Value = const(1023)
 
 class xPWM(pwm.PWM):
     """Enable DC/DC converter if one of these PWM is in use"""
     def seti(self, v):
+        # print('seti6({})'.format(v))
         if v > 0:
             p6.seti(DCDCON_Value)
         super().seti(v)
@@ -139,11 +145,6 @@ async def poweroff_dcdc():
             p6.seti(newval)
 
 board.BACKGROUND_RUNNERS.append(poweroff_dcdc())
-
-lo1 = lightswitchoverwrite.LightswitchOverwrite(0x20, bconf.AUX1_YELLOW)
-lo2 = lightswitchoverwrite.LightswitchOverwrite(0x21, bconf.AUX1_WHITE)
-
-
 
 def r():
     board.restart()
