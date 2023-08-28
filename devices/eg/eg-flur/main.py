@@ -1,5 +1,9 @@
-"""
-EG flur
+"""CONFIG:
+
+device: eg.flur.roof
+room: Flur EG
+
+
     // 2 PWM connected AUX-1 4P on beta board
     PWM ML-10
         8 PWM connected to ML-10
@@ -29,12 +33,10 @@ EG flur
 
 """
 
-# TODO: Motion Door needs pullup (or replace sensor because not OK with 3.3V?)
-
 import board
 board.LOCATION = 'eg-flur'
 board.DEBUG = True
-board.CANID = 0x100
+board.CANID = 0x344 # was 0x340
 
 poll_rate_s = None # overwrite if needed
 
@@ -76,10 +78,17 @@ i2c = i2cdevice.init(sda=bconf.RJ12_CENTER_4_GREEN_ML10_7, scl=bconf.RJ12_CENTER
 # THIS ONE WORKS FINE: sda=bconf.RJ12_CENTER_4_GREEN_ML10_7, scl=bconf.RJ12_CENTER_5_YELLOW_ML10_3
 #brightness = tsl2561.TSL2561(0x30, poll_intervall_in_ms=2000)
 
+
 b2 = bh1750.BH1750(0x31)
+"""CONFIG:
+name: Lichtsensor
+"""
 
 try:
     tath = aht.AHT20(0x32, poll_intervall_in_ms=_pollrate_ms)
+    """CONFIG:
+    name: Temperatur
+    """
 except:
     can.cancommon.errormessage([canerror.SENSOR_DISABLED, 0x32])
 
@@ -89,31 +98,76 @@ except:
 
 # Mitten auf dem Schrank mit I2C devices
 m1 = motionsensor.Motionsensor(0x10, bconf.RJ12_CENTER_1_WHITE)
+"""CONFIG:
+name: Schrank
+shortid: schrank
+"""
+
 
 # Richtung Treppe und WZ Tür
-m2 = motionsensor.Motionsensor(0x11, bconf.RJ12_EDGE_6_BLUE)
-m3 = motionsensor.Motionsensor(0x12, bconf.RJ12_EDGE_5_YELLOW)
+
+stairs = motionsensor.Motionsensor(0x11, bconf.RJ12_EDGE_6_BLUE)
+"""CONFIG:
+name: Treppe
+"""
+
+doorwz = motionsensor.Motionsensor(0x12, bconf.RJ12_EDGE_5_YELLOW)
+"""CONFIG:
+name: WZ Tür
+"""
+
+
 
 # Haustür
 m4 = motionsensor.Motionsensor(0x13, bconf.AUX2_WHITE)
+"""CONFIG:
+name: Tür
+shortid: door
+"""
 
-doorbell = doorbellsensor.DoorbellSensor(0x20, bconf.AUX1_YELLOW)
+ding = doorbellsensor.DoorbellSensor(0x20, bconf.AUX1_YELLOW)
+"""CONFIG:
+name: Türklingel
+"""
+
 lightoverwrite = lightswitchoverwrite.LightswitchOverwrite(0x21, bconf.AUX1_WHITE)
-
-#
-#doorbell = irqio.IRQIO(0x17, bconf.RJ12_CENTER_6_BLUE_INPUT_ONLY, canid=canid.SENSOR_DOORBELL_PUSHED)
-#lightswitchoverwrite = irqio.IRQIO(0x18, bconf.RJ12_CENTER_6_BLUE_INPUT_ONLY, canid=canid.SENSOR_LIGHTSWITCH_OVERRIDE)
+"""CONFIG:
+name: Lichtschalter
+"""
 
 
 p1 = pwm.PWM(1, bconf.ML10_PWM_1)
+"""CONFIG:
+name: Spot Treppe
+"""
+
 p2 = pwm.PWM(2, bconf.ML10_PWM_2)
+"""CONFIG:
+name: Spot WZ Tür
+"""
+
 p3 = pwm.PWM(3, bconf.ML10_PWM_3)
+"""CONFIG:
+name: Spot Mitte (WZ)
+"""
+
 p4 = pwm.PWM(4, bconf.ML10_PWM_4)
+"""CONFIG:
+name: Spot Mitte (Tür)
+"""
+
 p5 = pwm.PWM(5, bconf.ML10_PWM_5)
+"""CONFIG:
+name: Spot Tür
+"""
+
 
 spots_all = pwm.List(0x0a, p1, p2, p3, p3, p4, p5)
+
 spots_door = pwm.List(0x0b, p4, p5)
+
 spots_stair = pwm.List(0x0c, p1, p2, p3)
+
 
 # the 9V block - p6 is driving the DC/DC converter for p7 and p8
 p6 = pwm.PWM(6, bconf.ML10_PWM_6)
@@ -129,7 +183,16 @@ class xPWM(pwm.PWM):
         super().seti(v)
 
 p7 = xPWM(7, bconf.ML10_PWM_7)
+"""CONFIG:
+IGNORE: true
+name: 9V spot not connected
+"""
+
 p8 = xPWM(8, bconf.ML10_PWM_8)
+"""CONFIG:
+name: Kleiner Spot Treppe
+"""
+
 
 
 async def poweroff_dcdc():
