@@ -10,6 +10,7 @@ import (
 	"os/exec"
 	"path/filepath"
 	"regexp"
+	"strconv"
 	"strings"
 	"time"
 
@@ -533,7 +534,7 @@ func getCanIDFromTOML() int {
 	case err != nil:
 		log.Fatal().Err(err).Msg("Cannot glob for *.toml in current directory")
 	case len(tomlfiles) == 0:
-		log.Fatal().Msg("No .toml file found in current directory")
+		return parseMainDotPy()
 	case len(tomlfiles) != 1:
 		log.Fatal().Strs("files", tomlfiles).Int("found", len(tomlfiles)).Msg("Found multiple .toml files, need exactly one")
 	}
@@ -561,4 +562,23 @@ func getCanIDFromTOML() int {
 		l.Err(err).Str("file", fname).Msg("Cannot parse TOML file")
 	}
 	return cfg.Canid
+}
+
+func parseMainDotPy() int {
+	txt, err := os.ReadFile("main.py")
+	if err != nil {
+		log.Fatal().Err(err).Msg("Cannot find .toml file and cannot read main.py")
+	}
+	rx := regexp.MustCompile(`(?m)^\s*board.CANID\s*=\s*([^#\n\s]*)`)
+	m := rx.FindAllStringSubmatch(string(txt), 2)
+	if len(m) != 1 || len(m[0]) != 2 {
+		log.Fatal().Err(err).Msg("Cannot find .toml file and cannot find board.CANID = xxxx in main.py")
+	}
+	i, err := strconv.ParseInt(m[0][1], 0, 14)
+	if err != nil {
+		log.Fatal().Err(err).Msg("Cannot find .toml file and parse board.CANID = xxxx in main.py")
+	}
+	//fmt.Printf("%v\n", i)
+	//os.Exit(0)
+	return int(i)
 }
