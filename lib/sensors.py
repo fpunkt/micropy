@@ -141,6 +141,17 @@ class DHT(Sensor):
     def proclaim(self):
         super().proclaim()
 
+    def measure(self):
+        return self.dht.measure()
+
+    def decode(self):
+        """Return T10, H10 after calling dht.measure(). T and H have to be divided by 10"""
+        h = self.dht.buf[0] << 8 | self.dht.buf[1]
+        t = (self.dht.buf[2] & 0x7F) << 8 | self.dht.buf[3]
+        if self.dht.buf[2] & 0x80:
+            t = -t
+        return t, h
+
     def run(self):
         try:
             self.dht.measure()
@@ -175,6 +186,10 @@ class DHT11(Sensor):
 
     def proclaim(self):
         super().proclaim()
+
+    def decode(self):
+        """Return T10, H10 after calling dht.measure(). T and H have to be divided by 10"""
+        return 10 * self.dht.buf[2], 10 * self.dht.buf[0]
 
     def run(self):
         try:

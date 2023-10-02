@@ -109,7 +109,9 @@ def errormessage(payload):
 
 
 # Ping
-_pingmessage = Message(canid.PING_MESSAGE, [board.CANID >> 8, board.CANID & 0xff, 0, 0, 0, 0])
+_pingmessage = None
+if board.CANID is not None:
+    _pingmessage = Message(canid.PING_MESSAGE, [board.CANID >> 8, board.CANID & 0xff, 0, 0, 0, 0])
 
 def _send_ping():
     """Send a ping message"""
@@ -147,7 +149,8 @@ def _send_ping_or_change_rate(m):
     board.PINGTIME = t
 
 
-_memstat_message = Message(canid.MEMORY_STATUS, [board.CANID >> 8, board.CANID & 0xff, 0, 0, 0, 0, 0, 0])
+if board.CANID is not None:
+    _memstat_message = Message(canid.MEMORY_STATUS, [board.CANID >> 8, board.CANID & 0xff, 0, 0, 0, 0, 0, 0])
 _gc_counter = 0
 
 def _send_memstat():

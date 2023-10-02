@@ -22,6 +22,8 @@ CPU_ID = 1              # ESP32 per default
 BOARD_ID = 0            # PCB version, overwritten in bconf
 PERIPH_ID = 0           # PCB version, overwritten in main.py (or by including other .py files)
 
+LED = None              # overwritten in bconf
+
 RESET_ON_HARD_ERRORS = False # mainly CAN Errors
 ENABLE_WATCHDOG_AFTER_SECONDS = 120
 

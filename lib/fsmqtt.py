@@ -19,7 +19,6 @@ The publish function in this module is basically like mqtt.publish() but handles
 
 # pylint: disable=import-error, missing-docstring, redefined-builtin, too-many-arguments, no-member
 
-import secrets
 import board
 import uasyncio as asyncio
 import net
@@ -55,6 +54,7 @@ def connect(client, name=None, reset_on_error=True):
             # give some time to hit ctrl-c on terminal or do something smart via CAN bus
             utime.sleep(60)
             machine.reset()
+
 
 def publish(topic, message):
     if board.MQTT:

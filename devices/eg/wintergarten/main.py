@@ -10,7 +10,6 @@ wintergarten main.py
 #import time; print('Loading main, giving time to abort ....'); time.sleep(2)
 
 # import time; print('Loading boot, giving time to abort (initializing network) ....'); time.sleep(2)
-import net; net.start_wlan(); net.start_repl()
 
 # pylint: disable=import-error, missing-docstring, redefined-builtin, multiple-statements, no-member
 # pylint: disable=wrong-import-order, redefined-outer-name
@@ -22,17 +21,21 @@ import net; net.start_wlan(); net.start_repl()
 import board
 
 board.LOCATION = 'eg_wintergarten'
+board.DEBUG = True
 
+import net
+net.net(32)
 
 import gc
 import pwm
 import sensors
 # import utime
-import memstat
+#import memstat
 import umqttsimple
 import fsmqtt
+import time
 
-board.MQTT = fsmqtt.MQTTClient().connect()
+fsmqtt.connect(umqttsimple.MQTTClient('wg', '192.168.178.5'), 'wg')
 
 
 #
@@ -44,28 +47,12 @@ p5 = pwm.PWM(5, 22)
 p6 = pwm.PWM(6, 12)
 p7 = pwm.PWM(7, 5)
 
-p14 = pwm.PWMList(10, p1, p2, p3, p4)
-p57 = pwm.PWMList(11, p5, p6, p7)
-all = pwm.PWMList(99, p1, p2, p3, p4, p5, p6, p7)
+all = pwm.List(99, p1, p2, p3, p4, p5, p6, p7)
 
-pa = pwm.PWMList(12, p1, p3)
+pa = pwm.List(12, p1, p3)
 
-# t1 =
-
-def a(v=.01):
-    p14.dimf(v)
-def b():
-    p14.dimi(0)
-
-pall = pwm.PWMList(13, p1, p2, p3, p4, p5, p6, p7)
-#
-temperature = sensors.DHT(16, 21, poll_intervall_in_ms=sensors.poll_1_minute)
-
-b = sensors.Brightness(17, 39, poll_intervall_in_ms=5000)
-
-ping = sensors.PingDevice()
-
-sensors.proclaim()
+t1 = sensors.DHT(16, 21, poll_intervall_in_ms=sensors.poll_1_minute)
+t2 = sensors.DHT(17, 22, poll_intervall_in_ms=sensors.poll_1_minute)
 
 message_counter = 0
 
@@ -105,3 +92,33 @@ def ddloop():
 def alloff():
     pwm.ALL.dimi(0)
 
+def tmqtt(id, t, h):
+    fsmqtt.publish('wg/'+id, '{:.1f} {:.1f}'.format(t/10.0, h/10.0))
+
+def dhtloop():
+    while True:
+        try:
+            t1.measure()
+            t, h = t1.decode()
+            tmqtt('t1', t, h)
+        except:
+            pass
+
+        try:
+            t2.measure()
+            t, h = t2.decode()
+            tmqtt('t2', t, h)
+        except:
+            pass
+
+        time.sleep(10)
+
+dhtloop()
+
+def r():
+    board.restart()
+
+if 1 == 1: # pylint: disable=comparison-with-itself
+    board.run()
+else:
+    print('# run board.run() to start event handler')

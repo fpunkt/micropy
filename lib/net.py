@@ -117,5 +117,5 @@ def stop_repl():
 
 def net(base=0):
     ip = start_wlan(base)
-    print("# Connected to ", ip[0])
+    # print("# Connected to ", ip[0])
     start_repl()
