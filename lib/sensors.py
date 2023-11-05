@@ -77,6 +77,7 @@ class Sensor:
         self.poll_intervall_in_ms = poll_intervall_in_ms
         # TODO: do we really need fast? Go and write your own async() if needed.
         self.is_fast = False # can interrupt PWM dimming
+        self.arun = None
         board.SENSORSs.register(portid, self)
         if background_task is None:
             background_task = self.sensor_task()
@@ -117,11 +118,17 @@ class Sensor:
                 nextrun_in_ms = 2
             else:
                 try:
-                    self.run()
+                    if self.arun != None:
+                        # asyncio.run(self.arun())
+                        await self.arun()
+                    else:
+                        self.run()
                 except Exception as e: # pylint: disable=bare-except, broad-except
                     if board.DEBUG:
                         print('Exception from {}: {}'.format(self, e))
+            # print('sensor going to sleep ', nextrun_in_ms)
             await asyncio.sleep_ms(nextrun_in_ms)
+            # print('sensor sleeping done', nextrun_in_ms)
 
 
 class DHT(Sensor):
