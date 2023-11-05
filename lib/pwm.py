@@ -126,8 +126,9 @@ class PWM:
     def wait_until_set(self):
         """Make sure PWM has taken the correct value (can take up to about 1 ms,
         could be an issue when changing PWM speed in short intervalls)"""
-        while self.pwm.duty() != self.ival:
-            #pass
+        maxtry = 10
+        while maxtry > 0 and self.pwm.duty() != self.ival:
+            maxtry -= 1
             self.pwm.duty(self.ival)
 
     def maxi(self):
@@ -262,6 +263,9 @@ class List(PWM):
         self.toggle_mode = 0
         self.dimtovalue = -99
 
+    def __len__(self): return len(self.pwms)
+    def __getitem__(self, key): return self.pwms[key]
+
     def __repr__(self):
         return '<pwm.List with {} entries>'.format(len(self.pwms))
 
@@ -292,6 +296,10 @@ class List(PWM):
     def enable_dimming(self):
         for p in self.pwms:
             p.enable_dimming()
+
+    def disable_dimming(self):
+        for p in self.pwms:
+            p.disable_dimming()
 
     def on(self):
         # print('pwm.List #{self.id} on')
