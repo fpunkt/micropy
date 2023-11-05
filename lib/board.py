@@ -24,6 +24,8 @@ PERIPH_ID = 0           # PCB version, overwritten in main.py (or by including o
 
 LED = None              # overwritten in bconf
 
+MQTT = None             # Set when MQTT is connected
+
 RESET_ON_HARD_ERRORS = False # mainly CAN Errors
 ENABLE_WATCHDOG_AFTER_SECONDS = 120
 
