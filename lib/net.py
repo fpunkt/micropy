@@ -44,13 +44,13 @@ DEBUG = None
 # print('network activated: ', x)
 
 def start_wlan(base=0):
-    gc.collect()
-    stop_hotspot()
     wlan = network.WLAN(network.STA_IF) # create station interface
     if wlan.isconnected():
         cfg = wlan.ifconfig()
         #print("Already connected to ", cfg)
         return cfg
+    gc.collect()
+    stop_hotspot()
     # need some sleep, otherwise screen disconnects right away (gets reset??)
     wlan.active(True)       # activate the interface
     time.sleep(1)
