@@ -36,6 +36,12 @@ except:
 # dimdelay_inactive_poll_period_ms = 25
 dimdelay_inactive_poll_period_ms = 10
 
+if 0 == 1:
+    # make pylint think that it knows about 'const' variable
+    const = lambda x: x
+
+NODIMMING = const(-99)
+
 # Minimum step size - dimming takes about 350 ms for dimstep_min=5 and 200 ms for dimstep_min = 10
 dimstep_min = 10
 
@@ -78,16 +84,8 @@ class PWM:
         if pin is None:
             return
 
-        # global pwm_freq
-#        if pwm_freq > 0:
-#            self.pwm.freq(pwm_freq)
-#            # pwm_freq = 0
-#            utime.sleep_ms(5) # for some strange reason after setting pwm_freq ..
-        # print('setting duty for {}/{} to 0'.format(pwmid, pin))
-        # self.pwm.duty(0)
         self.seti_no_can_message(0) # power off
         self.dimtovalue = 0
-        # self.button = None
         self.mqttstate = None # cache to avoid gc
 
         # allocate message once to avoid garbage collection
@@ -98,17 +96,10 @@ class PWM:
         return '<PWM {}.{}>'.format(self.id, self.pwm)
 
     def disable_dimming(self):
-        self.dimtovalue = -99
+        self.dimtovalue = NODIMMING
 
     def enable_dimming(self):
         self.dimtovalue = self.ival
-
-    # def poll(self):
-    #     if self.dimtovalue < 0:
-    #         return False
-    #     if self.ival == self.dimtovalue:
-    #         return False
-    #     return self.run_next_dimstep()
 
     def seti_no_can_message(self, ival):
         """Set PWM value. NOTE: the actual value may not be the one that has been commanded.
@@ -167,7 +158,7 @@ class PWM:
 
     def run_next_dimstep(self):
         """Set next dimlevel. Return True when more steps are needed"""
-        # try smooth dimming
+        # do smooth dimming
         self.ival = self.pwm.duty()
         # Picking the correct step size is key for smooth dimming
         ds = (2*self.ival) // dimstep_scale
@@ -180,7 +171,9 @@ class PWM:
             # So in the order of a few milliseconds (up to 10 with 100 Hz pwm frequency)
             # However, simply setting is OK, it will come there sooner or later.
             self.seti(self.dimtovalue)
-            self.dimtovalue = -1
+            if remaining_counts == 0:
+                # reached target, stop dimming
+                self.dimtovalue = -1
             return False
         if remaining_counts > 0:
             self.seti_no_can_message(self.ival + ds)
@@ -191,11 +184,7 @@ class PWM:
     def dimi(self, value):
         """dim in raw units, return False if value is directly set, return True otherwise (dimming)"""
         value = valid(value)
-        #if value == self.ival and value == self.pwm.duty():
-        #    # still report value
-        #    self.send_status_to_can()
-        #    return False
-        if self.dimtovalue < -10:
+        if self.dimtovalue == NODIMMING:
             self.seti(value)
             return False
         self.dimtovalue = value
@@ -261,7 +250,7 @@ class List(PWM):
         self.pwms = list(args) # need to initialize here in case __repr__() is called
         super().__init__(pwmid, None)
         self.toggle_mode = 0
-        self.dimtovalue = -99
+        self.dimtovalue = NODIMMING
 
     def __len__(self): return len(self.pwms)
     def __getitem__(self, key): return self.pwms[key]
@@ -367,7 +356,6 @@ async def _next_dim_step_task():
     while True:
         isdimming = False
         for p in board.PWMs.pwms:
-#            if p.dimtovalue >= 0  and  p.pwm.duty() != p.dimtovalue:
             if p.dimtovalue >= 0  and  p.pwm.duty() != p.dimtovalue:
                 isdimming = True
                 p.run_next_dimstep()
