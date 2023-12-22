@@ -45,26 +45,24 @@ ds = ds1820.DS1820(0x10, bconf.ML10_PWM_8, poll_intervall_in_ms=10000)
 
 prevspeed = -99
 
+tt = ( 30,  33,  35,  38,  40,  45,  50,   55)
+sp = ( -1,   0, 100, 150, 200, 300, 500, 1023)
+def getspeed(t):
+    if t < tt[0]:
+        return -1
+    for i in range(len(tt)):
+        if t < tt[i]:
+            return sp[i]
+    return tt[-1]
+
 def dscallback(t):
     global prevspeed
     # print('ds callback: ', t)
     # pick the 2nd highest temperature
     t.sort(reverse=True)
     m = t[1]
-    speed = 0
-    if m > 45:
-        speed = 800
-    elif m > 40:
-        speed = 400
-    elif m > 35:
-        speed = 200
-    elif m > 30:
-        speed = 100
-    elif m > 25:
-        speed = 0
-    else:
-        speed = -1
-    print('ds callback, max={:4.1f}, speed={:4d}({:4d}), {}'.format(m, speed, prevspeed, t))
+    speed = getspeed(m)
+    #print('ds callback, max={:4.1f}, speed={:4d}({:4d}), {}'.format(m, speed, prevspeed, t))
     if prevspeed == speed:
         return
     prevspeed = speed
