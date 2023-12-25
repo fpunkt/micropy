@@ -33,13 +33,18 @@ try:
 except:
     fsmqtt = None
 
+
+# Decrease poll rate when not dimming - give CPU time for other things to do
 # dimdelay_inactive_poll_period_ms = 25
+# TODO: use asyncio.Event
 dimdelay_inactive_poll_period_ms = 10
+"""Poll time when no dimming is active (meaning: dimming will start earliest after this time)"""
 
 if 0 == 1:
     # make pylint think that it knows about 'const' variable
     const = lambda x: x
 
+_FINISHED_DIMMING = const(-1)
 NODIMMING = const(-99)
 
 # Minimum step size - dimming takes about 350 ms for dimstep_min=5 and 200 ms for dimstep_min = 10
@@ -139,47 +144,50 @@ class PWM:
         self.seti(i16_to_raw(i16))
 
     def send_status_to_can(self):
+        # self.send_status_to_can_value(self.pwm.duty())
+        self.send_status_to_can_value(self.ival)
+
+    def send_status_to_can_value(self, ival):
         if self.id is None:
             return
-        i1 = self.ival
-        i16 = i1 << 6
+        i16 = ival << 6
         if board.CAN:
             # self.msg.setsender(self.id)
             payload = self.msg.payload
             # self.msg[0] = board.CAN.canid >> 8
             # self.msg[1] = board.CAN.canid & 0xff
-            payload[3] = i1 >> 8
-            payload[4] = i1 & 0xff
-            if i1 == 1023:
+            payload[3] = ival >> 8
+            payload[4] = ival & 0xff
+            if ival == 1023:
                 i16 = 0xffff
             payload[5] = i16 >> 8
             payload[6] = i16 & 0xff
             self.msg.send()
 
     def run_next_dimstep(self):
-        """Set next dimlevel. Return True when more steps are needed"""
-        # do smooth dimming
+        """Set next dimlevel for smooth dimming to finally reach self.dimtovalue."""
         self.ival = self.pwm.duty()
-        # Picking the correct step size is key for smooth dimming
+        # Pick nice step size for smooth dimming
         ds = (2*self.ival) // dimstep_scale
-        #ds = min(50, max(5, ds))
-        #ds = min(150, max(5, ds)) # about 350 ms when min step is 5
         ds = min(dimstep_max, max(dimstep_min, ds)) # about 200 ms when min step is 10
         remaining_counts = self.dimtovalue - self.ival
+        if board.DEBUG:
+            print('pwm: {:2d}, iv: {:4d}, ds: {:3d}, remaining: {:4d}'.format(self.id, self.ival, ds, remaining_counts))
         if abs(remaining_counts) <= ds:
+            print('  end of dimming - remaining = {}, setting to {}'.format(remaining_counts, self.dimtovalue))
             # Accepting the PWM value takes a while, probably until the end of the phase.
             # So in the order of a few milliseconds (up to 10 with 100 Hz pwm frequency)
             # However, simply setting is OK, it will come there sooner or later.
-            self.seti(self.dimtovalue)
+            self.seti_no_can_message(self.dimtovalue)
             if remaining_counts == 0:
-                # reached target, stop dimming
-                self.dimtovalue = -1
-            return False
+                # reached target
+                self.send_status_to_can()
+                self.dimtovalue = _FINISHED_DIMMING
+            return
         if remaining_counts > 0:
             self.seti_no_can_message(self.ival + ds)
         else:
             self.seti_no_can_message(self.ival - ds)
-        return True
 
     def dimi(self, value):
         """dim in raw units, return False if value is directly set, return True otherwise (dimming)"""
@@ -187,10 +195,11 @@ class PWM:
         if self.dimtovalue == NODIMMING:
             self.seti(value)
             return False
-        self.dimtovalue = value
         if abs(self.ival-value) < 5:
+            self.dimtovalue = _FINISHED_DIMMING
             self.seti(value)
             return False
+        self.dimtovalue = value
         return True
 
     def dimi16(self, value):
@@ -198,11 +207,11 @@ class PWM:
         return self.dimi(i16_to_raw(value))
 
     def on(self):
-        if self.ival == self.lastintensity:
-            return
+        """Set intensity to lastintensity"""
         self.dimi(self.lastintensity)
 
     def off(self):
+        """Set intensity to 0"""
         self.dimi(0)
 
     def toggle(self):
@@ -351,12 +360,14 @@ async def _next_dim_step_task():
     # dimdelay = max(1, 1100 // pwm_freq)
 
     dimdelay_when_dimming = max(1, 1000 // pwm_freq)
+    if board.DEBUG:
+        print('dimdelay when dimming = {}'.format(dimdelay_when_dimming))
     was_dimming = False
 
     while True:
         isdimming = False
         for p in board.PWMs.pwms:
-            if p.dimtovalue >= 0  and  p.pwm.duty() != p.dimtovalue:
+            if p.dimtovalue >= 0:
                 isdimming = True
                 p.run_next_dimstep()
         # ask other async tasks to delay their execution to ensure smooth and uniterrupted dimming

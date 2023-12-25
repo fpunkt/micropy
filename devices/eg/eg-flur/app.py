@@ -46,12 +46,6 @@ poll_rate_s = None # overwrite if needed
 if board.DEBUG is True:
     print("This is {}, CANID {:03x}".format(board.LOCATION, 0 if board.CANID is None else board.CANID))
 
-if board.DEBUG is True:
-    import net
-    net.DEBUG = True
-    net.start_wlan(32)
-    net.start_repl()
-
 import bconf
 import can
 import canerror
@@ -186,6 +180,11 @@ class xPWM(pwm.PWM):
             p6.seti(DCDCON_Value)
         super().seti(v)
 
+    def dimi(self, v):
+        if v > 0:
+            p6.seti(DCDCON_Value)
+        super.dimi(v)
+
 p7 = xPWM(7, bconf.ML10_PWM_7)
 """CONFIG:
 IGNORE: true
@@ -198,7 +197,7 @@ name: Kleiner Spot Treppe
 """
 
 async def send_pwm_status():
-    await asyncio.sleep_ms(100)
+    await asyncio.sleep(2)
     all = list(spots_all) + list([p6, p7, p8])
     m = can.Message(0x777, [0, 0, 0])
     while True:
@@ -209,7 +208,7 @@ async def send_pwm_status():
             m.payload[2] = d & 0xff
             m.send()
             await asyncio.sleep_ms(100)
-        await asyncio.sleep(120)
+        await asyncio.sleep(30 * 60)
 
 board.BACKGROUND_RUNNERS.append(send_pwm_status())
 

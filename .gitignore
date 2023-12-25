@@ -11,3 +11,5 @@ bin/upload
 mupystubs/lup.py
 lup.py
 firmware/bbb/
+.build
+Attic
