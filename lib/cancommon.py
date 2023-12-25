@@ -265,7 +265,7 @@ def register(commandbyte, minargs, maxargs, callback):
 def send_wlan_connected(ip=None):
     if not board.CAN:
         return
-    board.LED.on()
+    # board.LED.on()
     if ip is None:
         ip = net.wlan_ip(ip)
     try:
@@ -300,10 +300,14 @@ def _disconnect_wlan(_):
     net.stop_wlan()
     send_wlan_connected(("0.0.0.0", None))
 
+def _debug_on_off(m):
+    board.DEBUG = len(m.payload) > 1 and m.payload[1] != 0
+    print('board.DEBUG now is {}'.format(board.DEBUG))
+
 register(canconf.WLAN_CONNECT, 1, 2, lambda m: _connect_to_wlan(m))
 register(canconf.WLAN_HOTSPOT, 1, 1, lambda _: send_wlan_connected(net.start_hotspot()))
 register(canconf.WLAN_STOP, 1, 1, _disconnect_wlan)
-register(canconf.SEND_PING, 1, 3, lambda m: _send_ping_or_change_rate(m))
+register(canconf.REQUEST_PING_FROM_DEVICE, 1, 3, lambda m: _send_ping_or_change_rate(m))
 register(canconf.SOFT_RESET, 1, 1, lambda _: machine.soft_reset())
 register(canconf.HARD_RESET, 1, 1, lambda _: machine.reset())
 register(canconf.INDENTIFY, 1, 1, lambda _: board.CAN.identify())
@@ -312,6 +316,7 @@ register(canconf.WEBREPL_STOP, 1, 1, lambda _: net.stop_repl())
 register(canconf.SEND_FREEMEM, 1, 1, lambda _: _send_memstat())
 register(canconf.ENABLE_WATCHDOG, 1, 1, lambda _: board.WD.enable())
 register(canconf.SEND_INFO, 1, 2, sendconfig)
+register(canconf.DEBUG_ON_OFF, 1, 2, _debug_on_off)
 
 
 _callback = None
