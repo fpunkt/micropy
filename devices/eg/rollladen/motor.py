@@ -60,8 +60,8 @@ class Motor:
         self.motor = None
         self.currentspeed = 0
         self.targetspeed = 0
-        self.m1.wait_until_set()
-        self.m2.wait_until_set()
+        self.m1.wait_until_set(0)
+        self.m2.wait_until_set(0)
 
     def set_freq(self, f):
         self.m1.pwm.freq(f)

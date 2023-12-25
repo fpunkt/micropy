@@ -34,6 +34,7 @@ except:
     fsmqtt = None
 
 
+#start_dimming = asyncio.Event()
 # Decrease poll rate when not dimming - give CPU time for other things to do
 # dimdelay_inactive_poll_period_ms = 25
 # TODO: use asyncio.Event
@@ -77,7 +78,6 @@ class PWM:
     """TODO: fix docstring? Wrapper for system PWM, using numbers from 0..1 and provide dimming"""
     def __init__(self, pwmid, pin):
         self.id = pwmid
-        self.ival = 0
         self.lastintensity = 100
         self.pwm = None
         if pin is not None:
@@ -100,52 +100,53 @@ class PWM:
     def __repr__(self):
         return '<PWM {}.{}>'.format(self.id, self.pwm)
 
+    def current_value(self):
+        """Return current pwm value"""
+        return self.pwm.duty()
+
     def disable_dimming(self):
         self.dimtovalue = NODIMMING
 
     def enable_dimming(self):
-        self.dimtovalue = self.ival
+        # set a valid value but prevent dimming to it -> use the current value
+        self.dimtovalue = self.current_value()
 
     def seti_no_can_message(self, ival):
         """Set PWM value. NOTE: the actual value may not be the one that has been commanded.
         Call wait_until_set() if you need the value to be correct.
         (This is not the case for dimming, because dimming reads the value read back
-        from the H/W. Value might be different if commands are send too fast)"""
+        from the H/W. Value might be different if commands are send too fast).
+        Function returns the value used (does some error checking for bad input)"""
         ival = valid(ival)
         self.pwm.duty(ival)
-        self.ival = ival
-        # a direct reading might not return the actual value
-        # we use the actual set/reported value to ensure that dimming works fine
-        # Call wait_until_set() if you want to ensure that the set value is correct
-        # self.ival = self.pwm.duty()
+        return ival
 
-    def wait_until_set(self):
+    def wait_until_set(self, value):
         """Make sure PWM has taken the correct value (can take up to about 1 ms,
         could be an issue when changing PWM speed in short intervalls)"""
         maxtry = 10
-        while maxtry > 0 and self.pwm.duty() != self.ival:
+        while maxtry > 0 and self.pwm.duty() != value:
             maxtry -= 1
-            self.pwm.duty(self.ival)
+            self.pwm.duty(value)
 
     def maxi(self):
         """maximum value currently set (actually useful for lists, to see whether all lights are off)"""
-        return self.ival
+        return self.current_value()
 
     def seti(self, ival):
         """Set raw integer duty from 0 .. 1023 and send status to CAN"""
-        self.seti_no_can_message(ival)
-        self.wait_until_set()
+        ival = self.seti_no_can_message(ival)
         if ival != 0:
             self.lastintensity = ival
-        self.send_status_to_can()
+        self.send_status_to_can_value(ival)
+        self.wait_until_set(ival)
 
     def seti16(self, i16):
         """Set integer 0..0xffff"""
         self.seti(i16_to_raw(i16))
 
     def send_status_to_can(self):
-        # self.send_status_to_can_value(self.pwm.duty())
-        self.send_status_to_can_value(self.ival)
+        self.send_status_to_can_value(self.current_value())
 
     def send_status_to_can_value(self, ival):
         if self.id is None:
@@ -166,13 +167,13 @@ class PWM:
 
     def run_next_dimstep(self):
         """Set next dimlevel for smooth dimming to finally reach self.dimtovalue."""
-        self.ival = self.pwm.duty()
+        ival = self.pwm.duty()
         # Pick nice step size for smooth dimming
-        ds = (2*self.ival) // dimstep_scale
+        ds = (2*ival) // dimstep_scale
         ds = min(dimstep_max, max(dimstep_min, ds)) # about 200 ms when min step is 10
-        remaining_counts = self.dimtovalue - self.ival
+        remaining_counts = self.dimtovalue - ival
         if board.DEBUG:
-            print('pwm: {:2d}, iv: {:4d}, ds: {:3d}, remaining: {:4d}'.format(self.id, self.ival, ds, remaining_counts))
+            print('pwm: {:2d}, iv: {:4d}, ds: {:3d}, remaining: {:4d}'.format(self.id, ival, ds, remaining_counts))
         if abs(remaining_counts) <= ds:
             print('  end of dimming - remaining = {}, setting to {}'.format(remaining_counts, self.dimtovalue))
             # Accepting the PWM value takes a while, probably until the end of the phase.
@@ -185,9 +186,9 @@ class PWM:
                 self.dimtovalue = _FINISHED_DIMMING
             return
         if remaining_counts > 0:
-            self.seti_no_can_message(self.ival + ds)
+            self.seti_no_can_message(ival + ds)
         else:
-            self.seti_no_can_message(self.ival - ds)
+            self.seti_no_can_message(ival - ds)
 
     def dimi(self, value):
         """dim in raw units, return False if value is directly set, return True otherwise (dimming)"""
@@ -195,7 +196,7 @@ class PWM:
         if self.dimtovalue == NODIMMING:
             self.seti(value)
             return False
-        if abs(self.ival-value) < 5:
+        if abs(self.current_value()-value) < 5:
             self.dimtovalue = _FINISHED_DIMMING
             self.seti(value)
             return False
@@ -216,7 +217,7 @@ class PWM:
 
     def toggle(self):
         """Toggle on/off. Returns True if output is on after toggle, False if off"""
-        if self.ival == 0:
+        if self.current_value() == 0:
             self.on()
             return True
         self.off()
@@ -267,11 +268,14 @@ class List(PWM):
     def __repr__(self):
         return '<pwm.List with {} entries>'.format(len(self.pwms))
 
+    def current_value(self):
+        """Current value of a PWM List it the maximum of all its PWMs"""
+        return self.maxi()
+
     def append(self, pwm):
         self.pwms.append(pwm)
 
     def seti_no_can_message(self, ival):
-        self.ival = ival
         for p in self.pwms:
             p.seti_no_can_message(ival)
 
@@ -281,7 +285,7 @@ class List(PWM):
 
     def maxi(self):
         """get max value of all PWMs"""
-        return max([p.ival for p in self.pwms])
+        return max([p.current_value() for p in self.pwms])
 
     def dimi(self, value):
         for p in self.pwms:
@@ -345,7 +349,7 @@ async def _next_dim_step_task():
     # set all dimto values to current values, otherwise we can't initialize PWM values for poweron
     for p in board.PWMs.pwms:
         if p.dimtovalue >= 0:
-            p.dimtovalue = p.ival
+            p.dimtovalue = p.current_value()
 
     #isdimming = False
     #dimsteps = 0

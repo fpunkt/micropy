@@ -178,7 +178,7 @@ class xPWM(pwm.PWM):
         # print('seti6({})'.format(v))
         if v > 0:
             p6.seti(DCDCON_Value)
-        super().seti(v)
+        return super().seti(v)
 
     def dimi(self, v):
         if v > 0:

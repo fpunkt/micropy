@@ -54,8 +54,8 @@ class RGB:
             return
         self._send_to_can()
         # just to make sure dimming didn't screw up
-        print('fixing to {}, {}, {}'.format(self.r.ival, self.g.ival, self.b.ival))
-        self.seti_no_can_message(self.r.ival, self.g.ival, self.b.ival)
+        print('fixing to {}, {}, {}'.format(self.r.current_value(), self.g.current_value(), self.b.current_value()))
+        self.seti_no_can_message(self.r.current_value(), self.g.current_value(), self.b.current_value())
         self.can_message_pending = False
 
     def seti_no_can_message(self, r, g, b):
@@ -101,7 +101,7 @@ class RGB:
         self.dimi10(_rshift(r), _rshift(g), _rshift(b))
 
     def _send_to_can(self):
-        self.send_status_to_can(self.r.ival, self.g.ival, self.b.ival)
+        self.send_status_to_can(self.r.current_value(), self.g.current_value(), self.b.current_value())
 
     def send_status_to_can(self, r, g, b):
         # Message format is
@@ -114,8 +114,8 @@ class RGB:
         if self.id is None or not board.CAN:
             return
 
-        # r, g, b = self.r.ival<<6, self.g.ival<<6, self.b.ival<<6
-        # print("r = {}/{:04x}  -->  {}/{:04x}".format(self.r.ival, self.r.ival, r, r))
+        # r, g, b = self.r.current_value()<<6, self.g.current_value()<<6, self.b.current_value()<<6
+        # print("r = {}/{:04x}  -->  {}/{:04x}".format(self.r.current_value(), self.r.current_value(), r, r))
         payload = self.msg.payload
         payload[3] = r >> 2
         payload[4] = g >> 2

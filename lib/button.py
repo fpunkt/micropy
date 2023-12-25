@@ -83,7 +83,7 @@ class Button(irqio.IRQIO):
 
         # autorepeat is active, do next step
         self.pwm.disable_dimming()
-        ival = self.pwm.ival
+        ival = self.pwm.current_value()
 
         # step = max(1, (ival * ival) // 500)
         # step = max(1, ival // 100)
@@ -111,11 +111,11 @@ class Button(irqio.IRQIO):
                 self.autorepeat_direction = not self.autorepeat_direction
                 # send to CAN and update save
                 # self.pwm.enable_dimming()
-                self.pwm.seti(self.pwm.ival)
+                self.pwm.seti(self.pwm.current_value())
             else:
                 self.pwm.toggle()
             self.state = 0 if self.pwm.dimtovalue == 0 else 1
-            # print('btn state {}, iv={}'.format(self.state, self.pwm.ival))
+            # print('btn state {}, iv={}'.format(self.state, self.pwm.current_value()))
             self.autorepeat_state = STATE_AR_IDLE
 
         if self.callback is not None:
