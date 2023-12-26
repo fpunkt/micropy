@@ -13,8 +13,6 @@ def read() -> cancommon.Message:
     packet = _hw_interface.recv()
     return cancommon.Message(packet[0], packet[3])
 
-
-
 def reset():
     """Reset CAN bus"""
     if _hw_interface is None:
@@ -64,8 +62,8 @@ def write(cid, payload):
 _currentfilter = None
 
 def setsimplefilter(id):
-    """only let given ID pass the CAN controller. Removes CPU load if a lot of
-    messages (not for this device) comming fast"""
+    """Only pass given ID pass the CAN controller. Removes CPU load if the bus
+    is heavy loaded, strongly decreases the risk of dropping packages"""
     # not fully understood how filters work. This works at least somehow ...
     global _currentfilter
     if _hw_interface is None:
@@ -90,8 +88,10 @@ async def _poll_CAN():
     while _hw_interface is None:
         await asyncio.sleep_ms(5000)
 
+    mcount = 0
+
     while True:
-        if  _hw_interface.any():
+        if  mcount < 5 and _hw_interface.any():
             board.CAN_MESSAGES_RECEIVED += 1
 #            print('juhu, got message')
 
@@ -108,15 +108,19 @@ async def _poll_CAN():
                 cancommon.static_incomming_message.payload = bytes(_static_message[3])
 
             cancommon.dispatch_incomming_message()
-            # eat all pending messages - ensure that we do not miss one
+
+            # eat more pending messages - ensure that we do not miss one
             # should not result in blocking other tasks because a message
             # takes about 1ms and we are most likely faster in processing
-            # the messages (especially if not for us)
+            # the messages. But ensure that we yield anyway from time to time.
+            mcount += 1
             continue
         else:
-            board.good_time_for_gc()
-            # good time for GC?
-            pass
+            # no message or messages comming too fast
+            if mcount < 3:
+                # good time for GC? Bus does not seem too busy
+                board.good_time_for_gc()
+            mcount = 0
         await asyncio.sleep_ms(board.CANPOLLTIME_MS)
 
 board.BACKGROUND_RUNNERS.append(_poll_CAN())
