@@ -16,37 +16,15 @@ import utime
 
 class Motionsensor(irqio.IRQIO):
     def __init__(self, portid, pinid, pullup=True):
-        super().__init__(portid, pinid, pullup=pullup, canid=canid.SENSOR_MOTION)
-        #self.msg = can.makemessage(canid.SENSOR_MOTION, 5, portid=portid)
-        self.fastcount = 0
-
-    def disable(self):
-        self.fastcount = -1
-        self.poll_intervall_in_ms = 1000
-        can.cancommon.errormessage([canerror.SENSOR_DISABLED, self.portid])
-
-    def enable(self):
-        self.fastcount = 0
-        self.poll_intervall_in_ms = 10
-
+        super().__init__(portid, pinid, pullup=pullup)
+        self.msg = can.makemessage(canid.SENSOR_MOTION, 5, portid=portid)
 
     def run(self):
-        if self.fastcount < 0:
-            return  # disabled
+        # print('id {}, ticks: {}, fc: {}'.format(self.portid, self.last_run_before_ms, self.fastcount))
         if not super().run():
             # no change
             return False
-
-        if self.last_run_ticks < 50:
-            # comming fast ..
-            if self.fastcount > 10:
-                # events are comming too fast
-                self.disable()
-                return False
-            self.fastcount += 1
-            return False
-
-        self.fastcount = 0
+        #print('     ticks: {}, fc: {}'.format(self.last_run_before_ms, self.fastcount))
         self.sendmessage()
 
         #if board.CAN is not None:

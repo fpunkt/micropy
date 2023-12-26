@@ -14,6 +14,7 @@ Example:
 # pylint: disable=import-error, missing-docstring, redefined-builtin, too-many-arguments
 # pylint: disable=too-few-public-methods
 
+import port
 import machine
 import dht
 import board
@@ -67,8 +68,9 @@ board.BACKGROUND_RUNNERS.append(board.WD.watchdog_task())
 
 
 class Sensor:
-    def __init__(self, name, portid, pin, poll_intervall_in_ms, background_task=None) -> None:
+    def __init__(self, name, portid, pin, poll_intervall_in_ms=0, background_task=None) -> None:
         # pylint: disable=redefined-outer-name
+
         self.name = name
         self.portid = portid
         self.pin = pin
@@ -112,10 +114,10 @@ class Sensor:
     async def sensor_task(self):
         self.proclaim()
         while True:
-            nextrun_in_ms = self.poll_intervall_in_ms
             if board.PWM_IS_DIMMING and not self.is_fast:
                 # minor delay in order to have smooth dimming. Used for slow sensors
-                nextrun_in_ms = 2
+                await asyncio.sleep_ms(100)
+                continue
             else:
                 try:
                     if self.arun != None:
@@ -126,8 +128,9 @@ class Sensor:
                 except Exception as e: # pylint: disable=bare-except, broad-except
                     if board.DEBUG:
                         print('Exception from {}: {}'.format(self, e))
+
             # print('sensor going to sleep ', nextrun_in_ms)
-            await asyncio.sleep_ms(nextrun_in_ms)
+            await asyncio.sleep_ms(self.poll_intervall_in_ms)
             # print('sensor sleeping done', nextrun_in_ms)
 
 

@@ -184,10 +184,12 @@ async def arun():
             sys.print_exception(e) # pylint: disable=no-member
 
 def run():
+    print('start running')
     for f in STARTUP_FUNCTIONS:
         f()
     # run GC once to supress memory messages after startup (because gc will be triggered after initialization ...)
     gc.collect()
+    print('start main loop')
     asyncio.run(arun())
 
 def restart():

@@ -2,6 +2,7 @@
 
 device: eg.flur.roof
 room: Flur EG
+location: eg-flur
 ESPIP: 192.168.178.164
 
 
@@ -40,12 +41,12 @@ import board
 import net
 
 board.LOCATION = 'eg-flur'
-board.DEBUG = net.wlan_ip(None) != None
-board.CANID = 0x344 # was 0x340
+board.CANID = 0x344
 
 poll_rate_s = None # overwrite if needed
+"""Poll rate in seconds for sensors. Use system default if set to None"""
 
-if board.DEBUG is True:
+if board.DEBUG:
     print("This is {}, CANID {:03x}".format(board.LOCATION, 0 if board.CANID is None else board.CANID))
 
 import bconf
@@ -178,7 +179,7 @@ class xPWM(pwm.PWM):
     """Enable DC/DC converter if one of these PWM is in use"""
     def _dbg(self, name, val):
         if board.DEBUG:
-            print('PWM #{}: {} to {}'.format(self.id, name, val))
+            print('PWM #{}: {} to {}'.format(self.portid, name, val))
 
     def _dcdcon(self, v):
         if v > 0:
@@ -231,7 +232,7 @@ async def send_pwm_status():
             await asyncio.sleep_ms(100)
         await asyncio.sleep(30 * 60)
 
-board.BACKGROUND_RUNNERS.append(send_pwm_status())
+# board.BACKGROUND_RUNNERS.append(send_pwm_status())
 
 
 
@@ -248,9 +249,6 @@ async def poweroff_dcdc():
             p6.seti(newval)
 
 board.BACKGROUND_RUNNERS.append(poweroff_dcdc())
-
-def r():
-    board.restart()
 
 def main():
     if 1 != 0: # pylint: disable=comparison-with-itself

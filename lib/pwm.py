@@ -28,6 +28,7 @@ import board
 import can
 import canid
 import pwmcode
+import port
 try:
     import fsmqtt
 except:
@@ -70,19 +71,18 @@ def valid(i):
     """Return value in range 0..1023"""
     return min(1023, max(i, 0))
 
-class PWM:
+class PWM(port.Port):
     """TODO: fix docstring? Wrapper for system PWM, using numbers from 0..1 and provide dimming"""
-    def __init__(self, pwmid, pin):
-        self.id = pwmid
+    def __init__(self, portid, pinid):
+        super().__init__(portid, pinid)
         self.lastintensity = 100
         self.pwm = None
-        if pin is not None:
-            self.pwm = machine.PWM(machine.Pin(pin), duty=0, freq=pwm_freq)
-        board.SENSORSs.register(pwmid, self)
+        if pinid is not None:
+            self.pwm = machine.PWM(machine.Pin(pinid), duty=0, freq=pwm_freq)
         if board.PWMs is not None:
             # is still None for ALL pwm list
             board.PWMs.append(self)
-        if pin is None:
+        if pinid is None:
             return
 
         self.seti_no_can_message(0) # power off
@@ -91,10 +91,10 @@ class PWM:
 
         # allocate message once to avoid garbage collection
         self.msg = can.Message(canid.PWM_VALUE, [0, 0, 0, 0, 0, 0, 0])
-        self.msg.setsender(self.id)
+        self.msg.setsender(self.portid)
 
     def __repr__(self):
-        return '<{} {}.{}>'.format(self.__class__.__name__, self.id, self.pwm)
+        return '<{} {}.{}>'.format(self.__class__.__name__, self.portid, self.pwm)
 
     def current_value(self):
         """Return current pwm value"""
@@ -145,7 +145,7 @@ class PWM:
         self.send_status_to_can_value(self.current_value())
 
     def send_status_to_can_value(self, ival):
-        if self.id is None:
+        if self.portid is None:
             return
         i16 = ival << 6
         if board.CAN:
@@ -168,10 +168,10 @@ class PWM:
         ds = (2*ival) // dimstep_scale
         ds = min(dimstep_max, max(dimstep_min, ds)) # about 200 ms when min step is 10
         remaining_counts = self.dimtovalue - ival
-        if board.DEBUG:
-            print('pwm: {:2d}, iv: {:4d}, ds: {:3d}, remaining: {:4d}'.format(self.id, ival, ds, remaining_counts))
+        if board.DEBUG > 2:
+            print('pwm: {:2d}, iv: {:4d}, ds: {:3d}, remaining: {:4d}'.format(self.portid, ival, ds, remaining_counts))
         if abs(remaining_counts) <= ds:
-            if board.DEBUG:
+            if board.DEBUG > 1:
                 print('  end of dimming - remaining = {}, setting to {}'.format(remaining_counts, self.dimtovalue))
             # Accepting the PWM value takes a while, probably until the end of the phase.
             # So in the order of a few milliseconds (up to 10 with 100 Hz pwm frequency)
@@ -198,8 +198,8 @@ class PWM:
             self.seti(value)
             return False
         self.dimtovalue = value
-        if board.DEBUG:
-            print('Start dimming')
+        if board.DEBUG > 2:
+            print('Start dimming {}'.format(self.portid))
         start_dimming.set()
         return True
 
@@ -250,7 +250,7 @@ class PWM:
             l -= 1
         print('PWM callback got value "{}"'.format(msg[l:-1]))
         value = int(msg[l:-1])
-        print('Setting PWM {} to {}'.format(self.id, value))
+        print('Setting PWM {} to {}'.format(self.portid, value))
         self.dimi16(((value & 0xff) << 8) | value)
         return
 
@@ -359,10 +359,6 @@ async def _next_dim_step_task():
         if p.dimtovalue >= 0:
             p.dimtovalue = p.current_value()
 
-    #isdimming = False
-    #dimsteps = 0
-    #starttime = 0
-
     # since we have just set the PWM we can tell how long it will take until the next value
     # will be accepted
 
@@ -423,13 +419,13 @@ async def _next_dim_step_task():
         #    utime.sleep_ms(dimdelay_when_dimming)
         #    continue
         if isdimming:
-            asyncio.sleep_ms(dimdelay_when_dimming)
+            await asyncio.sleep_ms(dimdelay_when_dimming)
         else:
             start_dimming.clear()
-            if board.DEBUG:
+            if board.DEBUG > 0:
                 print('stopped dimming, waiting for start_dimming event()')
             await start_dimming.wait()
-            if board.DEBUG:
+            if board.DEBUG > 1:
                 print('return from start_dimming waiter')
 
 

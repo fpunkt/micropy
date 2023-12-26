@@ -7,23 +7,24 @@ Use IRQ for debouncing and async polling for event processing.
 # pylint: disable=import-error, missing-docstring, redefined-builtin, too-many-arguments
 # pylint: disable=too-few-public-methods, too-many-instance-attributes
 
+import port
 import machine
 import utime
-# import micropython
-# import uasyncio as asyncio
 import sensors
 import can
 import canerror
 import board
+import uasyncio as asyncio
+import sys
 
-class IRQIO(sensors.Sensor):
-    def __init__(self, portid, pinid, trigger=None, pullup=True, canid=0, debounce_ms=1, inverted=False):
+class IRQIO(port.Port):
+    def __init__(self, portid, pinid, trigger=None, pullup=True, debounce_ms=0, inverted=False):
         # initialize this first so we get error messages during initialization
         # self._repr = '{} #{} {}'.format(self.__class__.__name__, portid, pinid)
         pullupmode = machine.Pin.PULL_UP if pullup is True else pullup
-        super().__init__(self, portid, machine.Pin(pinid, machine.Pin.IN, pullupmode), poll_intervall_in_ms=10)
+        super().__init__(portid, machine.Pin(pinid, machine.Pin.IN, pullupmode))
+
         # typically buttons or motions sensors have very short running handlers
-        self.is_fast = True
         if trigger is None:
             trigger = machine.Pin.IRQ_RISING | machine.Pin.IRQ_FALLING
         elif trigger == 'rise':
@@ -32,38 +33,44 @@ class IRQIO(sensors.Sensor):
             trigger = machine.Pin.IRQ_FALLING
         else:
             raise ValueError('trigger needs to be one of None, rise or fall, found {}'.format(trigger))
-        self.callback = None
-        self.pinvalue = self.pin.value()
-        if inverted:
-            self.pinvalue = 1 - self.pinvalue
-        self.last_irq = utime.ticks_ms()
-        self.last_run_ticks = self.last_irq
-        self.last_run_before_ms = 0
-        self.last_value = 0
-        self.inverted = inverted
-        self.pin.irq(trigger=trigger, handler=self._irq_handler)
-        self.debounce_ms = debounce_ms
-        self.fastcount = 0
+        self.trigger = trigger
 
-        self.msg = None
-        if canid != 0:
-            self.msg = can.makemessage(canid, 5, portid=portid)
+        self.inverted = inverted
+        self.debounce_ms = debounce_ms
+        self.last_irq = utime.ticks_ms()
+        self.last_run_before_ms = 0
+        self.is_disabled = False
+        self.triggerevent = asyncio.Event()
+        self.pinvalue = self.value()
+        self.enable()
+        board.BACKGROUND_RUNNERS.append(self._runner())
+
+    def value(self):
+        """Return pin value (respecting the value of self.inverted)"""
+        if self.inverted:
+            return 1-self.pin.value()
+        return self.pin.value()
 
     def disable(self):
-        self.fastcount = -1
-        self.poll_intervall_in_ms = 1000
-        can.cancommon.errormessage([canerror.SENSOR_DISABLED, self.portid])
+        """Disable events from this input"""
+        self.is_disabled = True
+        self.pin.irq(trigger=None, handler=None)
+        self.send_disabled_error()
 
     def enable(self):
-        self.fastcount = 0
-        self.poll_intervall_in_ms = 10
-
+        """Enable events from this input"""
+        self.is_disabled = False
+        self.pin.irq(trigger=self.trigger, handler=self._irq_handler)
 
     def _sendmessage(self, changed):
         if board.CAN is not None and self.msg is not None:
             self.msg.payload[3] = self.pinvalue
             self.msg.payload[4] = changed
             self.msg.send()
+
+    def send_disabled_error(self):
+        print('Disabled: {}'.format(self))
+        can.cancommon.errormessage([canerror.SENSOR_DISABLED, self.portid])
 
     def sendmessage(self):
         """Called when status has changed"""
@@ -73,36 +80,36 @@ class IRQIO(sensors.Sensor):
         """Regularily report status with changed flag cleared"""
         self._sendmessage(0)
 
-    def run(self):
-        if self.fastcount < 0:
-            return  False # disabled
+    async def run(self):
+        """Overload this by your function"""
+        print('calling IRQIO.run for port {:02x}, you should overload this'.format(self.portid))
 
-        now = utime.ticks_ms()
-        # print('time since last IRQ: {} ms'.format(utime.ticks_diff(now, self.last_irq)))
-        if utime.ticks_diff(now, self.last_irq) < self.debounce_ms:
-            # keep on debouncing
-            return False
-        pv = self.pin.value()
-        if self.inverted:
-            pv = 1 - pv
-        if pv == self.pinvalue:
-            # no change
-            return False
-        self.last_run_before_ms = utime.ticks_diff(now, self.last_run_ticks)
-        if self.last_run_before_ms < 50:
-            # comming fast ..
-            if self.fastcount > 10:
-                # events are comming too fast
-                self.disable()
-                return False
-            self.fastcount += 1
-            return False
-        self.fastcount = 0
-        self.last_run_ticks = now
-        self.pinvalue = pv
-        if self.callback is not None:
-            self.callback(self) # pylint: disable=not-callable
-        return True
+    async def _runner(self):
+        while True:
+            await self.triggerevent.wait()
+            if self.is_disabled:
+                print('port {:02c} is disabled but still receiving events'.format(self.portid))
+                await asyncio.sleep_ms(50)
+                self.triggerevent.clear()
+                continue
+
+            # some basic debounding is already done by the scheduler
+            now = utime.ticks_ms()
+            self.last_run_before_ms = utime.ticks_diff(now, self.last_irq)
+            self.last_irq = now
+
+            if board.DEBUG > 1:
+                print('IRQ triggered for {:02x} (now: {}, prev: {})'.format(self.portid, self.last_run_before_ms, utime.ticks_ms(), self.last_irq))
+            try:
+                self.triggerevent.clear()
+                self.pinvalue = self.value()
+                await self.run()
+            except Exception as e:
+                print('Raised error in irqio.run(), disabling: {}'.format(e))
+                sys.print_exception(e)
+                self.send_disabled_error()
+                await asyncio.sleep(10)
 
     def _irq_handler(self, _):
-        self.last_irq = utime.ticks_ms()
+        self.triggerevent.set()
+

@@ -1,9 +1,10 @@
-"""
-Kueche main.py
+"""CONFIG:
 
-To update run
-
-../../../webrepl/webrepl_cli.py -p x main.py 192.168.178.161:
+device: eg.kueche.fridge
+room: Küche
+location: kueche
+zone: eg
+ESPIP: 192.168.178.162
 
 
 3 buttons
@@ -12,31 +13,21 @@ To update run
 """
 
 import board
-board.LOCATION = 'kueche'
-# board.DEBUG = True
 board.CANID = 0x350
 
-if board.DEBUG is True:
+if board.DEBUG:
     print("This is eg/kueche, location {}, CANID {:03x}".format(board.LOCATION, board.CANID))
 
-if board.DEBUG is True:
-    import net
-    net.start_wlan(32)
-    net.start_repl()
-
-import gc
 import bconf
-import can
-import machine
+print('boncf loaded')
 import sensors
+print('sensors loaded')
 import pwm
+print('pwm loaded')
 import button
-# import pbutton as button
-import uasyncio as asyncio
 import motionsensor
 
-if board.CAN and board.DEBUG:
-    board.CAN.cancommon.send_wlan_connected()
+print('imports loaded')
 
 if 0 == 1:
     # make pylint think that it knows about 'const' variable
@@ -74,72 +65,22 @@ p7.lastintensity = _defi1
 
 # PINs on left side (buttons, thermometer and motionsensors)
 # 13, 12, 14, 27, 26, 25, 33
-b1 = button.Button(0x10, bconf.RJ12_2_WHITE)
-b2 = button.Button(0x11, bconf.RJ12_2_GREEN)
-b3 = button.Button(0x12, bconf.RJ12_2_YELLOW)
-# b1 = button.Button(0x10, bconf.RJ12_1_YELLOW)
-# b2 = button.Button(0x11, bconf.RJ12_1_BLUE)
-# b3 = button.Button(0x12, bconf.RJ12_1_GREEN_INPUT_ONLY_NO_PULLUP)
+b1 = button.Button(0x10, bconf.RJ12_CENTER_1_WHITE)
+b2 = button.Button(0x11, bconf.RJ12_CENTER_4_GREEN_ML10_7)
+b3 = button.Button(0x12, bconf.RJ12_CENTER_5_YELLOW_ML10_3)
 
-# async def pbv():
-#     while True:
-#         print('b1={}, b2={}, b3={}'.format(b1.pin.value(), b2.pin.value(), b3.pin.value()))
-#         await asyncio.sleep_ms(500)
-#
-# board.BACKGROUND_RUNNERS.append(pbv())
 
-def _motion_callback(x):
-    if board.DEBUG:
-        print('Motion detected on {}'.format(x))
+m1 = motionsensor.Motionsensor(0x20, bconf.AUX1_WHITE)
+m2 = motionsensor.Motionsensor(0x21, bconf.AUX1_YELLOW)
 
-m1 = motionsensor.Motionsensor(0x20, bconf.AUX1_WHITE, pullup=None)
-#m1.callback = _motion_callback
-
-m2 = motionsensor.Motionsensor(0x21, bconf.AUX1_YELLOW, pullup=None)
-m2.callback = _motion_callback
-
-# def cb(but):
-#     board.PRINT('got event from button {}', but)
-#
-# b1.callback = cb
-# b2.callback = cb
 
 pl1 = pwm.List(None, p1, p2, p3, p4, p5)
 pl2 = pwm.List(None, p1, p2, p3, p4, p5, p7)
 pl3 = pwm.List(None, p1, p2, p3, p4, p5, p6, p7)
-# pl1.toggle_mode = 1
+
 
 b1.pwm = pl1
 b2.pwm = pl2
 b3.pwm = pl3
 
-#
-temperature = sensors.DHT11(0x30, bconf.AUX2_WHITE, poll_intervall_in_ms=5*60*1000)
-
-message_counter = 0
-
-# def can_callback(msg):
-#     # pylint: disable=global-statement
-#     global message_counter
-#     message_counter += 1
-#     # print("GOT CAN message #{:4d}: {}".format(message_counter, msg))
-#
-#     if len(msg.payload) > 3 and msg.payload[0] == 0x11:
-#         count = 10*((msg.payload[1]<<8) + msg.payload[2])
-#         print("DOING SOME STUPID LOOPING", count, msg.payload)
-#         while count > 0:
-#             count -= 1
-#         print("DONE with stupid looping")
-#         return
-#     msg.unknown_command()
-#
-#
-# can.subscribe(can_callback)
-
-def r():
-    board.run()
-
-if 1 == 1: # pylint: disable=comparison-with-itself
-    r()
-else:
-    print('# run r() to start event handler')
+temperature = sensors.DHT11(0x30, bconf.AUX2_WHITE, poll_intervall_in_ms=sensors.poll_5_minutes)

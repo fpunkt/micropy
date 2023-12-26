@@ -53,7 +53,7 @@ def start_wlan(base=0):
     stop_hotspot()
     # need some sleep, otherwise screen disconnects right away (gets reset??)
     wlan.active(True)       # activate the interface
-    time.sleep(1)
+    time.sleep(0.5)
     # TODO: why do we scan for access points?
     #wlan.scan()             # scan for access points
     #time.sleep(1)

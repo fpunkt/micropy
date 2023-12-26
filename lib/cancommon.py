@@ -276,6 +276,9 @@ def send_wlan_connected(ip=None):
         if board.DEBUG:
             print('** ERROR: Cannot send WLAN IP for {}'.format(ip))
 
+# Send wlan status at startup
+send_wlan_connected()
+
 
 async def _report_net_status():
     while True:
