@@ -34,12 +34,8 @@ except:
     fsmqtt = None
 
 
-#start_dimming = asyncio.Event()
-# Decrease poll rate when not dimming - give CPU time for other things to do
-# dimdelay_inactive_poll_period_ms = 25
-# TODO: use asyncio.Event
-dimdelay_inactive_poll_period_ms = 10
-"""Poll time when no dimming is active (meaning: dimming will start earliest after this time)"""
+# Wakeup dimmer loop when needed
+start_dimming = asyncio.Event()
 
 if 0 == 1:
     # make pylint think that it knows about 'const' variable
@@ -98,7 +94,7 @@ class PWM:
         self.msg.setsender(self.id)
 
     def __repr__(self):
-        return '<PWM {}.{}>'.format(self.id, self.pwm)
+        return '<{} {}.{}>'.format(self.__class__.__name__, self.id, self.pwm)
 
     def current_value(self):
         """Return current pwm value"""
@@ -175,7 +171,8 @@ class PWM:
         if board.DEBUG:
             print('pwm: {:2d}, iv: {:4d}, ds: {:3d}, remaining: {:4d}'.format(self.id, ival, ds, remaining_counts))
         if abs(remaining_counts) <= ds:
-            print('  end of dimming - remaining = {}, setting to {}'.format(remaining_counts, self.dimtovalue))
+            if board.DEBUG:
+                print('  end of dimming - remaining = {}, setting to {}'.format(remaining_counts, self.dimtovalue))
             # Accepting the PWM value takes a while, probably until the end of the phase.
             # So in the order of a few milliseconds (up to 10 with 100 Hz pwm frequency)
             # However, simply setting is OK, it will come there sooner or later.
@@ -201,6 +198,9 @@ class PWM:
             self.seti(value)
             return False
         self.dimtovalue = value
+        if board.DEBUG:
+            print('Start dimming')
+        start_dimming.set()
         return True
 
     def dimi16(self, value):
@@ -291,9 +291,17 @@ class List(PWM):
         for p in self.pwms:
             p.dimi(value)
 
+    def dimi16(self, value):
+        for p in self.pwms:
+            p.dimi16(value)
+
     def seti(self, value):
         for p in self.pwms:
             p.seti(value)
+
+    def seti16(self, value):
+        for p in self.pwms:
+            p.seti16(value)
 
     def enable_dimming(self):
         for p in self.pwms:
@@ -414,7 +422,16 @@ async def _next_dim_step_task():
         #if isdimming:
         #    utime.sleep_ms(dimdelay_when_dimming)
         #    continue
-        await asyncio.sleep_ms(dimdelay_when_dimming if isdimming else dimdelay_inactive_poll_period_ms)
+        if isdimming:
+            asyncio.sleep_ms(dimdelay_when_dimming)
+        else:
+            start_dimming.clear()
+            if board.DEBUG:
+                print('stopped dimming, waiting for start_dimming event()')
+            await start_dimming.wait()
+            if board.DEBUG:
+                print('return from start_dimming waiter')
+
 
 board.BACKGROUND_RUNNERS.append(_next_dim_step_task())
 
@@ -457,4 +474,3 @@ can.register(pwmcode.SET_INTENSITY_NATIVE, 4, 4, lambda msg: _getpwm(msg).dimi(m
 can.register(pwmcode.ON, 2, 2, lambda msg: _getpwm(msg).on())
 can.register(pwmcode.OFF, 2, 2, lambda msg: _getpwm(msg).off())
 can.register(pwmcode.TOGGLE, 2, 2, lambda msg: _getpwm(msg).toggle())
-
