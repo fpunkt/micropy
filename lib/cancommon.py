@@ -297,6 +297,9 @@ def _connect_to_wlan(m):
     send_wlan_connected(net.start_wlan(b))
 
 def _disconnect_wlan(_):
+    if board.DEBUG:
+        print('DEBUGGING turned off with WLAN - to turn on again run  cansend {:03x}#7e'.format(board.CANID))
+        board.DEBUG = False
     net.stop_wlan()
     send_wlan_connected(("0.0.0.0", None))
 
