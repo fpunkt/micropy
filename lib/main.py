@@ -12,4 +12,8 @@ if True:
 # Init Watchdog
 
 import app
+
+def r():
+    app.r()
+
 app.main()
