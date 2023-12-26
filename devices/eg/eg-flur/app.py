@@ -37,8 +37,10 @@ ESPIP: 192.168.178.164
 # Connect using   picocom --baud 115420 /dev/tty.usbserial-0001
 
 import board
+import net
+
 board.LOCATION = 'eg-flur'
-board.DEBUG = True
+board.DEBUG = net.wlan_ip(None) != None
 board.CANID = 0x344 # was 0x340
 
 poll_rate_s = None # overwrite if needed
@@ -174,16 +176,35 @@ DCDCON_Value = const(1023)
 
 class xPWM(pwm.PWM):
     """Enable DC/DC converter if one of these PWM is in use"""
-    def seti(self, v):
-        # print('seti6({})'.format(v))
+    def _dbg(self, name, val):
+        if board.DEBUG:
+            print('PWM #{}: {} to {}'.format(self.id, name, val))
+
+    def _dcdcon(self, v):
         if v > 0:
+            if board.DEBUG:
+                print(' # ** switching DCDC on')
             p6.seti(DCDCON_Value)
+
+    def seti(self, v):
+        self._dbg('seti', v)
+        self._dcdcon(v)
         return super().seti(v)
 
+    def seti16(self, v):
+        self._dbg('seti16', v)
+        self._dcdcon(v)
+        return super().seti16(v)
+
     def dimi(self, v):
-        if v > 0:
-            p6.seti(DCDCON_Value)
-        super.dimi(v)
+        self._dbg('dimi', v)
+        self._dcdcon(v)
+        super().dimi(v)
+
+    def dimi16(self, v):
+        self._dbg('dimi16', v)
+        self._dcdcon(v)
+        super().dimi16(v)
 
 p7 = xPWM(7, bconf.ML10_PWM_7)
 """CONFIG:
@@ -236,6 +257,12 @@ def main():
         board.run()
     else:
         print('# run  restart   (or board.run()) to start event handler')
+
+## DEBUGGING STUFF
+# import can, board, pwm
+# msg = can.Message(0x344, [0x1a, 0x08, 0x7f, 0xff])
+# board.SENSORSs.find(msg, (PWM, List), 0xa0)
+
 
 ## Reste vom Trial and Error
 
