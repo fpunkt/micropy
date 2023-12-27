@@ -19,6 +19,14 @@ if True:
 import app
 import board
 
+# Set network status LED if net module has been loaded, send network status to CAN
+try:
+    import sys
+    sys.modules['net'].set_status_led()
+    sys.modules['cancommon'].send_wlan_connected()
+except:
+    pass
+
 def r():
     board.restart()
 

@@ -23,9 +23,6 @@ Message = cancommon.Message
 makemessage = cancommon.makemessage
 errormessage = cancommon.errormessage
 
-net.DEBUG = board.DEBUG
-net.LED = board.LED
-
 def simplefilter(id):
     """Set hardware CAN filter to this address. Ignore (almost all) other addresses"""
     pass

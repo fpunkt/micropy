@@ -22,16 +22,8 @@ board.LED = board.Led(2, 0)
 if board.DEBUG is True:
     print("This is {}, CANID {:03x}".format(board.LOCATION, 0 if board.CANID is None else board.CANID))
 
-if board.DEBUG is True:
-    import net
-    net.LED = board.LED
-    net.start_wlan()
-    net.start_repl()
-else:
-    import net
-    net.LED = board.LED
-    net.start_wlan(0)
-    net.start_repl()
+import net
+net.net()
 
 import gc
 def mem(msg):

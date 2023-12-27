@@ -29,13 +29,10 @@ import time
 import machine
 import network
 import webrepl
+import board
 import gc
 import c
 
-LED = None # filled in later, avoid import of board.py (easier bootstep on 1M boards)
-DEBUG = None
-
-# import board
 
 # ap = network.WLAN(network.AP_IF)
 # print(ap.ifconfig())
@@ -59,7 +56,7 @@ def start_wlan(base=0):
     #time.sleep(1)
     # pylint: disable=no-member
     s, p = c.s(base)
-#    if DEBUG:
+#    if board.DEBUG:
 #        print('Connect to {} / {}'.format(s, p))
     wlan.connect(s, p) # connect to an AP
     for i in range(30):
@@ -72,8 +69,7 @@ def start_wlan(base=0):
         wlan.active(False)
         return None
     cfg = wlan.ifconfig()
-    if LED:
-        LED.on()
+    set_status_led()
     print("Connected to ", cfg)
     return cfg
 
@@ -91,9 +87,17 @@ def start_hotspot():
     ap.config(max_clients=3) # set how many clients can connect to the network
     ap.active(True)         # activate the interface
     time.sleep(1)
-    if LED:
-        LED.on()
+    set_status_led()
     return serial
+
+def set_status_led():
+    """Turn on LED when network is active"""
+    if board.LED:
+        if wlan_ip() != None:
+            board.LED.on()
+        else:
+            board.LED.off()
+
 
 def stop_hotspot():
     ap = network.WLAN(network.AP_IF) # create access-point interface
@@ -106,8 +110,7 @@ def stop_wlan():
         pass
     network.WLAN().disconnect()
     network.WLAN().active(False)
-    if LED:
-        LED.off()
+    set_status_led()
 
 def start_repl(password='x'):
     webrepl.start(password=password)
@@ -115,7 +118,8 @@ def start_repl(password='x'):
 def stop_repl():
     webrepl.stop()
 
-def net(base=0):
+def net(base=32):
+    """Start network and repl"""
     ip = start_wlan(base)
     # print("# Connected to ", ip[0])
     start_repl()
