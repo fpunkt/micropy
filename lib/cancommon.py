@@ -7,6 +7,7 @@ import gc
 import machine
 import net
 import utime
+import button
 
 # last upload time
 try:
@@ -310,6 +311,12 @@ def _debug_on_off(m):
     board.DEBUG = len(m.payload) > 1 and m.payload[1] != 0
     print('board.DEBUG now is {}'.format(board.DEBUG))
 
+def _button_press(m):
+    b = button.find(m)
+    if b is None:
+        return
+    b.pressed()
+
 register(canconf.WLAN_CONNECT, 1, 2, lambda m: _connect_to_wlan(m))
 register(canconf.WLAN_HOTSPOT, 1, 1, lambda _: send_wlan_connected(net.start_hotspot()))
 register(canconf.WLAN_STOP, 1, 1, _disconnect_wlan)
@@ -323,6 +330,7 @@ register(canconf.SEND_FREEMEM, 1, 1, lambda _: _send_memstat())
 register(canconf.ENABLE_WATCHDOG, 1, 1, lambda _: board.WD.enable())
 register(canconf.SEND_INFO, 1, 2, sendconfig)
 register(canconf.DEBUG_ON_OFF, 1, 2, _debug_on_off)
+register(canconf.EMULATE_BUTTON_PRESSED, 2, 2, _button_press)
 
 
 _callback = None

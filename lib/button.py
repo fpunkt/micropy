@@ -8,15 +8,20 @@ Buttons use IRQ for debouncing and async polling for event processing.
 # pylint: disable=too-few-public-methods, too-many-instance-attributes
 
 import board
-import can
 import canid
 import irqio
 import utime
 import uasyncio as asyncio
+import sys
 
 if 0 == 1:
     # make pylint think that it knows about 'const' variable
     const = lambda x: x
+
+def find(msg):
+    """Find button with ID as 2nd byte of payload"""
+    return board.PORTs.find(msg, (Button, ARButton), 0xa1)
+
 
 STATE_AR_IDLE = const(0)
 STATE_AR_ARM = const(1)
@@ -26,23 +31,16 @@ class Button(irqio.IRQIO):
     def __init__(self, portid, pinid, inverted=False):
         # note that we swap inverted here: buttons are usually inputs pulled to low
         super().__init__(portid, pinid, inverted=0 if inverted else 1)
-        self.msg = can.makemessage(canid.BUTTON_PRESSED, 5, portid=self.portid)
-
-        self.debounce_ms = 20
+        self._makemessage(canid.BUTTON_PRESSED)
         self.pwm = None
         self.state = 0
         self._arevent = asyncio.Event()
         self._arevent.clear()
-        self.autorepeat_last_action_timestamp = utime.ticks_ms()
-        self.autorepeat_arm_ms = 1000
-        self.autorepeat_speed_ms = 5
-        self.autorepeat_speed_ms = -1
-        self.autorepeat_direction = False
-        self.autorepeat_state = STATE_AR_IDLE
         self.callback = None
+        self.update_payload() # ensure that calls to send_telemetry have a valid status
 
     def __repr__(self):
-        return '<{}, {}, state={}>'.format(self._repr, self.pwm, self.state)
+        return self._repr('{}, state={}'.format(self.pwm, self.state))
 
     async def _autorepeat_handler(self):
         while True:
@@ -59,30 +57,88 @@ class Button(irqio.IRQIO):
             if self.pinvalue != self.value():
                 if board.DEBUG > 0:
                     print("Still debouncing {}".format(self))
-                return
-
-        if self.autorepeat_speed_ms < 0:
-            # autorepeat is disabled
-            if self.pinvalue == 1:
-                self._pressed()
+                return False
 
         if self.pinvalue == 1:
             self.pressed()
         else:
             self.released()
-        return
+        return True
+
+    def send_telemetry(self):
+        self.set_changed_status(0)
+
+    def update_payload(self):
+        self.set_changed_status(1)
+        self.msg.payload[3] = self.state
+
+    def is_on(self):
+        return self.state != 0
+
+    def is_off(self):
+        return self.state == 0
+
+    def toggle_state(self):
+        """Toggle button status, update connected PWM, send status to CAN"""
+        self.set_state(1-self.state)
+
+    def set_state(self, on_or_off):
+        """Set button status, update connected PWM, send status to CAN"""
+        self.state = 1 if on_or_off else 0
+        if self.callback:
+            try:
+                self.callback(self)
+            except Exception as e:
+                print('{} callback raised error'.format(self))
+                sys.print_exception(e)
+                # don't update CAN message and PWM stuff
+                # You could use this as behaviour of some special button action:
+                #  simply raise an error if you want to stop the normal button handling
+                return
+        self.update_payload_and_send_message()
+        if self.pwm is not None:
+            if self.is_on():
+                self.pwm.on()
+            else:
+                self.pwm.off()
+
+    def pressed(self):
+        """Called when button is pushed down"""
+        if board.DEBUG:
+            print('Botton pressed {}'.format(self))
+        self.toggle_state()
+
+    def released(self):
+        if board.DEBUG:
+            print('Botton released {}'.format(self))
 
 
-        if self.autorepeat_arm_ms == 0:
-            # autorepeat disabled, directly react on button down, don't wait for button up
-            if not changed:
-                return False
-            if self.pinvalue == 1:
-                # button released, nothing to do
-                return True
+class ARButton(Button):
+    """Button with auto-repeat"""
+    def __init__(self, portid, pinid, inverted=False):
+        # note that we swap inverted here: buttons are usually inputs pulled to low
+        super().__init__(portid, pinid, inverted=0 if inverted else 1)
+        self._makemessage(canid.BUTTON_PRESSED)
 
-            return self._pressed()
+        self.debounce_ms = 20
+        self.pwm = None
+        self.state = 0
+        self._arevent = asyncio.Event()
+        self._arevent.clear()
+        self.autorepeat_last_action_timestamp = utime.ticks_ms()
+        self.autorepeat_arm_ms = 1000
+        self.autorepeat_speed_ms = 5
+        self.autorepeat_speed_ms = -1
+        self.autorepeat_direction = False
+        self.autorepeat_state = STATE_AR_IDLE
+        self.callback = None
 
+    async def run(self):
+        if self.autorepeat_speed_ms <= 0:
+            # autorepeat disabled
+            return await super().run()
+
+        return False
         # autorepeat mode
 
         if changed:
@@ -136,45 +192,4 @@ class Button(irqio.IRQIO):
         # print('dim to {}, iv={}, step={}'.format(newval, ival, step))
         self.pwm.seti_no_can_message(newval)
         self.autorepeat_last_action_timestamp = now
-        return True
-
-    def toggle_state(self):
-        self.state = 1-self.state
-
-    def pressed(self):
-        """Called when a button is pressed (after de-bouncing, handlig auto-repeat, etc)"""
-        self.toggle_state()
-        print('Botton pressed {}'.format(self))
-        self.sendmessage()
-        if self.pwm is not None:
-            self.pwm.toggle()
-
-    def released(self):
-        if board.DEBUG:
-            print('Botton released {}'.format(self))
-
-
-    def _pressed(self):
-        self.state = 1 - self.state
-        if self.pwm is not None:
-            if self.autorepeat_state == STATE_AR_ACTIVE:
-                # finished autorepeat
-                self.autorepeat_direction = not self.autorepeat_direction
-                # send to CAN and update save
-                # self.pwm.enable_dimming()
-                self.pwm.seti(self.pwm.current_value())
-            else:
-                self.pwm.toggle()
-            self.state = 0 if self.pwm.dimtovalue == 0 else 1
-            # print('btn state {}, iv={}'.format(self.state, self.pwm.current_value()))
-            self.autorepeat_state = STATE_AR_IDLE
-
-        if self.callback is not None:
-            self.callback(self) # pylint: disable=not-callable
-
-        if board.CAN is not None:
-            self.msg.payload[3] = self.state
-            self.msg.payload[4] = 1
-            self.msg.send()
-
         return True

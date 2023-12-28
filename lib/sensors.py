@@ -22,6 +22,7 @@ import can
 import canid
 import canerror
 import uasyncio as asyncio
+import sys
 try:
     import fsmqtt
 except:
@@ -35,6 +36,7 @@ def minutes(n):
     """Convert to milliseconds"""
     return int(n*60000)
 
+poll_30_seconds = const(30 * 1000)
 poll_1_minute = const(1 * 60 * 1000)
 poll_2_minutes = const(2 * 60 * 1000)
 poll_5_minutes = const(5 * 60 * 1000)
@@ -66,33 +68,27 @@ class WDT:
 board.WD = WDT()
 board.BACKGROUND_RUNNERS.append(board.WD.watchdog_task())
 
+class Sensorxxx(port.Port):
+    pass
 
-class Sensor:
-    def __init__(self, name, portid, pin, poll_intervall_in_ms=0, background_task=None) -> None:
-        # pylint: disable=redefined-outer-name
 
-        self.name = name
-        self.portid = portid
-        self.pin = pin
-        if poll_intervall_in_ms is None:
+class Sensor(port.Port):
+    def __init__(self, portid, pin, poll_intervall_in_ms) -> None:
+        super().__init__(portid, pin)
+        if poll_intervall_in_ms is None or poll_intervall_in_ms == 0:
             poll_intervall_in_ms = poll_5_minutes
+
         self.poll_intervall_in_ms = poll_intervall_in_ms
         # TODO: do we really need fast? Go and write your own async() if needed.
         self.is_fast = False # can interrupt PWM dimming
         self.arun = None
-        board.SENSORSs.register(portid, self)
-        if background_task is None:
-            background_task = self.sensor_task()
-        board.BACKGROUND_RUNNERS.append(background_task)
+        board.BACKGROUND_RUNNERS.append(self.sensor_task())
 
     def __repr__(self) -> str:
-        if isinstance(self.portid, int):
-            ids = hex(self.portid)
-        else:
-            ids = 'None'
-        return '<{}:{}.{}>'.format(self.__class__.__name__, ids, self.pin)
+        return self._repr('poll_intervall: {} ms'.format(self.poll_intervall_in_ms))
 
     def proclaim(self): # pylint: disable=no-self-use
+        # TODO: remove proclaim
         return None
 
     def mqtt_setup_and_proclaim(self, topic):
@@ -116,7 +112,7 @@ class Sensor:
         while True:
             if board.PWM_IS_DIMMING and not self.is_fast:
                 # minor delay in order to have smooth dimming. Used for slow sensors
-                await asyncio.sleep_ms(100)
+                await asyncio.sleep_ms(50)
                 continue
             else:
                 try:
@@ -125,16 +121,23 @@ class Sensor:
                         await self.arun()
                     else:
                         self.run()
-                except Exception as e: # pylint: disable=bare-except, broad-except
+                    self.update_payload()
+                    self.send_message()
+                except Exception as e:
                     if board.DEBUG:
                         print('Exception from {}: {}'.format(self, e))
+                        sys.print_exception(e)
 
-            # print('sensor going to sleep ', nextrun_in_ms)
+            if board.DEBUG:
+                print('sensor {} going to sleep for {} ms'.format(self, self.poll_intervall_in_ms))
             await asyncio.sleep_ms(self.poll_intervall_in_ms)
-            # print('sensor sleeping done', nextrun_in_ms)
+            if board.DEBUG:
+                print('sensor {} woke up after {} ms'.format(self, self.poll_intervall_in_ms))
 
 
-class DHT(Sensor):
+# ================================= DHT temperature sensors
+
+class _DHT(Sensor):
     """Temperature sensor
     3 to 5V power and I/O
     2.5mA max current use during conversion (while requesting data)
@@ -142,17 +145,61 @@ class DHT(Sensor):
     Good for -40 to 80°C temperature readings ±0.5°C accuracy
     No more than 0.5 Hz sampling rate (once every 2 seconds)
     """
-    def __init__(self, portid, pin, poll_intervall_in_ms=poll_5_minutes):
-        super().__init__('DHT', portid, pin, poll_intervall_in_ms)
-        self.dht = dht.DHT22(machine.Pin(pin))
+    def __init__(self, portid, pin, dht, poll_intervall_in_ms=poll_5_minutes):
+        super().__init__(portid, pin, poll_intervall_in_ms)
+        self.dht = dht
         self.msg = can.makemessage(canid.DATALOGGER_AM2302, 7)
         self.msg.setsender(self.portid)
 
     def proclaim(self):
         super().proclaim()
 
-    def measure(self):
-        return self.dht.measure()
+    def decode(self):
+        """Return T10, H10 after calling dht.measure(). T and H have to be divided by 10"""
+        raise NotImplemented
+
+    def update_payload(self):
+        raise NotImplemented
+        # decode ourself to avoid malloc
+        h = self.dht.buf[0] << 8 | self.dht.buf[1]
+        t = (self.dht.buf[2] & 0x7F) << 8 | self.dht.buf[3]
+        if self.dht.buf[2] & 0x80:
+            t = -t
+        if board.CAN is not None:
+            payload = self.msg.payload
+            payload[3] = h >> 8
+            payload[4] = h & 0xff
+            payload[5] = t >> 8
+            payload[6] = t & 0xff
+
+    def update_payload(self, h, t):
+        if board.CAN is not None:
+            t, h = self.decode()
+            payload = self.msg.payload
+            payload[3] = h >> 8
+            payload[4] = h & 0xff
+            payload[5] = t >> 8
+            payload[6] = t & 0xff
+
+    def run(self):
+        try:
+            self.dht.measure()
+        except:
+            self.read_error()
+            raise
+
+
+class DHT(_DHT):
+    """Temperature sensor
+    3 to 5V power and I/O
+    2.5mA max current use during conversion (while requesting data)
+    Good for 0-100% humidity readings with 2-5% accuracy
+    Good for -40 to 80°C temperature readings ±0.5°C accuracy
+    No more than 0.5 Hz sampling rate (once every 2 seconds)
+    """
+    def __init__(self, portid, pinid, poll_intervall_in_ms=poll_5_minutes):
+        pin = machine.Pin(pinid)
+        super().__init__(portid, pin, dht.DHT22(pin), poll_intervall_in_ms)
 
     def decode(self):
         """Return T10, H10 after calling dht.measure(). T and H have to be divided by 10"""
@@ -162,75 +209,31 @@ class DHT(Sensor):
             t = -t
         return t, h
 
-    def run(self):
-        try:
-            self.dht.measure()
-        except:
-            self.read_error()
-            raise
-        # decode ourself to avoid malloc
-        h = self.dht.buf[0] << 8 | self.dht.buf[1]
-        t = (self.dht.buf[2] & 0x7F) << 8 | self.dht.buf[3]
-        if self.dht.buf[2] & 0x80:
-            t = -t
-        if board.CAN is not None:
-            payload = self.msg.payload
-            payload[3] = h >> 8
-            payload[4] = h & 0xff
-            payload[5] = t >> 8
-            payload[6] = t & 0xff
-            self.msg.send()
-
-class DHT11(Sensor):
+class DHT11(_DHT):
     """
     3 to 5V power and I/O
     2.5mA max current use during conversion (while requesting data)
     Good for 20-80% humidity readings with 5% accuracy
     Good for 0-50°C temperature readings ±2°C accuracy
     """
-    def __init__(self, portid, pin, poll_intervall_in_ms=poll_5_minutes):
-        super().__init__('DHT11', portid, pin, poll_intervall_in_ms)
-        self.dht = dht.DHT11(machine.Pin(pin))
-        self.msg = can.makemessage(canid.DATALOGGER_AM2302, 7)
-        self.msg.setsender(self.portid)
-
-    def proclaim(self):
-        super().proclaim()
+    def __init__(self, portid, pinid, poll_intervall_in_ms=poll_5_minutes):
+        pin = machine.Pin(pinid)
+        super().__init__(portid, pin, dht.DHT11(pin), poll_intervall_in_ms)
 
     def decode(self):
         """Return T10, H10 after calling dht.measure(). T and H have to be divided by 10"""
         return 10 * self.dht.buf[2], 10 * self.dht.buf[0]
 
-    def run(self):
-        try:
-            self.dht.measure()
-        except:
-            self.read_error()
-            raise
-        # decode ourself to avoid malloc
-        h = 10 * self.dht.buf[0]
-        t = 10 * self.dht.buf[2]
-        if board.CAN is not None:
-            payload = self.msg.payload
-            payload[3] = h >> 8
-            payload[4] = h & 0xff
-            payload[5] = t >> 8
-            payload[6] = t & 0xff
-            self.msg.send()
-
 
 class AnalogBrightness(Sensor):
     """Analog brighness sensors, 0 is dark, 0xff is maximum brightness"""
     def __init__(self, portid, pin, poll_intervall_in_ms=poll_5_minutes):
-        super().__init__('Brightness', portid, pin, poll_intervall_in_ms)
+        super().__init__(portid, pin, poll_intervall_in_ms)
         self.adc = machine.ADC(machine.Pin(pin))
         self.adc.width(machine.ADC.WIDTH_9BIT)
         self.last_read = 0
         self.last_read_pwm_off = 0
         self.msg = can.makemessage(canid.DATALOGGER_BRIGHTNESS_SENSOR_8, 5)
-
-    def proclaim(self):
-        super().proclaim()
 
     def read(self):
         self.last_read = 0xff - (self.adc.read() >> 1) # 8 bit

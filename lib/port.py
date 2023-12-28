@@ -11,7 +11,7 @@ class Port:
         self.pin = pin
         # keep a static can message per port to avoid frequent allocs
         self.msg = None
-        board.SENSORSs.register(portid, self)
+        board.PORTs.register(portid, self)
 
     def __repr__(self) -> str:
         return self._repr('')
@@ -21,6 +21,50 @@ class Port:
             ids = hex(self.portid)
         else:
             ids = 'None'
-        return '<{}:{}.{}{}>'.format(self.__class__.__name__, ids, self.pinid, more)
+        return '<{}:{}.{}{}{}>'.format(self.__class__.__name__, ids, self.pin, ' ' if more else '', more)
+
+    def send_disabled_error(self):
+        """Call this when the port has been disabled for some reason"""
+        print('Disabled: {}'.format(self))
+        if board.CAN is not None:
+            board.CAN.cancommon.errormessage([board.CAN.canerror.SENSOR_DISABLED, self.portid])
+
+    def update_payload(self):
+        """Set all payload bytes, overload this."""
+        if board.DEBUG:
+            print('Called update_payload - not overloaded for {}'.format(self))
+        return
+
+    def update_telemetry(self):
+        """Update self.msg to the current status.
+        Might be called regulary by some background task in order to send telemetry.
+        Packages sent by this call should clearly indicate that nothing changed, i.e. no action is required
+        """
+        if board.DEBUG:
+            print('Called update_telemetry - not overloaded for {}'.format(self))
+        pass
+
+    def send_telemetry(self):
+        """Might be called regulary by some background task in order to send telemetry.
+        Packages sent by this call should clearly indicate that nothing changed, i.e. no action is required
+        """
+        if self.can_is_active():
+            self.update_telemetry()
+            self.msg.send()
+
+    def can_is_active(self):
+        """Return true when CAN bus is up and running and message sending is enabled"""
+        return board.CAN is not None and  self.msg is not None
+
+    def send_message(self):
+        """Called this when the port status has changed and you want to send the updated status to the bus"""
+        if self.can_is_active():
+            self.msg.send()
+
+    def update_payload_and_send_message(self):
+        if self.can_is_active():
+            self.update_payload()
+            self.msg.send()
+
 
 

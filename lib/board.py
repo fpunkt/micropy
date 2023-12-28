@@ -55,7 +55,7 @@ class Led:
         self.led.value(1-self.onvalue)
 
 
-class RegisteredSensorIDs:
+class RegisteredPortIDs:
     """Keep record of registered sensors"""
     def __init__(self):
         self.r = dict()
@@ -76,8 +76,8 @@ class RegisteredSensorIDs:
 
     def find(self, msg, withclass, sensortype=0xfe):
         """Find a registered sensor ID that is provided as 2nd value in the CAN payload.
-        The sensor should have one of the classes in withclass (or None if you don't care).
-        If the sensor is not found the function returns and raises an error on
+        The port should have one of the classes in withclass (or None if you don't care).
+        If the port is not found the function returns and sends an error message on
         CAN bus.
         The optional sensortype is used in the errormessage.
         """
@@ -112,7 +112,7 @@ class RegisteredSensorIDs:
 
 # Sensors will be set by sensors.py and will provide funtions
 # register and find.
-SENSORSs = RegisteredSensorIDs()
+PORTs = RegisteredPortIDs()
 
 # PWMs holds a list of all defined PWMs (initialized by loading pwm.py)
 PWMs = None
@@ -177,11 +177,10 @@ async def arun():
     except asyncio.TimeoutError:
         if DEBUG:
             print('asyncIO timeout!')
-    except Exception as e: # pylint: disable=broad-except
+    except Exception as e:
         if DEBUG:
-            print('**** ERROR in runner')
-            print(e)
-            sys.print_exception(e) # pylint: disable=no-member
+            print('**** ERROR in runner: {}'.format(e))
+            sys.print_exception(e)
 
 def run():
     print('start running')

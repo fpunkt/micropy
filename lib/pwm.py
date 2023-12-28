@@ -96,6 +96,9 @@ class PWM(port.Port):
     def __repr__(self):
         return '<{} {}.{}>'.format(self.__class__.__name__, self.portid, self.pwm)
 
+    def send_telemetry(self):
+        pass
+
     def current_value(self):
         """Return current pwm value"""
         return self.pwm.duty()
@@ -446,19 +449,23 @@ class _badPWMClass: # used to avoid the need of error catching in CAN callbacks
 
 _dummyPWM = _badPWMClass()
 
+def find(msg):
+    """Find pwm with ID in 2nd byte of payload"""
+    return board.PORTs.find(msg, (PWM, List), 0xa0)
+
 # return a PWM for the portid.
 # If portid >0x7f a list of PWMs (which bit position is set in portid) will be returned
 def _getpwm(msg):
     if msg.payload[1] & 0x80 == 0:
-        sensor = board.SENSORSs.find(msg, (PWM, List), 0xa0)
-        return sensor and sensor or _dummyPWM
+        pwm = find(msg)
+        return pwm and pwm or _dummyPWM
     # create a list of PWMs
     pwms = List(None)
     i = 0
     bm = msg.payload[1] & 0x7f
     while bm != 0:
         if bm & 1 == 1:
-            p = board.SENSORSs.get_sensor(i)
+            p = board.PORTs.get_sensor(i)
             if isinstance(p, (PWM, List)):
                 pwms.append(p)
         bm >>= 1

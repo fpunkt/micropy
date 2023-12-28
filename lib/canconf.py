@@ -33,6 +33,11 @@ BUS_IS_ALIVE                                       = const(  246) # 0x00f6
 # Turning debuggin on/off means setting the board.DEBUG variable
 DEBUG_ON_OFF                                       = const(  247) # 0x00f7
 
+# Emulate a button press
+#   Arg # 0: portid/8
+#   Arg # 1: mode/8 - 0: press
+EMULATE_BUTTON_PRESSED                             = const(  248) # 0x00f8
+
 WLAN_CONNECT                                       = const(  250) # 0x00fa
 
 WLAN_HOTSPOT                                       = const(  251) # 0x00fb

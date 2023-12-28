@@ -29,7 +29,6 @@ import time
 import machine
 import network
 import webrepl
-import board
 import gc
 import c
 
@@ -92,11 +91,15 @@ def start_hotspot():
 
 def set_status_led():
     """Turn on LED when network is active"""
-    if board.LED:
-        if wlan_ip() != None:
-            board.LED.on()
-        else:
-            board.LED.off()
+    try:
+        import board
+        if board.LED:
+            if wlan_ip() != None:
+                board.LED.on()
+            else:
+                board.LED.off()
+    except:
+        print('net: cannot import board - OK during board setup')
 
 
 def stop_hotspot():

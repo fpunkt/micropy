@@ -8,7 +8,7 @@ import canid
 
 import board
 
-class DS1820(sensors.Sensor):
+class DS1820(sensors.Sensorxxx):
     """DS18x20 temperature sensors"""
     def __init__(self, portid, pin, poll_intervall_in_ms=sensors.poll_5_minutes):
         super().__init__('DS1820', portid, pin, poll_intervall_in_ms)

@@ -4,7 +4,7 @@ import canid
 import sensors
 import ahtx0
 
-class _aht(sensors.Sensor):
+class _aht(sensors.Sensorxxx):
     def __init__(self, name, portid, aht, poll_intervall_in_ms, background_task) -> None:
         if poll_intervall_in_ms is None:
              poll_intervall_in_ms = 5 * 60 * 1000 # once every 5 minutes

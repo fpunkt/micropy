@@ -38,7 +38,7 @@ class RGB:
         self.id = portid
         self.r, self.g, self.b = pwm.PWM(None, rpin), pwm.PWM(None, gpin), pwm.PWM(None, bpin)
         self.seti_no_can_message(0, 0, 0) # poweroff
-        board.SENSORSs.register(portid, self)
+        board.PORTs.register(portid, self)
         # allocate message once to avoid garbage collection
         self.msg = can.Message(canid.PWM_RGB_VALUE, [0, 0, 0, 0, 0, 0, 0, 0])
         self.msg.setsender(self.id)
@@ -126,7 +126,7 @@ class RGB:
 
 
 def _dimrgb16(msg):
-    rgb = board.SENSORSs.find(msg, RGB, 0xa1)
+    rgb = board.PORTs.find(msg, RGB, 0xa1)
     if board.DEBUG:
         print('got set RGB, rgb={}'.format(rgb))
     if not rgb:
@@ -136,13 +136,13 @@ def _dimrgb16(msg):
     rgb.dimi16(msg.u16(2), msg.u16(4), msg.u16(6))
 
 def _dimrgb10(msg):
-    rgb = board.SENSORSs.find(msg, RGB, 0xa1)
+    rgb = board.PORTs.find(msg, RGB, 0xa1)
     if not rgb:
         return
     rgb.dimi10(msg.u16(2), msg.u16(4), msg.u16(6))
 
 def _setrgb10(msg):
-    rgb = board.SENSORSs.find(msg, RGB, 0xa1)
+    rgb = board.PORTs.find(msg, RGB, 0xa1)
     if not rgb:
         return
     rgb.seti10(msg.u16(2), msg.u16(4), msg.u16(6))

@@ -19,12 +19,12 @@ import sensors
 
 
 
-class BrightnessTLS2561(sensors.Sensor):
+class BrightnessTLS2561(sensors.Sensorxxx):
     def __init__(self, portid, pin, i2c, poll_intervall_in_ms=sensors.poll_5_minutes):
         super().__init__('Brightness', portid, pin, poll_intervall_in_ms)
 
 
-class TSL2561(sensors.Sensor):
+class TSL2561(sensors.Sensorxxx):
     def __init__(self, portid, poll_intervall_in_ms=2000, tint=101):
         msg = 'Initialize I2C'
         try:

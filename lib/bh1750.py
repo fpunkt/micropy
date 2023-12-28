@@ -24,7 +24,7 @@ import bh1750fllrth
 # Abstellraum, Keller, Hobbyr	100 bis 300
 
 
-class BH1750(sensors.Sensor):
+class BH1750(sensors.Sensorxxx):
     def __init__(self, portid, address=0x23, poll_intervall_in_ms=None):
         self.bh1750 = bh1750fllrth.BH1750(address, board.I2C)
         super().__init__('BH1750', portid, board.I2C_SDA_PIN, poll_intervall_in_ms)

@@ -50,7 +50,7 @@ ML10_PWM_8 = const(21)
 #
 
 # 2nd ML10 connector
-ML10_1 = const(12)
+ML10_1_CANNOT_WRITE_FLASH = const(12)
 ML10_2 = const(13)
 ML10_3 = const(14)
 ML10_4 = const(25)

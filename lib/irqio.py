@@ -41,9 +41,15 @@ class IRQIO(port.Port):
         self.last_run_before_ms = 0
         self.is_disabled = False
         self.triggerevent = asyncio.Event()
+        # store the current value in pinvalue to ensure a consistant behaviour while callbacks
+        # are running (might be confusing if value changes ...)
         self.pinvalue = self.value()
         self.enable()
         board.BACKGROUND_RUNNERS.append(self._runner())
+
+    def _makemessage(self, canid):
+        """Create CAN message for use and store in self.msg"""
+        self.msg = can.makemessage(canid, 5, portid=self.portid)
 
     def value(self):
         """Return pin value (respecting the value of self.inverted)"""
@@ -62,23 +68,15 @@ class IRQIO(port.Port):
         self.is_disabled = False
         self.pin.irq(trigger=self.trigger, handler=self._irq_handler)
 
-    def _sendmessage(self, changed):
-        if board.CAN is not None and self.msg is not None:
-            self.msg.payload[3] = self.pinvalue
-            self.msg.payload[4] = changed
-            self.msg.send()
+    def set_changed_status(self, status):
+        self.msg.payload[4] = 1 if status else 0
 
-    def send_disabled_error(self):
-        print('Disabled: {}'.format(self))
-        can.cancommon.errormessage([canerror.SENSOR_DISABLED, self.portid])
+    def update_telemetry(self):
+        self.set_changed_status(0)
 
-    def sendmessage(self):
-        """Called when status has changed"""
-        self._sendmessage(1)
-
-    def statusmessage(self):
-        """Regularily report status with changed flag cleared"""
-        self._sendmessage(0)
+    def update_payload(self):
+        self.set_changed_status(1)
+        self.msg.payload[3] = self.pinvalue
 
     async def run(self):
         """Overload this by your function"""
