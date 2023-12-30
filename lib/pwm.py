@@ -76,6 +76,7 @@ class PWM(port.Port):
     def __init__(self, portid, pinid):
         super().__init__(portid, pinid)
         self.lastintensity = 100
+        self.button = None
         self.pwm = None
         if pinid is not None:
             self.pwm = machine.PWM(machine.Pin(pinid), duty=0, freq=pwm_freq)
@@ -88,6 +89,7 @@ class PWM(port.Port):
         self.seti_no_can_message(0) # power off
         self.dimtovalue = 0
         self.mqttstate = None # cache to avoid gc
+        self.toggle_prefer_off = False
 
         # allocate message once to avoid garbage collection
         self.msg = can.Message(canid.PWM_VALUE, [0, 0, 0, 0, 0, 0, 0])
@@ -95,6 +97,11 @@ class PWM(port.Port):
 
     def __repr__(self):
         return '<{} {}.{}>'.format(self.__class__.__name__, self.portid, self.pwm)
+
+    def set_button(self, button):
+        if self.button is not None:
+            self.button.set_pwm(None)
+        self.button = button
 
     def send_telemetry(self):
         pass
@@ -129,8 +136,25 @@ class PWM(port.Port):
             self.pwm.duty(value)
 
     def maxi(self):
-        """maximum value currently set (actually useful for lists, to see whether all lights are off)"""
+        """maximum value currently set (actually useful for lists, to see whether at one light is on)"""
         return self.current_value()
+
+    def mini(self):
+        """minimum value currently set (actually useful for lists, to see whether all lights are on)"""
+        return self.current_value()
+
+    def one_is_on(self) -> bool:
+        """Return True if at least one light is on"""
+        return self.maxi() > 0
+
+    def all_are_on(self) -> bool:
+        """Return True if all lights are on"""
+        return self.mini() > 0
+
+    def all_are_off(self) -> bool:
+        """Return True if all lights are off"""
+        return self.mini() == 0
+
 
     def seti(self, ival):
         """Set raw integer duty from 0 .. 1023 and send status to CAN"""
@@ -138,6 +162,8 @@ class PWM(port.Port):
         if ival != 0:
             self.lastintensity = ival
         self.send_status_to_can_value(ival)
+        if self.button is not None:
+            self.button.set_state(ival)
         self.wait_until_set(ival)
 
     def seti16(self, i16):
@@ -218,13 +244,17 @@ class PWM(port.Port):
         """Set intensity to 0"""
         self.dimi(0)
 
-    def toggle(self):
-        """Toggle on/off. Returns True if output is on after toggle, False if off"""
-        if self.current_value() == 0:
-            self.on()
-            return True
-        self.off()
-        return False
+    def toggle(self) -> bool:
+        """Turn PWM on if it was off or vice versa.
+        For PWM List you can set the .toggle_prefer_off to switch all of if at least one was off
+        or to switch all on if at least one was on.
+        The function returns True when (at least) one light is on after calling toggle, False otherwise.
+        """
+        if self.maxi() > 0 and self.mini() == 0 and self.toggle_prefer_off:
+            self.off()
+            return False
+        self.on()
+        return True
 
     def mqtt_callback(self, _, msg):
         try:
@@ -290,6 +320,10 @@ class List(PWM):
         """get max value of all PWMs"""
         return max([p.current_value() for p in self.pwms])
 
+    def mini(self):
+        """Return min value of all PWMs"""
+        return min([p.current_value() for p in self.pwms])
+
     def dimi(self, value):
         for p in self.pwms:
             p.dimi(value)
@@ -349,6 +383,7 @@ class List(PWM):
     def mqtt_callback(self, topic, msg):
         for p in self.pwms:
             p.mqtt_callback(topic, msg)
+
 
 
 board.PWMs = List(0xff) # Create a (dynamic) list that includes ALL PWMs

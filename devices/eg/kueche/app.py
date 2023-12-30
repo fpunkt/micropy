@@ -65,13 +65,13 @@ p7.lastintensity = _defi1
 
 # PINs on left side (buttons, thermometer and motionsensors)
 # 13, 12, 14, 27, 26, 25, 33
-b1 = button.Button(0x10, bconf.RJ12_CENTER_1_WHITE)
+b1 = button.Button(0x10, bconf.RJ12_CENTER_1_WHITE_ML10_6)
 b2 = button.Button(0x11, bconf.RJ12_CENTER_4_GREEN_ML10_7)
 b3 = button.ARButton(0x12, bconf.RJ12_CENTER_5_YELLOW_ML10_3)
 
 
-m1 = motionsensor.Motionsensor(0x20, bconf.AUX1_WHITE)
-m2 = motionsensor.Motionsensor(0x21, bconf.AUX1_YELLOW)
+# m1 = motionsensor.Motionsensor(0x20, bconf.AUX1_WHITE_ML10_1_CANNOT_WRITE_FLASH)
+m2 = motionsensor.Motionsensor(0x21, bconf.AUX1_YELLOW_ML10_2)
 
 
 pl1 = pwm.List(None, p1, p2, p3, p4, p5)
@@ -83,5 +83,4 @@ b1.pwm = pl1
 b2.pwm = pl2
 b3.pwm = pl3
 
-# temperature = sensors.DHT11(0x30, bconf.AUX2_WHITE, poll_intervall_in_ms=sensors.poll_5_minutes)
-temperature = sensors.DHT11(0x30, bconf.ML10_2, poll_intervall_in_ms=sensors.poll_30_seconds)
+temperature = sensors.DHT11(0x30, bconf.AUX2_WHITE_ML10_4, poll_intervall_in_ms=sensors.poll_5_minutes)

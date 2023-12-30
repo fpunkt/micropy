@@ -17,19 +17,4 @@ import utime
 class Motionsensor(irqio.IRQIO):
     def __init__(self, portid, pinid, pullup=True):
         super().__init__(portid, pinid, pullup=pullup)
-        self.msg = can.makemessage(canid.SENSOR_MOTION, 5, portid=portid)
-
-    def run(self):
-        # print('id {}, ticks: {}, fc: {}'.format(self.portid, self.last_run_before_ms, self.fastcount))
-        if not super().run():
-            # no change
-            return False
-        #print('     ticks: {}, fc: {}'.format(self.last_run_before_ms, self.fastcount))
-        self.sendmessage()
-
-        #if board.CAN is not None:
-        #    self.msg.payload[3] = self.pinvalue
-        #    self.msg.payload[4] = 1
-        #    self.msg.send()
-        # self.event.clear()
-        return True
+        self.makemessage(canid.SENSOR_MOTION)

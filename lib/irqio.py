@@ -47,7 +47,7 @@ class IRQIO(port.Port):
         self.enable()
         board.BACKGROUND_RUNNERS.append(self._runner())
 
-    def _makemessage(self, canid):
+    def makemessage(self, canid):
         """Create CAN message for use and store in self.msg"""
         self.msg = can.makemessage(canid, 5, portid=self.portid)
 
@@ -79,8 +79,13 @@ class IRQIO(port.Port):
         self.msg.payload[3] = self.pinvalue
 
     async def run(self):
-        """Overload this by your function"""
-        print('calling IRQIO.run for port {:02x}, you should overload this'.format(self.portid))
+        """This function is run when an interrupt is received. It returns true if something has been
+        done, False when the event is ignored for whatever reason.
+        You might want to overload this by your for your sensor"""
+        if board.DEBUG > 0:
+            print('{} got interrupt {}/{}'.format(self, self.pinvalue, self.value()))
+        self.update_payload()
+        self.send_message()
 
     async def _runner(self):
         while True:

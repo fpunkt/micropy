@@ -31,12 +31,13 @@ class Button(irqio.IRQIO):
     def __init__(self, portid, pinid, inverted=False):
         # note that we swap inverted here: buttons are usually inputs pulled to low
         super().__init__(portid, pinid, inverted=0 if inverted else 1)
-        self._makemessage(canid.BUTTON_PRESSED)
+        self.makemessage(canid.BUTTON_PRESSED)
         self.pwm = None
         self.state = 0
         self._arevent = asyncio.Event()
         self._arevent.clear()
         self.callback = None
+        self.all_off_mode = False
         self.update_payload() # ensure that calls to send_telemetry have a valid status
 
     def __repr__(self):
@@ -47,8 +48,6 @@ class Button(irqio.IRQIO):
             await self._arevent.wait()
 
     async def run(self):
-        # pylint: disable=too-many-return-statements
-
         if board.DEBUG > 0:
             print('Button {} updown {} changed to {}'.format(self.portid, self.value(), self.state))
 
@@ -65,12 +64,22 @@ class Button(irqio.IRQIO):
             self.released()
         return True
 
+    def set_pwm(self, pwm):
+        """Connect a PWM to this button"""
+        if self.pwm is not None:
+            self.pwm.set_button(None) # disconnect previous
+        self.pwm = pwm
+        pwm.set_button(self)
+
     def send_telemetry(self):
         self.set_changed_status(0)
 
     def update_payload(self):
         self.set_changed_status(1)
         self.msg.payload[3] = self.state
+
+    def set_state(self, on_or_off):
+        self.state = 1 if on_or_off else 0
 
     def is_on(self):
         return self.state != 0
@@ -112,13 +121,33 @@ class Button(irqio.IRQIO):
         if board.DEBUG:
             print('Botton released {}'.format(self))
 
+    def toggle(self):
+        """Press button, toggle state. If a PWM is connected the state will be determined from the PWM"""
+        if self.pwm is None:
+            self.pressed()
+            return
+        if self.pwm.toggle():
+            self.state = 1
+        else:
+            self.state = 0
+        self.update_payload_and_send_message()
+
+    def on(self):
+        """Press button, afterwards state is on"""
+        self.state = 0
+        self.pressed()
+
+    def off(self):
+        """Press button, afterwards state is off"""
+        self.state = 1
+        self.pressed()
+
 
 class ARButton(Button):
     """Button with auto-repeat"""
     def __init__(self, portid, pinid, inverted=False):
         # note that we swap inverted here: buttons are usually inputs pulled to low
-        super().__init__(portid, pinid, inverted=0 if inverted else 1)
-        self._makemessage(canid.BUTTON_PRESSED)
+        super().__init__(portid, pinid, inverted)
 
         self.debounce_ms = 20
         self.pwm = None

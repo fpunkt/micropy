@@ -313,9 +313,10 @@ def _debug_on_off(m):
 
 def _button_press(m):
     b = button.find(m)
-    if b is None:
-        return
-    b.pressed()
+    if b:
+        p = m.payload[2] if len(m.payload) > 2 else 2
+        if p == 0:
+            b.pressed()
 
 register(canconf.WLAN_CONNECT, 1, 2, lambda m: _connect_to_wlan(m))
 register(canconf.WLAN_HOTSPOT, 1, 1, lambda _: send_wlan_connected(net.start_hotspot()))
@@ -330,7 +331,7 @@ register(canconf.SEND_FREEMEM, 1, 1, lambda _: _send_memstat())
 register(canconf.ENABLE_WATCHDOG, 1, 1, lambda _: board.WD.enable())
 register(canconf.SEND_INFO, 1, 2, sendconfig)
 register(canconf.DEBUG_ON_OFF, 1, 2, _debug_on_off)
-register(canconf.EMULATE_BUTTON_PRESSED, 2, 2, _button_press)
+register(canconf.EMULATE_BUTTON_PRESSED, 2, 3, _button_press)
 
 
 _callback = None
@@ -353,7 +354,12 @@ def dispatch_incomming_message():
     # check for installed handler for that message
     payload = static_incomming_message.payload
     # print('# Dispatching {:03x} for board {:03x}'.format(static_incomming_message.canid, board.CANID))
-    if board.CANID == static_incomming_message.canid and len(payload) > 0:
+    if board.CANID != static_incomming_message.canid:
+        if board.DEBUG:
+            print('Got Message for id {:03x} - check filter'.format(static_incomming_message.canid))
+            return
+
+    if len(payload) > 0:
         handler = _handlers.get(payload[0], None)
         if handler is not None:
             minargs, maxargs, callback = handler

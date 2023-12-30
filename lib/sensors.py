@@ -73,6 +73,10 @@ class Sensorxxx(port.Port):
 
 
 class Sensor(port.Port):
+    """Sensor is the baseclass for devices that need regular polling. You should overload functions
+    aysnc poll: start a measurement, return when update_payload will do something usefule
+    update_payload() patch self.msg so it can be send
+    """
     def __init__(self, portid, pin, poll_intervall_in_ms) -> None:
         super().__init__(portid, pin)
         if poll_intervall_in_ms is None or poll_intervall_in_ms == 0:
@@ -81,7 +85,6 @@ class Sensor(port.Port):
         self.poll_intervall_in_ms = poll_intervall_in_ms
         # TODO: do we really need fast? Go and write your own async() if needed.
         self.is_fast = False # can interrupt PWM dimming
-        self.arun = None
         board.BACKGROUND_RUNNERS.append(self.sensor_task())
 
     def __repr__(self) -> str:
@@ -98,7 +101,9 @@ class Sensor(port.Port):
             self._mqtt_state_topic = s + 'state'
             fsmqtt.publish(s + "status", "ON")
 
-    def run(self): # pylint: disable=no-self-use
+    async def poll(self): # pylint: disable=no-self-use
+        """This function is called periodically. It should prepare a measurement and return
+        when a call to self.update_payload() will do something useful."""
         return None
 
     def read_error(self):
@@ -116,11 +121,7 @@ class Sensor(port.Port):
                 continue
             else:
                 try:
-                    if self.arun != None:
-                        # asyncio.run(self.arun())
-                        await self.arun()
-                    else:
-                        self.run()
+                    await self.poll()
                     self.update_payload()
                     self.send_message()
                 except Exception as e:
@@ -128,10 +129,10 @@ class Sensor(port.Port):
                         print('Exception from {}: {}'.format(self, e))
                         sys.print_exception(e)
 
-            if board.DEBUG:
+            if board.DEBUG > 2:
                 print('sensor {} going to sleep for {} ms'.format(self, self.poll_intervall_in_ms))
             await asyncio.sleep_ms(self.poll_intervall_in_ms)
-            if board.DEBUG:
+            if board.DEBUG > 2:
                 print('sensor {} woke up after {} ms'.format(self, self.poll_intervall_in_ms))
 
 
@@ -159,20 +160,6 @@ class _DHT(Sensor):
         raise NotImplemented
 
     def update_payload(self):
-        raise NotImplemented
-        # decode ourself to avoid malloc
-        h = self.dht.buf[0] << 8 | self.dht.buf[1]
-        t = (self.dht.buf[2] & 0x7F) << 8 | self.dht.buf[3]
-        if self.dht.buf[2] & 0x80:
-            t = -t
-        if board.CAN is not None:
-            payload = self.msg.payload
-            payload[3] = h >> 8
-            payload[4] = h & 0xff
-            payload[5] = t >> 8
-            payload[6] = t & 0xff
-
-    def update_payload(self, h, t):
         if board.CAN is not None:
             t, h = self.decode()
             payload = self.msg.payload
@@ -181,12 +168,9 @@ class _DHT(Sensor):
             payload[5] = t >> 8
             payload[6] = t & 0xff
 
-    def run(self):
-        try:
-            self.dht.measure()
-        except:
-            self.read_error()
-            raise
+    async def poll(self):
+        self.dht.measure()
+        return True
 
 
 class DHT(_DHT):
@@ -241,7 +225,7 @@ class AnalogBrightness(Sensor):
             self.last_read_pwm_off = self.last_read
         return self.last_read
 
-    def run(self):
+    async def poll(self):
         self.read()
         if board.CAN is not None:
             payload = self.msg.payload
