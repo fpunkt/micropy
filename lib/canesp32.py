@@ -25,7 +25,6 @@ def init(self, rx=33, tx=32, baudrate=125, mode=machine.CAN.NORMAL):
     # machine.CAN(0, mode=machine.CAN.NORMAL, baudrate=125, rx_io=33, tx_io=32, rx_queue=10, tx_queue=8)
     global _hw_interface
     _hw_interface = machine.CAN(0, mode=mode, baudrate=baudrate, rx_io=rx, tx_io=tx, rx_queue=10, tx_queue=8)
-    cancommon.send_poweron()
 
 def _send_without_reset(cid, payload):
     """Send packet"""
@@ -86,7 +85,7 @@ _static_message = [0, 0, 0, memoryview(bytearray(8))]
 async def _poll_CAN():
     # CAN initialized ?
     while _hw_interface is None:
-        await asyncio.sleep_ms(5000)
+        await asyncio.sleep_ms(1000)
 
     mcount = 0
 
