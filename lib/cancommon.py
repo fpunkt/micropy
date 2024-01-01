@@ -357,7 +357,7 @@ def dispatch_incomming_message():
     if board.CANID != static_incomming_message.canid:
         if board.DEBUG:
             print('Got Message for id {:03x} - check filter'.format(static_incomming_message.canid))
-            return
+        return
 
     if len(payload) > 0:
         handler = _handlers.get(payload[0], None)
