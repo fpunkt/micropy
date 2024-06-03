@@ -61,23 +61,29 @@ dimstep_scale = 7
 # pwm_freq = 100
 pwm_freq = 200
 
+_nbit_pwm = const(10)
+_max_raw_value = const((1 << _nbit_pwm)-1)
+
 def i16_to_raw(v):
-    vv = v >> 6
+    vv = v >> (16-_nbit_pwm)
     if vv == 0 and v > 0:
         return 1
     return vv
 
 def valid(i):
-    """Return value in range 0..1023"""
-    return min(1023, max(i, 0))
+    """Return value in range 0..1023, accepts raw integers (0..1023) or floating point numbers 0.0 .. 1.0"""
+    if isinstance(i, float):
+        return int(i*_max_raw_value)
+    return min(_max_raw_value, max(i, 0))
 
 class PWM(port.Port):
     """TODO: fix docstring? Wrapper for system PWM, using numbers from 0..1 and provide dimming"""
-    def __init__(self, portid, pinid):
+    def __init__(self, portid, pinid, lastintensity=100):
         super().__init__(portid, pinid)
-        self.lastintensity = 100
+        self.lastintensity = lastintensity
         self.button = None
         self.pwm = None
+        self.toggle_prefer_off = False
         if pinid is not None:
             self.pwm = machine.PWM(machine.Pin(pinid), duty=0, freq=pwm_freq)
         if board.PWMs is not None:
@@ -89,7 +95,6 @@ class PWM(port.Port):
         self.seti_no_can_message(0) # power off
         self.dimtovalue = 0
         self.mqttstate = None # cache to avoid gc
-        self.toggle_prefer_off = False
 
         # allocate message once to avoid garbage collection
         self.msg = can.Message(canid.PWM_VALUE, [0, 0, 0, 0, 0, 0, 0])
@@ -100,6 +105,7 @@ class PWM(port.Port):
 
     def set_button(self, button):
         if self.button is not None:
+            # unregister with previously set button
             self.button.set_pwm(None)
         self.button = button
 
@@ -143,6 +149,20 @@ class PWM(port.Port):
         """minimum value currently set (actually useful for lists, to see whether all lights are on)"""
         return self.current_value()
 
+    def is_on(self):
+        """Return if PWM is considered ON.
+        May behave differently for Lists and Scence (e.g. one vs all are on)"""
+        maxi = self.maxi()
+        mini = self.mini()
+        if board.DEBUG:
+            print('{} is_on maxi={}, mini={}, toggle_prefer_off={}'.format(self, maxi, mini, self.toggle_prefer_off))
+        if maxi == 0:
+            return False
+        if mini > 0:
+            return True
+        # some are on, some are off
+        return self.toggle_prefer_off
+
     def one_is_on(self) -> bool:
         """Return True if at least one light is on"""
         return self.maxi() > 0
@@ -154,7 +174,6 @@ class PWM(port.Port):
     def all_are_off(self) -> bool:
         """Return True if all lights are off"""
         return self.mini() == 0
-
 
     def seti(self, ival):
         """Set raw integer duty from 0 .. 1023 and send status to CAN"""
@@ -250,11 +269,14 @@ class PWM(port.Port):
         or to switch all on if at least one was on.
         The function returns True when (at least) one light is on after calling toggle, False otherwise.
         """
-        if self.maxi() > 0 and self.mini() == 0 and self.toggle_prefer_off:
+        t = self.is_on()
+        if board.DEBUG:
+            print('PWM {} is_on: {}'.format(self, t))
+        if t:
             self.off()
-            return False
-        self.on()
-        return True
+        else:
+            self.on()
+        return not t
 
     def mqtt_callback(self, _, msg):
         try:
@@ -289,7 +311,7 @@ class PWM(port.Port):
 
 
 class List(PWM):
-    def __init__(self, pwmid, *args):
+    def __init__(self, pwmid, *args) -> None:
         self.pwms = list(args) # need to initialize here in case __repr__() is called
         super().__init__(pwmid, None)
         self.toggle_mode = 0
@@ -384,6 +406,97 @@ class List(PWM):
         for p in self.pwms:
             p.mqtt_callback(topic, msg)
 
+class SceneEntry:
+    def __init__(self, pwm, rawvalue):
+        self.pwm = pwm
+        self.rawvalue =  rawvalue
+
+class Scene(PWM):
+    """A scene is a collection of PWMs that will be set to predefined levels.
+    A scene itself can be on or off"""
+    def __init__(self, portid, *values) -> None:
+        super().__init__(portid, None)
+        self.dimtovalue = NODIMMING
+        self.entries = dict()
+        self.define_values(*values)
+
+    def on(self):
+        """turn scene on"""
+        for e in self.entries.values():
+            e.pwm.dimi(e.rawvalue)
+
+    def off(self):
+        """turn scene off"""
+        for e in self.entries.values():
+            e.pwm.dimi(0)
+
+    def is_on(self) -> bool:
+        """Return true when each PWM matches its predefined value"""
+        allzero = True
+        for p in self.entries.values():
+            d = p.pwm.pwm.duty()
+            if allzero and d == 0:
+                continue
+            if p.rawvalue != d:
+                return self.toggle_prefer_off
+            allzero = False
+        return not allzero
+
+    def toggle(self):
+        """Toggle Scene, return True when light is on after toggle"""
+        state = self.is_on()
+        if board.DEBUG:
+            print('PWM toggle, old state is {} {}'.format(self, state))
+        if state:
+            self.off()
+        else:
+            self.on()
+        return not state
+
+    def dimi(self, value):
+        if value > 0:
+            self.on()
+        else:
+            self.off()
+
+    def seti(self, value):
+        self.dimi(value)
+
+    def current_value(self):
+        return self.maxi()
+
+    def maxi(self):
+        return max([p.pwm.current_value() for p in self.entries.values()])
+
+    def mini(self):
+        """Get min intensity, ignore LEDs that are switched off in this scene"""
+        mini = 0xffff
+        for p in self.entries.values():
+            if p.rawvalue > 0:
+                mini = min(mini, p.pwm.current_value())
+        return mini
+
+    def define_value(self, pwm, value):
+        """Define the scene-on-value for given PWM. Use None or -1 to remove the PWM from this scene.
+        pwm can be a PWM or a port-id"""
+        pid = pwm.portid
+        if value is None or value < 0:
+            # do not use the PWM in this scene
+            del self.entries[pid]
+            return
+        self.entries[pid] = SceneEntry(pwm, valid(value))
+
+    def define_values(self, *values):
+        for v in values:
+            if isinstance(v, SceneEntry):
+                self.define_value(v.pwm, v.value)
+            else:
+                try:
+                    p, val = v
+                    self.define_value(p, val)
+                except:
+                    raise
+
 
 
 board.PWMs = List(0xff) # Create a (dynamic) list that includes ALL PWMs
@@ -460,10 +573,10 @@ async def _next_dim_step_task():
             await asyncio.sleep_ms(dimdelay_when_dimming)
         else:
             start_dimming.clear()
-            if board.DEBUG > 0:
+            if board.DEBUG > 2:
                 print('stopped dimming, waiting for start_dimming event()')
             await start_dimming.wait()
-            if board.DEBUG > 1:
+            if board.DEBUG > 3:
                 print('return from start_dimming waiter')
 
 
@@ -512,3 +625,4 @@ can.register(pwmcode.SET_INTENSITY_NATIVE, 4, 4, lambda msg: _getpwm(msg).dimi(m
 can.register(pwmcode.ON, 2, 2, lambda msg: _getpwm(msg).on())
 can.register(pwmcode.OFF, 2, 2, lambda msg: _getpwm(msg).off())
 can.register(pwmcode.TOGGLE, 2, 2, lambda msg: _getpwm(msg).toggle())
+
