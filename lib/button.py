@@ -48,7 +48,7 @@ class Button(irqio.IRQIO):
             await self._arevent.wait()
 
     async def run(self):
-        if board.DEBUG > 0:
+        if board.DEBUG > 2:
             print('Button {} updown {} changed to {}'.format(self.portid, self.value(), self.state))
 
         if self.debounce_ms > 0:
@@ -78,59 +78,33 @@ class Button(irqio.IRQIO):
         self.set_changed_status(1)
         self.msg.payload[3] = self.state
 
-    def set_state(self, on_or_off):
-        self.state = 1 if on_or_off else 0
-
-    def is_on(self):
+    def is_on(self) -> bool:
         return self.state != 0
-
-    def is_off(self):
-        return self.state == 0
-
-    def toggle_state(self):
-        """Toggle button status, update connected PWM, send status to CAN"""
-        self.set_state(1-self.state)
-
-    def set_state(self, on_or_off):
-        """Set button status, update connected PWM, send status to CAN"""
-        self.state = 1 if on_or_off else 0
-        if self.callback:
-            try:
-                self.callback(self)
-            except Exception as e:
-                print('{} callback raised error'.format(self))
-                sys.print_exception(e)
-                # don't update CAN message and PWM stuff
-                # You could use this as behaviour of some special button action:
-                #  simply raise an error if you want to stop the normal button handling
-                return
-        self.update_payload_and_send_message()
-        if self.pwm is not None:
-            if self.is_on():
-                self.pwm.on()
-            else:
-                self.pwm.off()
 
     def pressed(self):
         """Called when button is pushed down"""
-        if board.DEBUG:
+        if board.DEBUG > 1:
             print('Botton pressed {}'.format(self))
-        self.toggle_state()
+        self.toggle()
 
     def released(self):
-        if board.DEBUG:
+        if board.DEBUG > 1:
             print('Botton released {}'.format(self))
 
-    def toggle(self):
+    def toggle(self) -> bool:
         """Press button, toggle state. If a PWM is connected the state will be determined from the PWM"""
+        if board.DEBUG:
+            print('Botton toggle {}'.format(self))
         if self.pwm is None:
-            self.pressed()
-            return
-        if self.pwm.toggle():
+            self.state = 1-self.state
+        elif self.pwm.toggle():
             self.state = 1
         else:
             self.state = 0
         self.update_payload_and_send_message()
+        if board.DEBUG:
+            print('{} new state after toggle is {}'.format(self, self.state))
+        return self.state != 0
 
     def on(self):
         """Press button, afterwards state is on"""
