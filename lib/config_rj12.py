@@ -63,6 +63,6 @@ if board.CANID is not None:
     can.init(board.CANID, rx=35, tx=32)
     board.CAN = can
     board.CAN.simplefilter(board.CANID)
-    if board.DEBUG:
+    if board.DEBUG > 2:
         print('bconf(rj12): can initialized for {:03x}, input filter set'.format(board.CANID))
     can.cancommon.send_poweron()

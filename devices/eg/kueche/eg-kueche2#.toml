@@ -1,0 +1,92 @@
+device = "eg.kueche.fridge"
+canid = 0x350
+room = "Küche"
+
+#[led.arbeitsplattewarm]
+#name = "Abzugshaube (kalt)"
+##name = "Arbeitsplatte (warm)"
+#port = 3 # 0
+
+#[led.window]
+[[port]]
+id = "worktopcold"
+type = "led"
+name = "Arbeitsplatte (kalt)"
+port = 1
+
+[[port]]
+id = "hoodwarm"
+type = "led"
+name = "Abzugshaube (warm)"
+port = 2
+
+#[led.hoodcold]
+[[port]]
+id = "hoodcold"
+type = "led"
+name = "Abzugshaube (kalt)"
+port = 3
+
+#[led.arbeitsplattecold]
+[[port]]
+id = "coffee"
+type = "led"
+name = "Kaffeemühle"
+port = 4
+
+[[port]]
+id = "worktopwarm"
+type = "led"
+name = "Arbeitsplatte (warm)"
+port = 5
+
+[[port]]
+id = "corner"
+type = "led"
+name = "Eckschrank"
+port = 6
+
+[[port]]
+id = "sink"
+type = "led"
+name = "Spüle"
+port = 7
+
+[[port]]
+id = "NC"
+type = "led"
+name = "not connected"
+port = 8
+
+[[port]]
+id = "right"
+type = "button"
+port = 0x10
+
+[[port]]
+id = "center"
+type = "button"
+port = 0x11
+
+[[port]]
+id = "left"
+type = "button"
+port = 0x12
+
+[[port]]
+id = "kueche"
+type = "am2302"
+port = 0x30
+name = "Küche"
+
+[[port]]
+id = "fridge"
+type = "motionsensor"
+name = "Durchgang"
+port = 0x20
+
+[[port]]
+id = "corner"
+type = "motionsensor"
+name = "Ecke"
+port = 0x21

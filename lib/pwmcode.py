@@ -21,7 +21,7 @@ SET_INTENSITY16                                    =    26 # 0x001a
 
 # PWM information and configuration command.
 # Sends a pwm_power_config packet if no argument is provided, otherwise a pwm_info_packet
-#   Arg # 0: [portid/8] - if missing return pwm_power_config: #ports and #ports with power > 0
+#   Arg # 0: [portid/8] - if missing return pwm_power_EXPORT: #ports and #ports with power > 0
 #   Arg # 1: command/8 - 1: portconfig, return resolution and current value for port
 #   Arg # 2: /8 - 2: configure PWM ---
 CONFIG                                             =    27 # 0x001b

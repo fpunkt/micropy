@@ -1,8 +1,9 @@
-"""CONFIG:
+"""EXPORT:
 
 device: eg.flur.roof
 room: Flur EG
 location: eg-flur
+zone: EG
 ESPIP: 192.168.178.164
 
 
@@ -79,7 +80,7 @@ i2c = i2cdevice.init(sda=bconf.RJ12_CENTER_4_GREEN_ML10_7, scl=bconf.RJ12_CENTER
 
 try:
     b2 = bh1750.BH1750(0x31)
-    """CONFIG:
+    """EXPORT:
     name: Lichtsensor
     """
 except:
@@ -87,7 +88,7 @@ except:
 
 try:
     tath = aht.AHT20(0x32, poll_intervall_in_ms=_pollrate_ms)
-    """CONFIG:
+    """EXPORT:
     name: Temperatur
     """
 except:
@@ -99,21 +100,21 @@ except:
 
 # Mitten auf dem Schrank mit I2C devices
 m1 = motionsensor.Motionsensor(0x10, bconf.RJ12_CENTER_1_WHITE, pullup=True)
-"""CONFIG:
+"""EXPORT:
 name: Schrank
-shortid: schrank
+id: schrank
 """
 
 
 # Richtung Treppe und WZ Tür
 
 stairs = motionsensor.Motionsensor(0x11, bconf.RJ12_EDGE_6_BLUE)
-"""CONFIG:
+"""EXPORT:
 name: Treppe
 """
 
 doorwz = motionsensor.Motionsensor(0x12, bconf.RJ12_EDGE_5_YELLOW)
-"""CONFIG:
+"""EXPORT:
 name: WZ Tür
 """
 
@@ -121,44 +122,44 @@ name: WZ Tür
 
 # Haustür
 m4 = motionsensor.Motionsensor(0x13, bconf.AUX2_WHITE)
-"""CONFIG:
+"""EXPORT:
 name: Tür
-shortid: door
+id: door
 """
 
 ding = doorbellsensor.DoorbellSensor(0x20, bconf.AUX1_YELLOW)
-"""CONFIG:
+"""EXPORT:
 name: Türklingel
 """
 
 lightoverwrite = lightswitchoverwrite.LightswitchOverwrite(0x21, bconf.AUX1_WHITE)
-"""CONFIG:
+"""EXPORT:
 name: Lichtschalter
 """
 
 
 p1 = pwm.PWM(1, bconf.ML10_PWM_1)
-"""CONFIG:
+"""EXPORT:
 name: Spot Treppe
 """
 
 p2 = pwm.PWM(2, bconf.ML10_PWM_2)
-"""CONFIG:
+"""EXPORT:
 name: Spot WZ Tür
 """
 
 p3 = pwm.PWM(3, bconf.ML10_PWM_3)
-"""CONFIG:
+"""EXPORT:
 name: Spot Mitte (WZ)
 """
 
 p4 = pwm.PWM(4, bconf.ML10_PWM_4)
-"""CONFIG:
+"""EXPORT:
 name: Spot Mitte (Tür)
 """
 
 p5 = pwm.PWM(5, bconf.ML10_PWM_5)
-"""CONFIG:
+"""EXPORT:
 name: Spot Tür
 """
 
@@ -208,14 +209,15 @@ class xPWM(pwm.PWM):
         super().dimi16(v)
 
 p7 = xPWM(7, bconf.ML10_PWM_7)
-"""CONFIG:
+"""EXPORT:
 IGNORE: true
 name: 9V spot not connected
 """
 
 p8 = xPWM(8, bconf.ML10_PWM_8)
-"""CONFIG:
+"""EXPORT:
 name: Kleiner Spot Treppe
+class: pwm.PWM
 """
 
 async def send_pwm_status():

@@ -14,74 +14,50 @@ room = "Wohnzimmer"
 # name = "Decke (Fenster)"
 # port = 3
 
-[[port]]
-id = "spottv"
-type = "led"
+[led.spottv]
 name = "Spot TV"
 port = 1
 
-[[port]]
-id = "spotwz"
-type = "led"
+[led.spotwz]
 name = "Spot WZ"
 port = 2
 
-[[port]]
-id = "spotcenter"
-type = "led"
+[led.spotcenter]
 name = "Spot Center"
 port = 3
 
-[[port]]
-id = "spotwand"
-type = "led"
+[led.spotwand]
 name = "Spot Wand"
 port = 4
 
-[[port]]
-id = "spotfenster"
-type = "led"
+[led.spotfenster]
 name = "Spot Fenster"
 port = 5
 
-[[port]]
-id = "xmas"
-type = "led"
+[led.xmas]
 name = "Weihnachtsstern"
 port = 6 # 5
 
-[[port]]
-id = "spare"
-type = "led"
+[led.spare]
 name = "Spare"
 port = 7 # 6
 
-[[port]]
-id = "tvlight"
-type = "led"
+[led.tvlight]
 name = "Fernsehlampe"
 port = 8 # 4
 
-[[port]]
-id = "candle"
-type = "led"
+[led.candle]
 name = "1900 K LED Streifen"
 port = 10 # 7
 
-[[port]]
-id = "entrance"
-type = "led"
+[led.entrance]
 name = "Wohnzimmertür (2400 K)"
 port = 11 # 8
 
 
-[[port]]
-id = "left"
-type = "button"
+[button.left]
 port = 0x21
 
-[[port]]
-id = "right"
-type = "button"
+[button.right]
 port = 0x20
 

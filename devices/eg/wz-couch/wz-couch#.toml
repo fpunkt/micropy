@@ -1,49 +1,35 @@
 device = "eg.wz.couch"
 canid = 0x368
 
-[[port]]
-id = "wandleuchte"
-type = "led"
+[led.wandleuchte]
 name = "Wandleuchte"
 port = 1
 # default = 50
 
-[[port]]
-id = "redlight"
-type = "led"
+[led.redlight]
 name = "Rote Lampe"
 port = 2
 # default = 50
 
-[[port]]
-id = "xmaslight"
-type = "led"
+[led.xmaslight]
 name = "Weihnachtslichterkette Fensterbank"
 port = 3
 # default = 30
 
-[[port]]
-id = "vitrine"
-type = "led"
+[led.vitrine]
 name = "Vitrine"
 port = 5
 
-[[port]]
-id = "readinglight"
-type = "led"
+[led.readinglight]
 name = "Leselampe"
 port = 4
 
 # TODO: implement switch
-[[port]]
-id = "xmasdcdc"
-type = "light"
+[light.xmasdcdc]
 name = "DC/DC for Xmastree"
 port = 6
 
-[[port]]
-id = "xmastree"
-type = "led"
+[led.xmastree]
 name = "Weihnachtsbaum"
 port = 7
 
@@ -51,18 +37,12 @@ port = 7
 # name = "Not connected (no FET)"
 # port = 8
 
-[[port]]
-id = "b1"
-type = "button"
+[button.b1]
 port = 0x0a
 
-[[port]]
-id = "b2"
-type = "button"
+[button.b2]
 port = 0x0b
 
-[[port]]
-id = "couch"
-type = "am2302"
+[am2302.couch]
 name = "Unter der Couch"
 port = 0x14

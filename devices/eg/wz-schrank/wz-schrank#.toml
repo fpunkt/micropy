@@ -2,23 +2,17 @@ device = "eg.wz.schrank"
 canid = 0x338
 # canid = 0x10
 
-[[port]]
-id = "wand"
-type = "led"
+[led.wand]
 name = "Lampe Schrank"
 port = 1
 # default = 50
 
-[[port]]
-id = "salzlampe"
-type = "led"
+[led.salzlampe]
 name = "Salzlampe"
 port = 2
 # default = 50
 
-[[port]]
-id = "lichterkette"
-type = "led"
+[led.lichterkette]
 name = "Lichterkette Schrank"
 port = 3
 # default = 30
@@ -27,35 +21,33 @@ port = 3
 # name = "Spare"
 # port = 4
 
-[[port]]
-id = "rgb"
-type = "rgb"
+[rgb.rgb]
 name = "Farbige Lichterkette"
 port = 9
 
 # 2 * motionsensor
 
-[[port]]
-id = "dirdoor"
-type = "motionsensor"
+[motionsensor.dirdoor]
 name = "Schrank Tür"
 port = 0x10
 
-[[port]]
-id = "diressz"
-type = "motionsensor"
+[motionsensor.diressz]
 name = "Schrank Esszimmer"
 port = 0x11
 
 
-[[port]]
-id = "schrank"
-type = "am2302"
+[am2302.schrank]
 name = "Wohnzimmerschrank"
 port = 0x20
 
-[[port]]
-id = "dingdong"
-type = "trigger"
+[trigger.dingdong]
 name = "DingDong Klingel"
 port = 0x30
+
+
+[dependencies]
+libfiles = ["board.py", "boot.py", "button.py", "can.py", "cancodes.py", "cancommon.py",
+    "canconf.py", "canerror.py", "canesp32.py", "canid.py", "caninfo.py", "irqio.py",
+    "motionsensor.py", "net.py", "pwm.py", "pwmcode.py", "sensors.py",
+    "rgb.py", "digiio.py"
+]
