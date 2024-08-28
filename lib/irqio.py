@@ -108,9 +108,9 @@ class IRQIO(port.Port):
                 self.pinvalue = self.value()
                 await self.run()
             except Exception as e:
-                print('Raised error in irqio.run(), disabling: {}'.format(e))
-                sys.print_exception(e)
-                self.send_disabled_error()
+                if board.DEBUG:
+                    print('Raised error in irqio.run(), disabling: {}'.format(e))
+                self.send_exception_during_run_error(e)
                 await asyncio.sleep(10)
 
     def _irq_handler(self, _):
