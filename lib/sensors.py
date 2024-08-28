@@ -109,8 +109,9 @@ class Sensor(port.Port):
     def read_error(self):
         can.cancommon.errormessage([canerror.SENSOR_READ_ERROR, self.portid])
 
-    def disabled_error(self):
-        can.errormessage([canerror.SENSOR_DISABLED, self.portid])
+    # use port.send_disabled_error
+    # def disabled_error(self):
+    #     can.errormessage([canerror.SENSOR_DISABLED, self.portid])
 
     async def sensor_task(self):
         self.proclaim()
