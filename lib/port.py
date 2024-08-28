@@ -2,7 +2,6 @@
 Ports - base class for all sensors, PWMs, buttons, etc.
 """
 
-
 import board
 
 class Port:
@@ -28,6 +27,14 @@ class Port:
         print('Disabled: {}'.format(self))
         if board.CAN is not None:
             board.CAN.cancommon.errormessage([board.CAN.canerror.SENSOR_DISABLED, self.portid])
+
+    def send_exception_during_run_error(self, e):
+        """Call this when an exception occured during the run method"""
+        if board.DEBUG:
+            print('Exception from {}: {}'.format(self, e))
+            # sys.print_exception(e)
+        if board.CAN is not None:
+            board.CAN.cancommon.errormessage([board.CAN.canerror.SENSOR_EXCEPTION_DURING_RUN, self.portid])
 
     def update_payload(self):
         """Set all payload bytes, overload this."""
