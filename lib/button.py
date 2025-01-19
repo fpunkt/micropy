@@ -71,9 +71,6 @@ class Button(irqio.IRQIO):
         self.pwm = pwm
         pwm.set_button(self)
 
-    def send_telemetry(self):
-        self.set_changed_status(0)
-
     def update_payload(self):
         self.set_changed_status(1)
         self.msg.payload[3] = self.state
