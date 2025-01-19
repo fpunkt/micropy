@@ -30,5 +30,7 @@ class DoorbellSensor(irqio.IRQIO):
         self.last_run_at = t
         self.update_payload()
         self.send_message()
+        print('DoorbellSensor.run() sent message {}'.format(self.msg))
+        self.set_changed_status(0)
         return True
 
