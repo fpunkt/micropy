@@ -24,21 +24,18 @@ import bh1750fllrth
 # Abstellraum, Keller, Hobbyr	100 bis 300
 
 
-class BH1750(sensors.Sensorxxx):
+class BH1750(sensors.Sensor):
     def __init__(self, portid, address=0x23, poll_intervall_in_ms=None):
         self.bh1750 = bh1750fllrth.BH1750(address, board.I2C)
-        super().__init__('BH1750', portid, board.I2C_SDA_PIN, poll_intervall_in_ms)
+        super().__init__(portid, board.I2C_SDA_PIN, poll_intervall_in_ms)
         self.msg = can.makemessage(canid.DATALOGGER_BRIGHTNESS_SENSOR_8, 6)
         self.msg.setsender(self.portid)
 
-    def run(self):
+    def update_payload(self):
         x = self.bh1750.measurement
-        # print('BH1750: {:.2f} lux'.format(x))
         if board.CAN is not None:
             i = int(x)
             payload = self.msg.payload
             payload[3] = 1 # send as LUX
             payload[4] = i >> 8
             payload[5] = i & 0xff
-            self.msg.send()
-

@@ -68,16 +68,19 @@ class WDT:
 board.WD = WDT()
 board.BACKGROUND_RUNNERS.append(board.WD.watchdog_task())
 
-class Sensorxxx(port.Port):
+class Sensorxxxxx(port.Port):
     pass
 
+# TODO: remove Sensorxxx
+
+# TODO: background_task is not used? At least not tested. Remove it?
 
 class Sensor(port.Port):
     """Sensor is the baseclass for devices that need regular polling. You should overload functions
-    aysnc poll: start a measurement, return when update_payload will do something usefule
+    aysnc poll: start a measurement, return when update_payload will do something useful
     update_payload() patch self.msg so it can be send
     """
-    def __init__(self, portid, pin, poll_intervall_in_ms) -> None:
+    def __init__(self, portid, pin, poll_intervall_in_ms, background_task=None) -> None:
         super().__init__(portid, pin)
         if poll_intervall_in_ms is None or poll_intervall_in_ms == 0:
             poll_intervall_in_ms = poll_5_minutes
@@ -85,7 +88,9 @@ class Sensor(port.Port):
         self.poll_intervall_in_ms = poll_intervall_in_ms
         # TODO: do we really need fast? Go and write your own async() if needed.
         self.is_fast = False # can interrupt PWM dimming
-        board.BACKGROUND_RUNNERS.append(self.sensor_task())
+        if background_task is None:
+            background_task = self.sensor_task
+        board.BACKGROUND_RUNNERS.append(background_task())
 
     def __repr__(self) -> str:
         return self._repr('poll_intervall: {} ms'.format(self.poll_intervall_in_ms))
@@ -129,6 +134,7 @@ class Sensor(port.Port):
                     if board.DEBUG:
                         print('Exception from {}: {}'.format(self, e))
                         sys.print_exception(e)
+                    await asyncio.sleep_ms(1000)
 
             if board.DEBUG > 2:
                 print('sensor {} going to sleep for {} ms'.format(self, self.poll_intervall_in_ms))
