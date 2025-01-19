@@ -13,3 +13,5 @@ lup.py
 firmware/bbb/
 .build
 Attic
+.DS_Store
+.vscode/settings.json
