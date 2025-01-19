@@ -86,20 +86,20 @@ i2c = i2cdevice.init(sda=bconf.RJ12_CENTER_4_GREEN_ML10_7, scl=bconf.RJ12_CENTER
 #brightness = tsl2561.TSL2561(0x30, poll_intervall_in_ms=2000)
 
 try:
+    # CONFIG: name = "Lichtsensor"
     b2 = bh1750.BH1750(0x31)
     """EXPORT:
     name: Lichtsensor
     """
-    # CONFIG: name = "Lichtsensor"
 except:
     can.cancommon.errormessage([canerror.SENSOR_DISABLED, 0x31])
 
 try:
+    # CONFIG: name = "Temperatur"
     tath = aht.AHT20(0x32, poll_intervall_in_ms=_pollrate_ms)
     """EXPORT:
     name: Temperatur
     """
-    # CONFIG: name = "Temperatur"
 except:
     can.cancommon.errormessage([canerror.SENSOR_DISABLED, 0x32])
 
@@ -108,6 +108,8 @@ except:
 ##### under the roof connection - connected via RJ12 to terminal block
 
 # Mitten auf dem Schrank mit I2C devices
+# CONFIG: name = "Schrank"
+# CONFIG: id = "schrank"
 m1 = motionsensor.Motionsensor(0x10, bconf.RJ12_CENTER_1_WHITE_ML10_6, pullup=True)
 """EXPORT:
 name: Schrank
@@ -188,14 +190,13 @@ DCDCON_Value = const(1023)
 class xPWM(pwm.PWM):
     """Enable DC/DC converter if one of these PWM is in use"""
     def _dbg(self, name, val):
-        if False:
-            if board.DEBUG:
-                print('PWM #{}: {} to {}'.format(self.portid, name, val))
+        if board.DEBUG > 2:
+            print('egflur: PWM #{}: {} to {}'.format(self.portid, name, val))
 
     def _dcdcon(self, v):
         if v > 0:
-            if board.DEBUG:
-                print(' # ** switching DCDC on')
+            if board.DEBUG > 2:
+                print('egflur:  ** switching DCDC on')
             p6.seti(DCDCON_Value)
 
     def seti(self, v):
@@ -256,7 +257,8 @@ async def poweroff_dcdc():
         if p7.dimtovalue > 0 or p8.dimtovalue > 0 or p7.pwm.duty() > 0 or p8.pwm.duty() > 0:
             # trust nobody
             newval = DCDCON_Value
-        print('Checking duty {} / {}, newval={}'.format(p7.pwm.duty(), p8.pwm.duty(), newval))
+        if board.DEBUG > 2:
+            print('egflur: checking DCDC duty {} / {}, newval={}'.format(p7.pwm.duty(), p8.pwm.duty(), newval))
         if newval != p6.pwm.duty():
             p6.seti(newval)
 
