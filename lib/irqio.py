@@ -86,13 +86,14 @@ class IRQIO(port.Port):
             print('{} got interrupt {}/{}'.format(self, self.pinvalue, self.value()))
         self.update_payload()
         self.send_message()
+        return True
 
     async def _runner(self):
         while True:
             await self.triggerevent.wait()
             if self.is_disabled:
                 print('port {:02c} is disabled but still receiving events'.format(self.portid))
-                await asyncio.sleep_ms(50)
+                await asyncio.sleep_ms(100)
                 self.triggerevent.clear()
                 continue
 
