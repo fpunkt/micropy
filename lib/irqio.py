@@ -84,8 +84,10 @@ class IRQIO(port.Port):
         You might want to overload this by your for your sensor"""
         if board.DEBUG > 2:
             print('{} got interrupt {}/{}'.format(self, self.pinvalue, self.value()))
+        # TODO: check who is calling send_message() and update_payload() in the background
         self.update_payload()
         self.send_message()
+        self.set_changed_status(0)
         return True
 
     async def _runner(self):
