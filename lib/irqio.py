@@ -82,7 +82,7 @@ class IRQIO(port.Port):
         """This function is run when an interrupt is received. It returns true if something has been
         done, False when the event is ignored for whatever reason.
         You might want to overload this by your for your sensor"""
-        if board.DEBUG > 0:
+        if board.DEBUG > 2:
             print('{} got interrupt {}/{}'.format(self, self.pinvalue, self.value()))
         self.update_payload()
         self.send_message()
@@ -97,7 +97,7 @@ class IRQIO(port.Port):
                 self.triggerevent.clear()
                 continue
 
-            # some basic debounding is already done by the scheduler
+            # some basic debounding is already done by the scheduler because event is set only once
             now = utime.ticks_ms()
             self.last_run_before_ms = utime.ticks_diff(now, self.last_irq)
             self.last_irq = now

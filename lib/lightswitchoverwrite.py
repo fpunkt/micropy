@@ -16,6 +16,7 @@ class LightswitchOverwrite(irqio.IRQIO):
     def __init__(self, portid, pinid, pullup=True, inverted=True):
         super().__init__(portid, pinid, pullup=pullup, inverted=inverted)
         self.msg = can.makemessage(canid.SENSOR_LIGHTSWITCH_OVERRIDE, 5, portid=portid)
+        self.set_changed_status(0)
 
     # run is handled by the parent class irqio.IRQIO
     # async def run(self):

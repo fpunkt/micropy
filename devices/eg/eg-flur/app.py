@@ -36,10 +36,17 @@ ESPIP: 192.168.178.164
 
 """
 
+"""CONFIG:
+path = "eg.flur.roof"
+room = "Flur EG"
+
+
+"""
+
 # Connect using   picocom --baud 115420 /dev/tty.usbserial-0001
 
 import board
-import net
+# import net
 
 board.LOCATION = 'eg-flur'
 board.CANID = 0x344
@@ -53,15 +60,15 @@ if board.DEBUG:
 import bconf
 import can
 import canerror
-import machine
-import sensors
+# import machine
+# import sensors
 import pwm
 import uasyncio as asyncio
 import i2cdevice
-import tsl2561
+# import tsl2561
 import motionsensor
-import irqio
-import canid
+# import irqio
+# import canid
 import bh1750
 import aht
 import lightswitchoverwrite
@@ -83,6 +90,7 @@ try:
     """EXPORT:
     name: Lichtsensor
     """
+    # CONFIG: name = "Lichtsensor"
 except:
     can.cancommon.errormessage([canerror.SENSOR_DISABLED, 0x31])
 
@@ -91,6 +99,7 @@ try:
     """EXPORT:
     name: Temperatur
     """
+    # CONFIG: name = "Temperatur"
 except:
     can.cancommon.errormessage([canerror.SENSOR_DISABLED, 0x32])
 
@@ -99,7 +108,7 @@ except:
 ##### under the roof connection - connected via RJ12 to terminal block
 
 # Mitten auf dem Schrank mit I2C devices
-m1 = motionsensor.Motionsensor(0x10, bconf.RJ12_CENTER_1_WHITE, pullup=True)
+m1 = motionsensor.Motionsensor(0x10, bconf.RJ12_CENTER_1_WHITE_ML10_6, pullup=True)
 """EXPORT:
 name: Schrank
 id: schrank
@@ -121,18 +130,18 @@ name: WZ Tür
 
 
 # Haustür
-m4 = motionsensor.Motionsensor(0x13, bconf.AUX2_WHITE)
+m4 = motionsensor.Motionsensor(0x13, bconf.AUX2_WHITE_ML10_4)
 """EXPORT:
 name: Tür
 id: door
 """
 
-ding = doorbellsensor.DoorbellSensor(0x20, bconf.AUX1_YELLOW)
+ding = doorbellsensor.DoorbellSensor(0x20, bconf.AUX1_YELLOW_ML10_2)
 """EXPORT:
 name: Türklingel
 """
 
-lightoverwrite = lightswitchoverwrite.LightswitchOverwrite(0x21, bconf.AUX1_WHITE)
+lightoverwrite = lightswitchoverwrite.LightswitchOverwrite(0x21, bconf.AUX1_WHITE_ML10_1_CANNOT_WRITE_FLASH)
 """EXPORT:
 name: Lichtschalter
 """
@@ -179,8 +188,9 @@ DCDCON_Value = const(1023)
 class xPWM(pwm.PWM):
     """Enable DC/DC converter if one of these PWM is in use"""
     def _dbg(self, name, val):
-        if board.DEBUG:
-            print('PWM #{}: {} to {}'.format(self.portid, name, val))
+        if False:
+            if board.DEBUG:
+                print('PWM #{}: {} to {}'.format(self.portid, name, val))
 
     def _dcdcon(self, v):
         if v > 0:
@@ -263,55 +273,3 @@ def main():
 # msg = can.Message(0x344, [0x1a, 0x08, 0x7f, 0xff])
 # board.SENSORSs.find(msg, (PWM, List), 0xa0)
 
-
-## Reste vom Trial and Error
-
-# pylint: disable=import-error, wrong-import-order
-# pylint: disable=missing-docstring
-# pylint: disable=unused-import, multiple-statements
-
-
-
-#brightness = tsl2561.TSL2561(0x30, sda=bconf.ML10_3, scl=bconf.ML10_2, poll_intervall_in_ms=2000)
-# THIS ONE WORKS FINE: sda=bconf.ML10_4, scl=bconf.ML10_2,
-#brightness = tsl2561.TSL2561(0x30, sda=bconf.ML10_4, scl=bconf.ML10_2, poll_intervall_in_ms=2000)
-
-
-#dht = sensors.DHT(0x20, bconf.ML10_5, poll_intervall_in_ms=5000 if board.DEBUG else sensors.minutes(5))
-
-#m1 = motionsensor.Motionsensor(0x10, bconf.ML10_6)
-#m2 = motionsensor.Motionsensor(0x11, bconf.ML10_7)
-#m2 = motionsensor.Motionsensor(0x11, bconf.ML10_8_INPUT_ONLY)
-
-
-#
-# OK, however ML10_1 (pin 12) might prevent from flashing
-#t = tsl2561.TSL2561(0x30, sda=bconf.ML10_1, scl=bconf.ML10_2, poll_intervall_in_ms=2000)
-
-
-#t = tsl2561.TSL2561(0x30, sda=bconf.ML10_4, scl=bconf.ML10_2, poll_intervall_in_ms=2000)
-#Read error on TLS2561: [Errno 19] ENODEV
-#t = tsl2561.TSL2561(0x30, sda=bconf.ML10_2, scl=bconf.ML10_3, poll_intervall_in_ms=2000)
-
-# Read error on TLS2561: [Errno 19] ENODEV
-# t = tsl2561.TSL2561(0x30, sda=bconf.ML10_4, scl=bconf.ML10_3, poll_intervall_in_ms=2000)
-# t = tsl2561.TSL2561(0x30, sda=bconf.ML10_3, scl=bconf.ML10_4, poll_intervall_in_ms=2000)
-
-#E ML10_8 (1074903) gpio: io_num=34 can only be input
-#t = tsl2561.TSL2561(0x30, sda=bconf.ML10_7, scl=bconf.ML10_8, poll_intervall_in_ms=2000)
-
-# Sensor Read Error on 0x30
-#t = tsl2561.TSL2561(0x30, sda=bconf.ML10_3, scl=bconf.ML10_4, poll_intervall_in_ms=2000)
-
-# Read error on TLS2561: [Errno 19] ENODEV
-#t = tsl2561.TSL2561(0x30, sda=bconf.ML10_7, scl=bconf.ML10_6, poll_intervall_in_ms=2000)
-
-# GPIO output gpio_num error
-#t = tsl2561.TSL2561(0x30, sda=bconf.ML10_8, scl=bconf.ML10_2, poll_intervall_in_ms=2000)
-
-#t = tsl2561.TSL2561(0x30, sda=bconf.ML10_2, scl=bconf.ML10_8, poll_intervall_in_ms=2000)
-#
-# ML10_4 and 5 are OK for Montionsensor
-#m1 = motionsensor.Motionsensor(0x10, bconf.ML10_2_INPUT_ONLY)
-# m1 = motionsensor.Motionsensor(0x10, bconf.ML10_4)
-# m2 = motionsensor.Motionsensor(0x11, bconf.ML10_5)
