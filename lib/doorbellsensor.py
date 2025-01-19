@@ -18,7 +18,8 @@ class DoorbellSensor(irqio.IRQIO):
         self.msg = can.makemessage(canid.SENSOR_DOORBELL_PUSHED, 5, portid=portid)
         #self.msg = can.makemessage(canid.SENSOR_MOTION, 5, portid=portid)
 
-    async def run(self):
-        self.sendmessage()
-
-        return True
+    # run is handled by the parent class irqio.IRQIO
+    # async def run(self):
+    #     self.set_changed_status(1)
+    #     self.send_message()
+    #     return True
