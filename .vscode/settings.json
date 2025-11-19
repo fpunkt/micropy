@@ -1,34 +1,23 @@
 {
-    "restructuredtext.confPath": "",
-    "restructuredtext.languageServer.disabled": true,
-    "python.analysis.extraPaths": [
-        "${workspaceFolder}/mupystubs",
-        "./lib",
-        "./extern"
-    ],
-    "files.exclude": {
-        "**/*.mpy": true
+    "python.languageServer": "Pylance",
+    "python.analysis.typeCheckingMode": "basic",
+    "python.analysis.diagnosticSeverityOverrides": {
+        "reportMissingModuleSource": "none"
     },
-    "editor.find.addExtraSpaceOnTop": false,
-    "MicroPython.executeButton": [
-        {
-            "text": "▶",
-            "tooltip": "Run",
-            "alignment": "left",
-            "command": "extension.executeFile",
-            "priority": 3.5
-        }
+    "python.terminal.activateEnvironment": false,
+    "micropico.openOnStart": true,
+    "python.analysis.typeshedPaths": [
+        "~/.micropico-stubs/included"
     ],
-    "MicroPython.syncButton": [
-        {
-            "text": "$(sync)",
-            "tooltip": "sync",
-            "alignment": "left",
-            "command": "extension.execute",
-            "priority": 4
-        }
+    "python.analysis.extraPaths": [
+        "~/.micropico-stubs/included",
+        "./lib",
+        "./mupystubs"
     ],
-    //"python.analysis.diagnosticSeverityOverrides": {
-    //    "reportMissingImports": "none"
-    //}
+    "python.autoComplete.extraPaths": [
+        "./lib"
+    ],
+//    "python.analysis.packageIndexDepths": {
+//        "*": 2
+//    }
 }

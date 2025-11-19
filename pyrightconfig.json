@@ -1,0 +1,12 @@
+{
+	"executionEnvironments": [
+		{
+			"root": ".",
+			"extraPaths": [
+ 				"~/.micropico-stubs/included",
+ 				"lib",
+				"./mupystubs"
+			]
+		}
+	]
+}
