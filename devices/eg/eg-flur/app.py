@@ -199,25 +199,25 @@ class xPWM(pwm.PWM):
                 print('egflur:  ** switching DCDC on')
             p6.seti(DCDCON_Value)
 
-    def seti(self, v):
-        self._dbg('seti', v)
-        self._dcdcon(v)
-        return super().seti(v)
+    def seti(self, ival):
+        self._dbg('seti', ival)
+        self._dcdcon(ival)
+        return super().seti(ival)
 
-    def seti16(self, v):
-        self._dbg('seti16', v)
-        self._dcdcon(v)
-        return super().seti16(v)
+    def seti16(self, i16):
+        self._dbg('seti16', i16)
+        self._dcdcon(i16)
+        return super().seti16(i16)
 
-    def dimi(self, v):
-        self._dbg('dimi', v)
-        self._dcdcon(v)
-        super().dimi(v)
+    def dimi(self, value):
+        self._dbg('dimi', value)
+        self._dcdcon(value)
+        return super().dimi(value)
 
-    def dimi16(self, v):
-        self._dbg('dimi16', v)
-        self._dcdcon(v)
-        super().dimi16(v)
+    def dimi16(self, i16):
+        self._dbg('dimi16', i16)
+        self._dcdcon(i16)
+        return super().dimi16(i16)
 
 p7 = xPWM(7, bconf.ML10_PWM_7)
 """EXPORT:
