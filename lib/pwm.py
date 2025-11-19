@@ -251,9 +251,9 @@ class PWM(port.Port):
         start_dimming.set()
         return True
 
-    def dimi16(self, value):
+    def dimi16(self, i16):
         """dim to values from 0..0xffff"""
-        return self.dimi(i16_to_raw(value))
+        return self.dimi(i16_to_raw(i16))
 
     def on(self):
         """Set intensity to lastintensity"""
