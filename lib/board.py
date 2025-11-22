@@ -194,3 +194,40 @@ def run():
 def restart():
     gc.collect()
     asyncio.get_event_loop().run_forever()
+
+
+def reload_module(module_name, run_main=False):
+	"""
+	Reload a module by name in MicroPython.
+	- Versucht importlib.reload(mod) falls verfügbar.
+	- Falls nicht, entfernt den Eintrag aus sys.modules und importiert neu.
+	- Wenn run_main=True und das Modul hat eine main()-Funktion, wird diese aufgerufen.
+	Usage: reload_module('sensors') or reload_module('mypkg.modul', run_main=True)
+	"""
+	import sys
+	try:
+		# try importlib.reload if available
+		import importlib  # may not exist on some MicroPython builds
+		mod = sys.modules.get(module_name)
+		if mod is None:
+			# not loaded yet, import fresh
+			mod = __import__(module_name)
+		else:
+			mod = importlib.reload(mod)
+	except Exception:
+		# fallback: remove from sys.modules and import again
+		if module_name in sys.modules:
+			del sys.modules[module_name]
+		# __import__ returns top-level package for dotted names; walk attributes
+		mod = __import__(module_name)
+		parts = module_name.split('.')
+		for p in parts[1:]:
+			mod = getattr(mod, p)
+	# optional: run main() if present
+	if run_main and hasattr(mod, 'main'):
+		try:
+			mod.main()
+		except Exception as e:
+			if board.DEBUG:
+				print('reload_module: Fehler beim Aufruf von main():', e)
+	return mod
