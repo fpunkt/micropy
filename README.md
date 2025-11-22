@@ -1,5 +1,24 @@
 # HC clients in micropython (ESP32, including CAN bus)
 
+## Compile and upload files
+
+Create an `app.py` and then use tools
+
+- `mpycompile` compiles all requiremd files into the `.build` directory. The compile command parses the `app.py` (and all files?) in the current directory for dependencies and compiles all files that have changed.
+
+- `mpyupload` checks the .build directory for new entries and uploads via the webex interface as needed. A potentially running
+
+- `mpyterm` connects via websock and opens a terminal
+
+## Standard tools for VS-CODE
+
+- `micropico`
+Uploading buffers kind of works, but the repl seems to use another namespace, so typing something into the repl doesn't work. Not clear where the uploaded stuff is stored (not in filesystem, not in modues, not visible in repl)
+
+  - Keybinding `meta-R` to run the current buffer
+
+- `mpremote` as terminal to a MP device connected to USB
+
 ## Connect to serial port terminal
 
 Connect to USB and run

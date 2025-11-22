@@ -12,3 +12,8 @@ class Pin:
 
     def off(self):
         """Set Pin to low"""
+
+
+def reset():
+    """Reset the machine"""
+    pass
