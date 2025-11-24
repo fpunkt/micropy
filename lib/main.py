@@ -8,11 +8,15 @@ import board
 # You can overwrite this by providing a main.py for your application
 # or you can overwrite it by sending a CAN command after receiving a power on message
 if True:
-    import net
-    net.DEBUG = True
-    net.start_wlan(32)
-    net.start_repl()
-    board.DEBUG = 1
+    try:
+        import net
+        net.DEBUG = True
+        net.start_wlan(32, timeout=5)
+        net.start_repl()
+        board.DEBUG = 1
+    except Exception as e:
+        print('Failed to start network: {}'.format(e))
+        board.DEBUG = 0
 
 # Init Watchdog
 

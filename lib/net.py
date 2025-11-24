@@ -39,7 +39,8 @@ import c
 # x = ap.active(True)
 # print('network activated: ', x)
 
-def start_wlan(base=0):
+def start_wlan(base=0, timeout=30):
+    """Connect to WLAN using secrets.py for ssid and password"""
     wlan = network.WLAN(network.STA_IF) # create station interface
     if wlan.isconnected():
         cfg = wlan.ifconfig()
@@ -48,24 +49,26 @@ def start_wlan(base=0):
     gc.collect()
     stop_hotspot()
     # need some sleep, otherwise screen disconnects right away (gets reset??)
+    wlan.active(False)
+    time.sleep(0.1)
     wlan.active(True)       # activate the interface
-    time.sleep(0.5)
-    # TODO: why do we scan for access points?
-    #wlan.scan()             # scan for access points
-    #time.sleep(1)
+    wlan.disconnect()  # ensure clean start
+    time.sleep(0.1)
     # pylint: disable=no-member
     s, p = c.s(base)
-#    if board.DEBUG:
-#        print('Connect to {} / {}'.format(s, p))
+    print(f'Connecting to SSID: {s}, password: "{p}"')
     wlan.connect(s, p) # connect to an AP
-    for i in range(30):
+    for i in range(timeout):
+        s = wlan.status()
+        # print(hex(s))
+        print(f'Waiting for connection ... {i}, status={s}/{hex(s)}, connected={wlan.isconnected()}')
         if wlan.isconnected():
             break      # check if the station is connected to an AP
-        print('Trying to connect ...', i)
         time.sleep(1)
     if not wlan.isconnected():
         print('ERROR: cannot connect to WLAN.')
         wlan.active(False)
+        time.sleep(0.5)
         return None
     cfg = wlan.ifconfig()
     set_status_led()
@@ -121,8 +124,43 @@ def start_repl(password='x'):
 def stop_repl():
     webrepl.stop()
 
-def net(base=32):
+def net(base=32, timeout=30):
     """Start network and repl"""
-    ip = start_wlan(base)
+    ip = start_wlan(base, timeout=timeout)
     # print("# Connected to ", ip[0])
     start_repl()
+
+
+def format_mac(mac_bytes, sep=":"):
+    """Format bytes/iterable as hex MAC (xx:xx:...)."""
+    try:
+        return sep.join("{:02X}".format(b) for b in mac_bytes)
+    except Exception:
+        return str(mac_bytes)
+
+def get_mac_address(sep=":"):
+    """
+    Try to return the device MAC address.
+    - First attempt: network.WLAN(network.STA_IF).config('mac') (returns bytes).
+    - Fallback: machine.unique_id() (often the same/hardware id).
+    Returns bytes (if as_str=False) or formatted string (if as_str=True).
+    Usage: mac = get_mac_address(); print(mac)  # 'aa:bb:cc:...'
+    """
+    # try network WLAN MAC
+    try:
+        import network
+        wlan = network.WLAN(network.STA_IF)
+        try:
+            m = wlan.config('mac')
+            return format_mac(m, sep)
+        except Exception:
+            pass
+    except Exception:
+        pass
+    # fallback to machine.unique_id()
+    try:
+        uid = machine.unique_id()
+        return format_mac(uid, sep)
+    except Exception:
+        return "un:de:fi:ne:d0"
+

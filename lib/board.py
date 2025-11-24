@@ -144,6 +144,9 @@ def uptime_hms():
 # Location of the board, overwritten by main.py. Used e.g. by MQTT to construct the message
 LOCATION = "unknown"
 
+# Version of the board firmware, overwritten by main.py or app.py
+VERSION = "unknown"
+
 # Global CAN device. Use board.CAN to access the CAN bus from everywhere.
 # The actual value is set when can.py is loaded/initialized
 CAN = None

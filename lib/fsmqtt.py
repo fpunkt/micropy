@@ -32,7 +32,8 @@ class _Mqttoptions:
     def __init__(self) -> None:
         self.reset_on_error = False
         self.name = "undefined"
-        self.topic = "fsmqtt/undefined/"
+        # topic can be either None or a string like "hcm/myname/"
+        self.topic = "undefined"
 
 options = _Mqttoptions()
 _callbacks = dict()
@@ -46,34 +47,50 @@ def _safe_decode(value):
             return repr(value)
     return value
 
-def connect(client, name=None, reset_on_error=True):
+_mqtt_connect_count = 0
 
-    if isinstance(client, str):
-        import umqttsimple
-        if name is None:
-            name = client
-        client = umqttsimple.MQTTClient(client, '192.168.178.5')
-
+def connect(client, name=None, reset_on_error=True, timeout=60):
+    """Connect to MQTT server using given client (or client id string).
+    If name is given, use that as the name of this client, otherwise use board.LOCATION.
+    If reset_on_error is True, reset the machine on connection errors.
+    timeout specifies how long to retry connecting to WLAN before giving up.
+    """
+    global _mqtt_connect_count
     options.name = name if name is not None else board.LOCATION
     options.reset_on_error = reset_on_error
 
     if 'undefined' in options.topic:
-        options.topic = 'fsmqtt/' + options.name + '/'
+        options.topic = 'hcm/' + options.name + '/'
 
     while True:
         try:
-            net.start_wlan(32)
-            board.MQTT = client
+            cfg = net.start_wlan(32, timeout=timeout)
+            if cfg is None:
+                raise OSError('cannot connect to WLAN')
+            if isinstance(client, str):
+                import umqttsimple
+                if name is None:
+                    name = client
+                clientid = net.get_mac_address()+"-"+str(_mqtt_connect_count)
+                # limit client id to 23 characters for compatibility
+                if len(clientid) > 23:
+                    clientid = clientid[-23:]
+                print('MQTT client id: {}'.format(clientid))
+                board.MQTT = umqttsimple.MQTTClient(clientid, '192.168.178.5')
+                _mqtt_connect_count += 1
+            else:
+                board.MQTT = client
+
             board.MQTT.connect()
             if board.DEBUG:
-                print('MQTT connected')
-            publish("info", "connected")
+                print('MQTT connected ', cfg)
+            publish("info", "connected, version=" + board.VERSION + " mac=" + net.get_mac_address() + " IP=" + str(cfg))
             return True
         except OSError as e:
             if board.DEBUG:
                 print('ERROR: MQTT connect failed: {}'.format(e))
             if not reset_on_error:
-                return False
+                raise e
             # give some time to hit ctrl-c on terminal or do something smart via CAN bus
             utime.sleep(60)
             machine.reset()

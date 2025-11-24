@@ -29,13 +29,10 @@ net.net(32)
 import gc
 import pwm
 import sensors
-# import utime
-#import memstat
-import umqttsimple
 import fsmqtt
 import time
 
-fsmqtt.connect(umqttsimple.MQTTClient('wg', '192.168.178.5'), 'wg')
+fsmqtt.connect('wg')
 
 
 #

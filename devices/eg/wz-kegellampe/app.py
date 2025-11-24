@@ -6,31 +6,44 @@ MQTT client for Kegellampe with neo pixels.
 
 import board
 board.LOCATION = 'eg-wz-kegellampe'
+board.VERSION = '2025-11-24'
 
 import machine, neopixel
 import fsmqtt
+import time
 
 
-NPIXEL = 180
-np = neopixel.NeoPixel(machine.Pin(4), NPIXEL) # type: ignore
+NPIXEL = 80
+np = neopixel.NeoPixel(machine.Pin(1), NPIXEL) # type: ignore
 
-fsmqtt.connect('kegellampe')
 
 DARK_Pixels = 140
 DARK_Pixels = 141
+DARK_Pixels = 0
 
-
-def set_color(r: int, g: int, b: int):
+def _set_color(r: int, g: int, b: int):
+    """Set all pixels to given color, internal use only"""
     for index in range(DARK_Pixels, NPIXEL):
         np[index] = (r, g, b)
     np.write()
+
+_set_color(0, 0, 0)
+np[0] = (50, 50, 0)
+np.write()
+time.sleep(0.5)
+
+def set_color(r: int, g: int, b: int):
+    """Set all pixels to given color, send status to MQTT"""
+    _set_color(r, g, b)
     fsmqtt.publish('status/color', '{} {} {}'.format(r, g, b))
 
 def all_off():
+    """Turn off all pixels"""
     set_color(0, 0, 0)
 
 
 def set_random(max: int = 255):
+    """set random colors with max brightness"""
     import urandom
     for i in range(DARK_Pixels, NPIXEL):
         r = urandom.getrandbits(8) % (max + 1)
@@ -42,6 +55,7 @@ def set_random(max: int = 255):
 
 
 def set_gradient(msg=4):
+    """set gradient color effect, msg is scale factor"""
     scale = max(1, min(255, int(msg)))
     for i in range(DARK_Pixels, NPIXEL):
         r = (i - DARK_Pixels) * 255 // (NPIXEL - DARK_Pixels)
@@ -62,18 +76,69 @@ def set_color_string(colorstring: str):
     b = int(parts[2])
     set_color(r, g, b)
 
+def set_led(index: int, r: int, g: int, b: int):
+    """set single led color"""
+    if index < DARK_Pixels or index >= NPIXEL:
+        return
+    np[index] = (r, g, b)
+    np.write()
+    fsmqtt.publish('status/led/{}'.format(index), '{} {} {}'.format(r, g, b))
+
+def set_leds(colorstring: str):
+    """set multiple leds from string like '0 255 0 0;1 0 255 0;2 0 0 255'"""
+    parts = colorstring.split(';')
+    for part in parts:
+        subparts = part.split(' ')
+        if len(subparts) != 4:
+            continue
+        index = int(subparts[0])
+        r = int(subparts[1])
+        g = int(subparts[2])
+        b = int(subparts[3])
+        set_led(index, r, g, b)
+
+
 def test(topic, msg):
     fsmqtt.publish('status/test', f'got message t={topic} mt={type(msg)}, msg={msg}')
     print(f"Got type: {type(msg)} {msg}")
 
+
+reboot_count = 5
+while True:
+    try:
+        np[0] = (64, 0, 0)
+        np.write()
+        fsmqtt.connect('kegellampe', reset_on_error=False, timeout=60)
+        break
+    except Exception as e:
+        np[0] = (0, 0, 64)
+        np.write()
+        print('MQTT connect failed: {}'.format(e))
+        time.sleep(1)
+        reboot_count -= 1
+        if reboot_count <= 0:
+            print("Giving up MQTT connect, rebooting")
+            # set purple and reset after failure
+            np[0] = (32, 0, 32)
+            np.write()
+            time.sleep(0.5)
+            machine.reset()
+
+
 fsmqtt.subscribe('test', test)
+np[0] = (0, 128, 0)
+np.write()
 
 fsmqtt.subscribe('set/color', lambda _, msg: set_color_string(msg))
 fsmqtt.subscribe('set/random', lambda _, msg: set_random(int(msg)))
 fsmqtt.subscribe('set/gradient', lambda _, msg: set_gradient(msg))
 fsmqtt.subscribe('set/off', lambda _, msg: all_off())
+fsmqtt.subscribe('set/led', lambda _, msg: set_leds(msg))
 
-set_random(100)
+time.sleep(0.5)
+
+# also send initial status to MQTT
+all_off()
 
 def r():
     board.restart()
