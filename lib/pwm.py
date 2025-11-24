@@ -281,18 +281,17 @@ class PWM(port.Port):
     def mqtt_callback(self, _, msg):
         try:
             value = int(msg)
-            if value > 255:
-                value = 255
+            value = min(255, max(0, value))
             self.dimi16(((value & 0xff) << 8) | value)
             return
         except:
             pass
         # print('PWM {} got called by MQTT: {}'.format(self.id, msg))
         msg = msg.upper()
-        if msg == b'{"STATE": "OFF"}' or msg == b'OFF':
+        if msg == '{"STATE": "OFF"}' or msg == 'OFF':
             self.dimi(0)
             return
-        if msg == b'{"STATE": "ON"}' or msg == b'ON':
+        if msg == '{"STATE": "ON"}' or msg == 'ON':
             self.on()
             return
         # {"state": "ON", "brightness": 97}
@@ -333,6 +332,7 @@ class List(PWM):
     def seti_no_can_message(self, ival):
         for p in self.pwms:
             p.seti_no_can_message(ival)
+        return ival
 
     def send_status_to_can(self):
         for p in self.pwms:
@@ -347,20 +347,24 @@ class List(PWM):
         return min([p.current_value() for p in self.pwms])
 
     def dimi(self, value):
+        ret = False
         for p in self.pwms:
-            p.dimi(value)
+            ret |= p.dimi(value)
+        return ret
 
-    def dimi16(self, value):
+    def dimi16(self, i16):
+        ret = False
         for p in self.pwms:
-            p.dimi16(value)
+            ret |= p.dimi16(i16)
+        return ret
 
-    def seti(self, value):
+    def seti(self, ival):
         for p in self.pwms:
-            p.seti(value)
+            p.seti(ival)
 
-    def seti16(self, value):
+    def seti16(self, i16):
         for p in self.pwms:
-            p.seti16(value)
+            p.seti16(i16)
 
     def enable_dimming(self):
         for p in self.pwms:
