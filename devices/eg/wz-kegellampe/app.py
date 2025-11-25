@@ -2,6 +2,11 @@
 Kegellampe Application Module
 
 MQTT client for Kegellampe with neo pixels.
+
+80 LED in der Lampe.
+Bei maximaler Helligkeit sind es ca. 1.5A bei 12V.
+Der DC/DC Wandler (4A angegeben) wird nicht warm --> kein Kühlkörper nötig.
+
 """
 
 import board
