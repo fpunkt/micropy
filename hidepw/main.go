@@ -27,6 +27,7 @@ package main
 import (
 	"bytes"
 	"fmt"
+	"log/slog"
 	"math/rand"
 	"os"
 	"os/exec"
@@ -34,8 +35,7 @@ import (
 
 	"github.com/spf13/pflag"
 
-	"github.com/fpunkt/zlog"
-	"github.com/rs/zerolog/log"
+	"github.com/fpunkt/cslog"
 )
 
 const blockSize = 32 // max size for 2 strings
@@ -53,13 +53,13 @@ var (
 func addbyte(b byte) {
 	oindex := buffer.Len()
 	table := byte((b + offsets[oindex%len(offsets)]) & 0xff)
-	log.Trace().Int("pos", buffer.Len()).Uint8("byte", b).Uint8("table", table).Msg("Adding byte")
+	cslog.Trace("Adding byte", "pos", buffer.Len(), "byte", b, "table", table)
 	buffer.WriteByte(table)
 	//oindex++
 }
 
 func addstring(s string) {
-	log.Debug().Str("str", s).Msg("Adding string")
+	slog.Debug("Adding string", "str", s)
 	for _, c := range s {
 		addbyte(byte(c))
 	}
@@ -69,9 +69,9 @@ func addstring(s string) {
 func pad() {
 	currentPad += blockSize
 	if buffer.Len() >= currentPad {
-		log.Fatal().Int("size", buffer.Len()).Int("maxsize", currentPad).Msg("Strings to long, reduce size (change code)")
+		cslog.Fatal("Strings to long, reduce size (change code)", "size", buffer.Len(), "maxsize", currentPad)
 	}
-	log.Trace().Int("n", currentPad-buffer.Len()).Msg("Padding bytes")
+	cslog.Trace("Padding bytes", "n", currentPad-buffer.Len())
 	for buffer.Len() < currentPad {
 		b := rand.Intn(255)
 		buffer.WriteByte(byte(b))
@@ -81,10 +81,10 @@ func pad() {
 func decode(fname string) {
 	mod := strings.TrimSuffix(fname, ".py")
 	cmd := fmt.Sprintf("import %s; print(%s.s(0), %s.s(32))", mod, mod, mod)
-	log.Debug().Str("cmd", cmd).Msg("Going to run python command")
+	slog.Debug("Going to run python command", "cmd", cmd)
 	out, err := exec.Command("python3", "-c", cmd).Output()
 	if err != nil {
-		log.Fatal().Err(err).Str("cmd", cmd).Msg("Cannot run python")
+		cslog.Fatal("Cannot run python", "cmd", cmd, "error", err)
 	}
 	fmt.Println(string(out))
 }
@@ -99,7 +99,7 @@ func main() {
 	}
 	pflag.Parse()
 
-	zlog.InitL(verbose)
+	cslog.InitV(verbose)
 
 	if *decodeFlag {
 		mod := "c"
@@ -116,7 +116,7 @@ func main() {
 	}
 
 	if pflag.NArg() == 0 {
-		log.Error().Msg("Need at least two arguments, use like hidepw  ssid-1 pw-1  ssid-2 pw-2")
+		slog.Error("Need at least two arguments, use like hidepw  ssid-1 pw-1  ssid-2 pw-2")
 		return
 	}
 	for i, arg := range pflag.Args() {
@@ -135,10 +135,10 @@ func main() {
 	fd := os.Stdout
 
 	if *outputFile != "" {
-		log.Info().Str("file", *outputFile).Msg("Writing Python outputfile")
+		slog.Info("Writing Python outputfile", "file", *outputFile)
 		f, err := os.Create(*outputFile)
 		if err != nil {
-			log.Error().Err(err).Str("name", *outputFile).Msg("Cannot generate output file")
+			slog.Error("Cannot generate output file", "name", *outputFile, "error", err)
 		}
 		fd = f
 		defer fd.Close()
