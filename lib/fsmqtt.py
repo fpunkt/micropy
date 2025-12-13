@@ -48,6 +48,8 @@ def _safe_decode(value):
             return repr(value)
     return value
 
+after_connect = []
+
 _mqtt_connect_count = 0
 STATUS = "undefined"
 
@@ -66,10 +68,15 @@ async def _connect_in_background(name=None):
     
     while True:
         # board.PRINT('waiting for WLAN to connect, STATUS={} / {}'.format(net.STATUS, STATUS))
-        if net.STATUS == net.STATUS_OFF:
-            net.STATUS = net.STATUS_START_CONNECTING
+        if net.STATUS == "undefined":
+            net.connect_in_background()
+            await asyncio.sleep_ms(1000)
+            continue
 
-        if net.STATUS != net.STATUS_ON:
+        if net.STATUS == "off":
+            net.STATUS = "start_connecting"
+
+        if net.STATUS != "connected":
             board.PRINT('waiting for WLAN to connect')
             await asyncio.sleep_ms(1000)
             continue
@@ -94,6 +101,7 @@ async def _connect_in_background(name=None):
                 board.MQTT = None
             try:
                 board.MQTT = umqttsimple.MQTTClient(clientid, '192.168.178.5')
+                board.MQTT.set_last_will("hcm/disconnected", options.name)
                 # board.MQTT.setKeepAlive(180) # keep alive of 180 seconds
                 board.MQTT.connect()
                 cfg = net.wlan_ip()
@@ -107,6 +115,11 @@ async def _connect_in_background(name=None):
                 subscribe('#', lambda topic, msg: board.PRINT('MQTT: {} / {}'.format(topic, msg)))
                 publish_info()
                 publish_all()
+                for func in after_connect:
+                    try:
+                            func()
+                    except Exception as e:
+                        board.PRINT('ERROR: after_connect failed: {}'.format(e))
                 continue
 
             except Exception as e:
@@ -125,21 +138,33 @@ async def _connect_in_background(name=None):
 def _subscribe_to_all():
     # board.PRINT('subscribing to topics')
     # subscribe to all topics
+    # fix undefined topic
+    for topic in _callbacks:
+        if 'undefined' in topic:
+            cb = _callbacks[topic]
+            del _callbacks[topic]
+            topic = topic.replace(b'undefined', options.topic.encode('utf-8'))
+            _callbacks[topic] = cb
     for topic in _callbacks:
         board.MQTT.subscribe(topic)
-    for p in board.PWMs.pwms:
-        # ha/light/led_mg_buero_dimm_spotwand/set
-        # subscribe_raw('light/{}/{}/set'.format(board.LOCATION, p.portid), p.mqtt_callback)
-        subscribe('set/{}'.format(p.portid), p.mqtt_callback)
+    if board.PWMs:
+        for p in board.PWMs.pwms:
+            # ha/light/led_mg_buero_dimm_spotwand/set
+            # subscribe_raw('light/{}/{}/set'.format(board.LOCATION, p.portid), p.mqtt_callback)
+            subscribe('set/{}'.format(p.portid), p.mqtt_callback)
 
 def publish_all():
-    for p in board.PWMs.pwms:
-        p.send_status_to_can()
+    if board.PWMs:
+        for p in board.PWMs.pwms:
+            p.send_status_to_can()
 
 def publish_info():
     mac = net.get_mac_address()
     ip = net.get_ip_address()
-    pwms = ','.join([str(p.portid) for p in board.PWMs.pwms])
+    if board.PWMs:
+        pwms = ','.join([str(p.portid) for p in board.PWMs.pwms])
+    else:
+        pwms = 'none'
     # board.PRINT(pwms)
     info = "version=" + board.VERSION + "; mac=" + mac + "; IP=" + ip + "; pwms=" + pwms
     board.PRINT('publishing info: ' + info)
