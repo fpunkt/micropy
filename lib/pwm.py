@@ -191,11 +191,12 @@ class PWM(port.Port):
 
     def send_status_to_can(self):
         self.send_status_to_can_value(self.current_value())
-
+ 
     def send_status_to_can_value(self, ival):
         if self.portid is None:
             return
-        i16 = ival << 6
+        # extend a 12 bit value to 16 bit, so that 1023 is 0xffff
+        i16 = (ival << 6) | (ival >> 4)
         if board.CAN:
             # self.msg.setsender(self.id)
             payload = self.msg.payload
@@ -203,11 +204,13 @@ class PWM(port.Port):
             # self.msg[1] = board.CAN.canid & 0xff
             payload[3] = ival >> 8
             payload[4] = ival & 0xff
-            if ival == 1023:
-                i16 = 0xffff
             payload[5] = i16 >> 8
             payload[6] = i16 & 0xff
             self.msg.send()
+        # board.PRINT('Sending status to CAN for PWM {} - {} / {} - {} '.format(self.portid, self, ival, i16))
+        if board.MQTT_PUBLISH:
+            # board.MQTT_PUBLISH('light/{}/{}/set'.format(board.LOCATION, self.portid), i16)
+            board.MQTT_PUBLISH('state/{}'.format(self.portid), str(i16>>8)) 
 
     def run_next_dimstep(self):
         """Set next dimlevel for smooth dimming to finally reach self.dimtovalue."""
@@ -279,12 +282,14 @@ class PWM(port.Port):
         return not t
 
     def mqtt_callback(self, _, msg):
+        board.PRINT('MQTT callback for PWM {} got called by MQTT: {} - {}'.format(self.portid, msg, self))
         try:
             value = int(msg)
             value = min(255, max(0, value))
             self.dimi16(((value & 0xff) << 8) | value)
             return
-        except:
+        except Exception as e:
+            board.PRINT('MQTT callback for PWM {} got called by MQTT: {} - {}'.format(self.portid, msg, e))
             pass
         # print('PWM {} got called by MQTT: {}'.format(self.id, msg))
         msg = msg.upper()
@@ -297,14 +302,14 @@ class PWM(port.Port):
         # {"state": "ON", "brightness": 97}
         l = len(msg) - 1
         if l < 5:
-            print('Bad MQTT message {}'.format(msg))
+            board.PRINT('Bad MQTT message {}'.format(msg))
             return
         # search for blank
         while l > 0 and msg[l] != ord(' ') and msg[l] != ord(':'):
             l -= 1
-        print('PWM callback got value "{}"'.format(msg[l:-1]))
+        board.PRINT('PWM callback got value "{}"'.format(msg[l:-1]))
         value = int(msg[l:-1])
-        print('Setting PWM {} to {}'.format(self.portid, value))
+        board.PRINT('Setting PWM {} to {}'.format(self.portid, value))
         self.dimi16(((value & 0xff) << 8) | value)
         return
 
