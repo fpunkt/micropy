@@ -29,8 +29,7 @@ if board.DEBUG is True:
 
 if board.DEBUG is True:
     import net
-    net.DEBUG = True
-    net.start_wlan(32)
+    net.start_wlan()
     net.start_repl()
 
 import gc
