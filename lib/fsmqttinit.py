@@ -1,5 +1,5 @@
 """
-Init MQTT functions
+Init MQTT functions for registered PWMs and Sensors
 """
 
 import board
@@ -10,6 +10,7 @@ except: #pylint: disable=bare-except
 
 
 def _setup_mqtt_callbacks():
+    print("***** delete me _setup_mqtt_callbacks")
     if not board.MQTT:
         return
     if not fsmqtt:
@@ -18,5 +19,5 @@ def _setup_mqtt_callbacks():
         # ha/light/led_mg_buero_dimm_spotwand/set
         fsmqtt.subscribe('light/{}/{}/set'.format(board.LOCATION, p.id), p.mqtt_callback)
 
-if fsmqtt is not None:
-    board.STARTUP_FUNCTIONS.append(_setup_mqtt_callbacks)
+# if fsmqtt is not None:
+#     board.STARTUP_FUNCTIONS.append(_setup_mqtt_callbacks)

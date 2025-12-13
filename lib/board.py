@@ -22,9 +22,11 @@ CPU_ID = 1              # ESP32 per default
 BOARD_ID = 0            # PCB version, overwritten in bconf
 PERIPH_ID = 0           # PCB version, overwritten in main.py (or by including other .py files)
 
-LED = None              # overwritten in bconf
-
 MQTT = None             # Set when MQTT is connected
+"""The MQTT client. This is set in fsmqtt.py"""
+
+MQTT_PUBLISH = None     # Set when MQTT is connected
+"""The MQTT publish function. This is set in fsmqtt.py"""
 
 RESET_ON_HARD_ERRORS = False # mainly CAN Errors
 ENABLE_WATCHDOG_AFTER_SECONDS = 120
@@ -37,6 +39,7 @@ CAN_MESSAGES_RECEIVED = 0
 CAN_MESSAGES_SEND = 0
 
 def PRINT(formatstring, *args):
+    """Print a message if DEBUG is set"""
     if not DEBUG:
         return
     print(formatstring.format(*args))
@@ -45,15 +48,25 @@ def PRINT(formatstring, *args):
 class Led:
     """On/Off LED"""
     def __init__(self, pin, onvalue=1):
+        if pin == -1:
+            self.led = None
+            return
         self.led = machine.Pin(pin, mode=machine.Pin.OUT)
         self.onvalue = onvalue
     def on(self):
         """turn LED on"""
+        if self.led is None:
+            return
         self.led.value(self.onvalue)
     def off(self):
         """turn LED off"""
+        if self.led is None:
+            return
         self.led.value(1-self.onvalue)
 
+
+LED = Led(-1)              # overwritten in bconf
+"""The on board LED. This is set in bconf.py, use like "board.LED = board.Led(2)"""
 
 class RegisteredPortIDs:
     """Keep record of registered sensors"""
