@@ -30,9 +30,17 @@ import machine
 import network
 import webrepl
 import uasyncio as asyncio
-import board
 import gc
 import c
+
+try:
+    import board
+    PRINT = board.PRINT
+    LED = board.LED
+except:
+    board = None
+    PRINT = print
+    LED = None
 
 
 wlan = network.WLAN(network.STA_IF) 
@@ -61,24 +69,23 @@ def start_wlan(base=0, timeout=30):
     time.sleep(0.1)
     # pylint: disable=no-member
     s, p = c.s(base)
-    board.PRINT(f'Connecting to SSID: {s}, password: "{p}"')
+    PRINT(f'Connecting to SSID: {s}, password: "{p}"')
     wlan.connect(s, p) # connect to an AP
     for i in range(timeout):
         s = wlan.status()
-        # board.PRINT(hex(s))
-        board.PRINT(f'Waiting for connection ... {i}, status={s}/{hex(s)}, connected={wlan.isconnected()}')
+        PRINT(f'Waiting for connection ... {i}, status={s}/{hex(s)}, connected={wlan.isconnected()}')
         if wlan.isconnected():
             break      # check if the station is connected to an AP
         time.sleep(1)
     if not wlan.isconnected():
-        board.PRINT('ERROR: cannot connect to WLAN.')
+        PRINT('ERROR: cannot connect to WLAN.')
         wlan.active(False)
         time.sleep(0.5)
         return None
     cfg = wlan.ifconfig()
-    STATUS = STATUS_ON
+    STATUS = "connected"
     set_status_led()
-    board.PRINT("Connected to ", cfg)
+    PRINT("Connected to ", cfg)
     return cfg
 
 def wlan_ip(ipstring=None):
@@ -100,13 +107,13 @@ def start_hotspot():
 def set_status_led():
     """Turn on LED when network is active"""
     try:
-        if board.LED:
+        if LED:
             if wlan_ip() != None:
-                board.LED.on()
+                LED.on()
             else:
-                board.LED.off()
+                LED.off()
     except:
-        board.PRINT('net: cannot import board - OK during board setup')
+        PRINT('net: cannot import board - OK during initial setup')
 
 
 def stop_hotspot():
@@ -122,14 +129,10 @@ def stop_wlan():
     network.WLAN().disconnect()
     network.WLAN().active(False)
     set_status_led()
-    STATUS = STATUS_OFF
+    STATUS = "off"
 
-STATUS_OFF = const(0)
-STATUS_ON = const(1)
-STATUS_CONNECTING = const(2)
-STATUS_START_CONNECTING = const(3)
 
-STATUS = STATUS_OFF
+STATUS = "undefined"
 
 async def _connect_in_background(base=32):
     """Connect to WLAN in background"""
@@ -138,22 +141,22 @@ async def _connect_in_background(base=32):
     while True:
         global STATUS
 
-        if STATUS == STATUS_ON:
+        if STATUS == "connected":
             if not wlan.isconnected():
-                STATUS = STATUS_CONNECTING
+                STATUS = "connecting"
                 connect_count = 0
                 continue
             await asyncio.sleep(5)
             continue
 
-        if STATUS == STATUS_OFF:
+        if STATUS == "off":
             # do nothing
             await asyncio.sleep(1)
             continue
 
-        board.PRINT('WLANconnect_in_background: ', STATUS)
+        PRINT('WLANconnect_in_background: ', STATUS)
 
-        if STATUS == STATUS_START_CONNECTING:
+        if STATUS == "start_connecting":
             # initialize WLAN and try to connect
             set_status_led()
             stop_hotspot()
@@ -165,45 +168,45 @@ async def _connect_in_background(base=32):
             wlan.disconnect()
             time.sleep(0.1)
             s, p = c.s(base)
-            board.PRINT(f'Connecting to SSID: {s}, password: "{p}"')
+            PRINT(f'Connecting to SSID: {s}, password: "{p}"')
             wlan.connect(s, p)
-            STATUS = STATUS_CONNECTING
+            STATUS = "connecting"
             connect_count = 0
             await asyncio.sleep(1)
             continue
 
-        if STATUS == STATUS_CONNECTING:
+        if STATUS == "connecting":
             # wait for connection
             if wlan.isconnected():
-                STATUS = STATUS_ON
+                STATUS = "connected"
                 set_status_led()
                 continue
             connect_count += 1
             if connect_count > 30:
-                board.PRINT('Cannot connect to WLAN')
+                PRINT('Cannot connect to WLAN')
                 # reset and try again
-                STATUS = STATUS_START_CONNECTING
-                if board.LED:
+                STATUS = "start_connecting"
+                if LED:
                     for i in range(5):
-                        board.LED.off()
+                        LED.off()
                         await asyncio.sleep(0.1)
-                        board.LED.on()
+                        LED.on()
                         await asyncio.sleep(0.1)
                 continue
-            board.LED.off()
+            LED.off()
             start_repl()
             await asyncio.sleep(0.1)
-            board.LED.on()
+            LED.on()
             await asyncio.sleep(1)
             continue
 
-        board.PRINT('connect_in_background: unknown status: ', STATUS)
+        PRINT('connect_in_background: unknown status: ', STATUS)
         await asyncio.sleep(1)
 
 
 def connect_in_background(base=32):
     global STATUS
-    STATUS = STATUS_START_CONNECTING
+    STATUS = "start_connecting"
     asyncio.create_task(_connect_in_background(base))
 
 
