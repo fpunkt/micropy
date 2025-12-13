@@ -7,10 +7,9 @@ import board
 # Always start up with network on and basic debugging enabled.
 # You can overwrite this by providing a main.py for your application
 # or you can overwrite it by sending a CAN command after receiving a power on message
-if True:
+if False:
     try:
         import net
-        net.DEBUG = True
         net.start_wlan(32, timeout=5)
         net.start_repl()
         board.DEBUG = 1
@@ -40,3 +39,4 @@ try:
     app.main()
 except AttributeError:
     board.run()
+ 
