@@ -12,10 +12,12 @@ Der DC/DC Wandler (4A angegeben) wird nicht warm --> kein Kühlkörper nötig.
 import board
 board.LOCATION = 'eg-wz-kegellampe'
 board.VERSION = '2025-11-24'
+# board.DEBUG = True
 
 import machine, neopixel
 import fsmqtt
 import time
+import net
 
 
 NPIXEL = 80
@@ -33,7 +35,7 @@ def _set_color(r: int, g: int, b: int):
     np.write()
 
 _set_color(0, 0, 0)
-np[0] = (50, 50, 0)
+np[0] = (50, 50, 0) # make a green dot to show we are alive
 np.write()
 time.sleep(0.5)
 
@@ -66,7 +68,7 @@ def set_gradient(msg=4):
         r = (i - DARK_Pixels) * 255 // (NPIXEL - DARK_Pixels)
         g = 128
         b = int((255 - r)/scale)
-        np[i] = (r, g, b)
+        np[i] = (r, g, b) 
     np.write()
     fsmqtt.publish('status/color', 'gradient')
 
@@ -108,28 +110,6 @@ def test(topic, msg):
     print(f"Got type: {type(msg)} {msg}")
 
 
-reboot_count = 5
-while True:
-    try:
-        np[0] = (64, 0, 0)
-        np.write()
-        fsmqtt.connect('kegellampe', reset_on_error=False, timeout=60)
-        break
-    except Exception as e:
-        np[0] = (0, 0, 64)
-        np.write()
-        print('MQTT connect failed: {}'.format(e))
-        time.sleep(1)
-        reboot_count -= 1
-        if reboot_count <= 0:
-            print("Giving up MQTT connect, rebooting")
-            # set purple and reset after failure
-            np[0] = (32, 0, 32)
-            np.write()
-            time.sleep(0.5)
-            machine.reset()
-
-
 fsmqtt.subscribe('test', test)
 np[0] = (0, 128, 0)
 np.write()
@@ -140,14 +120,35 @@ fsmqtt.subscribe('set/gradient', lambda _, msg: set_gradient(msg))
 fsmqtt.subscribe('set/off', lambda _, msg: all_off())
 fsmqtt.subscribe('set/led', lambda _, msg: set_leds(msg))
 
-time.sleep(0.5)
+def _blink_red():
+    np[0] = (255, 0, 0)
+    np.write()
+    time.sleep(0.5)
+    np [0] = (0, 0, 0)
+    np.write()
+    time.sleep(0.5)
+    
+fsmqtt.after_connect.append(_blink_red)
+fsmqtt.after_connect.append(all_off)
 
-# also send initial status to MQTT
-all_off()
+net.connect_in_background()
+fsmqtt.connect_in_background()
+
 
 def r():
     board.restart()
 
-#def main():
-#    board.run()
+
+try:
+    if 0 == 1: # pylint: disable=comparison-with-itself
+        board.run()
+    else: 
+        print('# run  restart   (or board.run()) to start event handler')
+
+except Exception as e: # pylint: disable=bare-except, broad-except
+    print('Exception in main loop: ', e)
+    print("Try to connect to WLAN")
+    import net
+    net.net()
+
 
