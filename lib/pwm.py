@@ -282,14 +282,14 @@ class PWM(port.Port):
         return not t
 
     def mqtt_callback(self, _, msg):
-        board.PRINT('MQTT callback for PWM {} got called by MQTT: {} - {}'.format(self.portid, msg, self))
+        board.PRINTF('MQTT callback for PWM {} got called by MQTT: {} - {}', self.portid, msg, self)
         try:
             value = int(msg)
             value = min(255, max(0, value))
             self.dimi16(((value & 0xff) << 8) | value)
             return
         except Exception as e:
-            board.PRINT('MQTT callback for PWM {} got called by MQTT: {} - {}'.format(self.portid, msg, e))
+            board.PRINTF('MQTT callback for PWM {} got called by MQTT: {} - {}', self.portid, msg, e)
             pass
         # print('PWM {} got called by MQTT: {}'.format(self.id, msg))
         msg = msg.upper()
@@ -302,14 +302,14 @@ class PWM(port.Port):
         # {"state": "ON", "brightness": 97}
         l = len(msg) - 1
         if l < 5:
-            board.PRINT('Bad MQTT message {}'.format(msg))
+            board.PRINTF('Bad MQTT message {}', msg)
             return
         # search for blank
         while l > 0 and msg[l] != ord(' ') and msg[l] != ord(':'):
             l -= 1
-        board.PRINT('PWM callback got value "{}"'.format(msg[l:-1]))
+        board.PRINTF('PWM callback got value "{}"', msg[l:-1])
         value = int(msg[l:-1])
-        board.PRINT('Setting PWM {} to {}'.format(self.portid, value))
+        board.PRINTF('Setting PWM {} to {}', self.portid, value)
         self.dimi16(((value & 0xff) << 8) | value)
         return
 

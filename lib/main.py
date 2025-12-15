@@ -36,14 +36,14 @@ def r():
 # check whether app has defined its own main function. If so: run main()
 # Otherwise start the main eventloop which starts all registered services (e.g. sensors, PWM, etc.)
 try:
-    board.PRINT('run app.main()')
+    board.PRINTF('run app.main()')
     app.main()
 except AttributeError:
-    board.PRINT('run board.run()')
+    board.PRINTF('run board.run()')
     board.run()
 except Exception as e:
-    board.PRINT('Exception in main loop: ', e)
-    board.PRINT('Try to connect to WLAN')
+    board.PRINTF('Exception in main loop: {}', e)
+    board.PRINTF('Try to connect to WLAN')
     import net
     net.net()
     

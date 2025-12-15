@@ -63,7 +63,7 @@ m2 = motionsensor.Motionsensor(0x31, 26)
 m2.callback = _motion_callback
 
 def cb(but):
-    board.PRINT('got event from button {}', but)
+    board.PRINTF('got event from button {}', but)
 
 b1.callback = cb
 b2.callback = cb

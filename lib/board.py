@@ -38,7 +38,7 @@ CANPOLLTIME_MS = 5
 CAN_MESSAGES_RECEIVED = 0
 CAN_MESSAGES_SEND = 0
 
-def PRINT(formatstring, *args):
+def PRINTF(formatstring: str, *args):
     """Print a message if DEBUG is set"""
     if not DEBUG:
         return
