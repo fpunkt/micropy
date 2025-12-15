@@ -35,15 +35,18 @@ import c
 
 try:
     import board
-    PRINT = board.PRINT
+    PRINTF = board.PRINTF
     LED = board.LED
 except:
     board = None
-    PRINT = print
+    def PRINTF(formatstring: str, *args):
+        print(formatstring.format(*args))
     LED = None
 
 
 wlan = network.WLAN(network.STA_IF) 
+
+after_connect = []
 
 # ap = network.WLAN(network.AP_IF)
 # print(ap.ifconfig())
@@ -69,23 +72,23 @@ def start_wlan(base=0, timeout=30):
     time.sleep(0.1)
     # pylint: disable=no-member
     s, p = c.s(base)
-    PRINT(f'Connecting to SSID: {s}, password: "{p}"')
+    PRINTF(f'Connecting to SSID: {s}, password: "{p}"')
     wlan.connect(s, p) # connect to an AP
     for i in range(timeout):
         s = wlan.status()
-        PRINT(f'Waiting for connection ... {i}, status={s}/{hex(s)}, connected={wlan.isconnected()}')
+        PRINTF(f'Waiting for connection ... {i}, status={s}/{hex(s)}, connected={wlan.isconnected()}')
         if wlan.isconnected():
             break      # check if the station is connected to an AP
         time.sleep(1)
     if not wlan.isconnected():
-        PRINT('ERROR: cannot connect to WLAN.')
+        PRINTF('ERROR: cannot connect to WLAN.')
         wlan.active(False)
         time.sleep(0.5)
         return None
     cfg = wlan.ifconfig()
     STATUS = "connected"
     set_status_led()
-    PRINT("Connected to ", cfg)
+    PRINTF("Connected to {}", cfg)
     return cfg
 
 def wlan_ip(ipstring=None):
@@ -136,79 +139,100 @@ STATUS = "undefined"
 
 async def _connect_in_background(base=32):
     """Connect to WLAN in background"""
-    
+    global STATUS
     connect_count = 0
     while True:
-        global STATUS
+        if STATUS == "undefined" or STATUS == "off":
+            await asyncio.sleep_ms(500)
+            continue
 
-        if STATUS == "connected":
+        if STATUS == "connected": 
             if not wlan.isconnected():
                 STATUS = "connecting"
                 connect_count = 0
                 continue
-            await asyncio.sleep(5)
+            await asyncio.sleep_ms(5000)
             continue
 
-        if STATUS == "off":
-            # do nothing
-            await asyncio.sleep(1)
-            continue
-
-        PRINT('WLANconnect_in_background: ', STATUS)
-
-        if STATUS == "start_connecting":
+        PRINTF('WLANconnect_in_background: {}', STATUS)
+        if STATUS == "init_wlan":
             # initialize WLAN and try to connect
             set_status_led()
             stop_hotspot()
             wlan.active(False)
-            time.sleep(0.1)
+            time.sleep_ms(100)
             wlan.active(True)
-            time.sleep(0.1)
-            time.sleep(0.1)
+            time.sleep_ms(100)
+            time.sleep_ms(100)
             wlan.disconnect()
-            time.sleep(0.1)
+            time.sleep_ms(100)
             s, p = c.s(base)
-            PRINT(f'Connecting to SSID: {s}, password: "{p}"')
+            PRINTF('Connecting to SSID: {} password: "{}"', s, p)
             wlan.connect(s, p)
             STATUS = "connecting"
             connect_count = 0
-            await asyncio.sleep(1)
-            continue
 
         if STATUS == "connecting":
             # wait for connection
             if wlan.isconnected():
                 STATUS = "connected"
                 set_status_led()
+                start_repl()
+                for func in after_connect:
+                    try:
+                        func()
+                    except Exception as e:
+                        board.PRINTF('ERROR net: after_connect failed: {}', e)
+                await asyncio.sleep_ms(5000)
                 continue
+
+            await asyncio.sleep_ms(500)
             connect_count += 1
             if connect_count > 30:
-                PRINT('Cannot connect to WLAN')
+                PRINTF('Cannot connect to WLAN')
                 # reset and try again
-                STATUS = "start_connecting"
+                STATUS = "init_wlan"
                 if LED:
                     for i in range(5):
                         LED.off()
-                        await asyncio.sleep(0.1)
+                        await asyncio.sleep_ms(100)
                         LED.on()
-                        await asyncio.sleep(0.1)
-                continue
-            LED.off()
-            start_repl()
-            await asyncio.sleep(0.1)
-            LED.on()
-            await asyncio.sleep(1)
+                        await asyncio.sleep_ms(100)
             continue
 
-        PRINT('connect_in_background: unknown status: ', STATUS)
+        PRINTF('connect_in_background: unknown status: {}', STATUS)
         await asyncio.sleep(1)
 
 
 def connect_in_background(base=32):
     global STATUS
-    STATUS = "start_connecting"
-    asyncio.create_task(_connect_in_background(base))
+    start_task = STATUS == "undefined"
+    STATUS = "init_wlan"
+    if start_task:
+        asyncio.create_task(_connect_in_background(base))
 
+async def reconnect_if_needed():
+    global STATUS
+    PRINTF("reconnect_if_needed: {}", STATUS)
+    while True:
+        if wlan.isconnected():
+            STATUS = "connected"
+            return
+
+        if STATUS == "undefined":
+            STATUS = "init_wlan"
+            asyncio.create_task(_connect_in_background())
+
+        if STATUS == "off":
+            STATUS = "init_wlan"
+
+        if STATUS == "connecting" or STATUS == "init_wlan":
+            await asyncio.sleep_ms(500)
+            continue
+
+        PRINTF("reconnect_if_needed: unknown status: {}", STATUS)
+        await asyncio.sleep_ms(500)
+    
 
 def start_repl(password='x'):
     webrepl.start(password=password)

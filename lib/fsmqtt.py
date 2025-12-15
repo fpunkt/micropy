@@ -29,6 +29,8 @@ import utime
 import machine
 import umqttsimple
 
+after_connect = []
+
 class _Mqttoptions:
     def __init__(self) -> None:
         self.reset_on_error = False
@@ -48,14 +50,12 @@ def _safe_decode(value):
             return repr(value)
     return value
 
-after_connect = []
 
-_mqtt_connect_count = 0
+
 STATUS = "undefined"
 
 async def _connect_in_background(name=None):
     global STATUS
-    global _mqtt_connect_count
 
     STATUS = "connecting"
 
@@ -63,68 +63,67 @@ async def _connect_in_background(name=None):
 
 
     if 'undefined' in options.topic:
-        options.topic = 'hcm/' + options.name + '/'
+        newname = 'hcm/' + options.name + '/'
+        board.PRINTF('MQTT topic: {} -> {}', options.topic, newname)
+        options.topic = newname
+
+    clientid = net.get_mac_address()
+    # limit client id to 23 characters for compatibility
+    if len(clientid) > 23:
+        clientid = clientid[-23:]
+    board.PRINTF('MQTT client id: {}', clientid)
+    board.MQTT = umqttsimple.MQTTClient(clientid, '192.168.178.5')
+    board.MQTT.set_last_will("hcm/disconnected", options.name)
 
     
     while True:
         # board.PRINT('waiting for WLAN to connect, STATUS={} / {}'.format(net.STATUS, STATUS))
-        if net.STATUS == "undefined":
-            net.connect_in_background()
-            await asyncio.sleep_ms(1000)
-            continue
-
-        if net.STATUS == "off":
-            net.STATUS = "start_connecting"
-
-        if net.STATUS != "connected":
-            board.PRINT('waiting for WLAN to connect')
-            await asyncio.sleep_ms(1000)
-            continue
+        await net.reconnect_if_needed()
 
         if STATUS == "connected":
-            # board.PRINT('MQTT connected')
-            await asyncio.sleep_ms(5000)
-            continue
+            await asyncio.sleep_ms(2 * 60 * 1000)
+            try:
+                board.MQTT.ping()
+                continue
+            except Exception:
+                board.PRINTF('MQTT ping failed')
+                try:
+                    board.MQTT.disconnect()
+                except Exception:
+                    pass
+                STATUS = "connecting"
 
         if STATUS == "connecting":
-            _mqtt_connect_count += 1
-            board.PRINT('waiting for MQTT to connect')
-            clientid = net.get_mac_address()+"-"+str(_mqtt_connect_count)
-            # limit client id to 23 characters for compatibility
-            if len(clientid) > 23:
-                clientid = clientid[-23:]
-            board.PRINT('MQTT client id: {}'.format(clientid))
+            board.PRINTF('waiting for MQTT to connect')
             # trust nobody
-            if board.MQTT:
-                board.PRINT('disconnecting MQTT')
-                board.MQTT.disconnect()
-                board.MQTT = None
             try:
-                board.MQTT = umqttsimple.MQTTClient(clientid, '192.168.178.5')
-                board.MQTT.set_last_will("hcm/disconnected", options.name)
-                # board.MQTT.setKeepAlive(180) # keep alive of 180 seconds
+                board.MQTT.disconnect()
+            except Exception:
+                pass
+            try:
                 board.MQTT.connect()
                 cfg = net.wlan_ip()
-                board.PRINT('MQTT connected ', cfg)
+                board.PRINTF('MQTT connected {}', cfg)
                 publish_raw("hcm/connected", options.name)
                 board.MQTT.set_callback(_mqtt_callback)
                 board.MQTT_PUBLISH = publish
                 STATUS = "connected"
                 _subscribe_to_all()
                 # subscribe to all topics, bad messages will be printed by global callback
-                subscribe('#', lambda topic, msg: board.PRINT('MQTT: {} / {}'.format(topic, msg)))
+                subscribe('#', lambda topic, msg: board.PRINTF('MQTT: {} / {}', topic, msg))
                 publish_info()
                 publish_all()
                 for func in after_connect:
                     try:
-                            func()
+                        func()
                     except Exception as e:
-                        board.PRINT('ERROR: after_connect failed: {}'.format(e))
+                        board.PRINTF('ERROR fsmqtt: after_connect failed: {}', e)
+
                 continue
 
             except Exception as e:
                 board.MQTT = None
-                board.PRINT('ERROR: MQTT connect failed: {}'.format(e))
+                board.PRINTF('ERROR: MQTT connect failed: {}', e)
                 STATUS = "undefined"
                 await asyncio.sleep_ms(1000)
                 continue
@@ -167,7 +166,7 @@ def publish_info():
         pwms = 'none'
     # board.PRINT(pwms)
     info = "version=" + board.VERSION + "; mac=" + mac + "; IP=" + ip + "; pwms=" + pwms
-    board.PRINT('publishing info: ' + info)
+    board.PRINTF('publishing info: {}', info)
     publish("info", info)
 
 def connect_in_background(name=None):
@@ -252,7 +251,7 @@ def _mqtt_callback(topic, message):
     # prefer exact bytes-key match, fall back to decoded-string key
     cb = _callbacks.get(topic, None)
     if cb is not None:
-        board.PRINT('# MQTT running callback for T={}, M={}'.format(topic, m_str))
+        board.PRINTF('# MQTT running callback for T={}, M={}', topic, m_str)
         # call callback with decoded strings
         cb(message, m_str)
     else:
@@ -266,16 +265,15 @@ def _mqtt_callback(topic, message):
         if t.startswith("light"):
             return
 
-        board.PRINT('ERROR: MQTT no callback for T={}, M={}'.format(topic, m_str))
+        board.PRINTF('ERROR: MQTT no callback for T={}, M={}', topic, m_str)
         publish("error", "no callback for T='{}', M='{}'".format(topic, m_str))
 
 async def _mqtt_poller_task():
-    board.PRINT('MQTT poller started')
+    board.PRINTF('MQTT poller started')
     while True:
-        if board.MQTT is None:
-            board.PRINT('MQTT poller: no MQTT connection')
+        if board.MQTT is None  or  STATUS != "connected":
+            # board.PRINT('MQTT poller: no MQTT connection')
             await asyncio.sleep_ms(1000)
-            board.PRINT('****************+ done sleeping MQTT poller: no MQTT connection')
             continue
 
         try:
@@ -284,7 +282,7 @@ async def _mqtt_poller_task():
             board.MQTT.check_msg()
 
         except Exception as e:
-            board.PRINT('ERROR: MQTT poller failed: {}'.format(e))
+            board.PRINTF('ERROR: MQTT poller failed: {}', e)
             await asyncio.sleep_ms(1000)
             continue
         await asyncio.sleep_ms(10)
@@ -302,7 +300,7 @@ def subscribe_raw(topic, callback):
 #    except Exception:
 #        pass
     if board.DEBUG:
-        board.PRINT('MQTT subscribed to {}'.format(topic))
+        board.PRINTF('MQTT subscribed to {}', topic)
 
     if not board.MQTT:
         return
