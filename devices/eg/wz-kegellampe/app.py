@@ -11,8 +11,8 @@ Der DC/DC Wandler (4A angegeben) wird nicht warm --> kein Kühlkörper nötig.
 
 import board
 board.LOCATION = 'eg-wz-kegellampe'
-board.VERSION = '2025-11-24'
-# board.DEBUG = True
+board.VERSION = '2025-12-14'
+board.DEBUG = True
 
 import machine, neopixel
 import fsmqtt
@@ -35,14 +35,23 @@ def _set_color(r: int, g: int, b: int):
     np.write()
 
 _set_color(0, 0, 0)
-np[0] = (50, 50, 0) # make a green dot to show we are alive
-np.write()
-time.sleep(0.5)
+
+def _set_pixel(index: int, r: int, g: int, b: int):
+    np[index] = (r, g, b)
+    np.write()
+
+_set_pixel(0, 0, 50, 0) # green dot to show we are alive
+# show blue dot on WIFI connect
+net.after_connect.append(lambda: _set_pixel(0, 0, 0, 50))
+
 
 def set_color(r: int, g: int, b: int):
     """Set all pixels to given color, send status to MQTT"""
+    board.PRINTF('set_color {} {} {}', r, g, b)
     _set_color(r, g, b)
-    fsmqtt.publish('status/color', '{} {} {}'.format(r, g, b))
+    board.PRINTF('set_color {} {} {} done', r, g, b)
+    fsmqtt.publish('state/color', '{} {} {}'.format(r, g, b))
+    board.PRINTF('set_color {} {} {} published', r, g, b)
 
 def all_off():
     """Turn off all pixels"""
@@ -58,7 +67,7 @@ def set_random(max: int = 255):
         b = urandom.getrandbits(8) % (max + 1)
         np[i] = (r, g, b)
     np.write()
-    fsmqtt.publish('status/color', 'random max={}'.format(max))
+    fsmqtt.publish('state/color', 'random max={}'.format(max))
 
 
 def set_gradient(msg=4):
@@ -70,7 +79,7 @@ def set_gradient(msg=4):
         b = int((255 - r)/scale)
         np[i] = (r, g, b) 
     np.write()
-    fsmqtt.publish('status/color', 'gradient')
+    fsmqtt.publish('state/color', 'gradient')
 
 
 def set_color_string(colorstring: str):
@@ -89,7 +98,7 @@ def set_led(index: int, r: int, g: int, b: int):
         return
     np[index] = (r, g, b)
     np.write()
-    fsmqtt.publish('status/led/{}'.format(index), '{} {} {}'.format(r, g, b))
+    fsmqtt.publish('state/led/{}'.format(index), '{} {} {}'.format(r, g, b))
 
 def set_leds(colorstring: str):
     """set multiple leds from string like '0 255 0 0;1 0 255 0;2 0 0 255'"""
@@ -106,7 +115,7 @@ def set_leds(colorstring: str):
 
 
 def test(topic, msg):
-    fsmqtt.publish('status/test', f'got message t={topic} mt={type(msg)}, msg={msg}')
+    fsmqtt.publish('state/test', f'got message t={topic} mt={type(msg)}, msg={msg}')
     print(f"Got type: {type(msg)} {msg}")
 
 
@@ -120,16 +129,16 @@ fsmqtt.subscribe('set/gradient', lambda _, msg: set_gradient(msg))
 fsmqtt.subscribe('set/off', lambda _, msg: all_off())
 fsmqtt.subscribe('set/led', lambda _, msg: set_leds(msg))
 
-def _blink_red():
-    np[0] = (255, 0, 0)
+def _blink_green():
+    np[0] = (100, 100, 0)
     np.write()
-    time.sleep(0.5)
+    time.sleep_ms(500)
     np [0] = (0, 0, 0)
     np.write()
-    time.sleep(0.5)
+    time.sleep_ms(500)
+    all_off() # turn off all pixels and send status to MQTT
     
-fsmqtt.after_connect.append(_blink_red)
-fsmqtt.after_connect.append(all_off)
+fsmqtt.after_connect.append(_blink_green)
 
 net.connect_in_background()
 fsmqtt.connect_in_background()
