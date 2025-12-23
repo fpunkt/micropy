@@ -43,35 +43,6 @@ poll_5_minutes = const(5 * 60 * 1000)
 
 default_poll_time = const(poll_5_minutes)
 
-class WDT:
-    """Triggers the watchdog. Does not send any message, is simply sharing
-    the timer with other polled devices"""
-    def __init__(self, poll_intervall_in_ms=2000):
-        self.repeat_ms = poll_intervall_in_ms
-        self.wdt = None
-
-    def enable(self):
-        if board.DEBUG:
-            print('\033[38;5;226mStaring watchdog, {:.1f} seconds\033[0m'.format(self.repeat_ms/1000.0))
-        self.wdt = machine.WDT(timeout=2*self.repeat_ms)
-
-    async def watchdog_task(self):
-        while True:
-            if self.wdt:
-                self.wdt.feed()
-            await asyncio.sleep_ms(self.repeat_ms)
-
-    def trigger(self):
-        if self.wdt:
-            self.wdt.feed()
-
-board.WD = WDT()
-board.BACKGROUND_RUNNERS.append(board.WD.watchdog_task())
-
-class Sensorxxxxx(port.Port):
-    pass
-
-# TODO: remove Sensorxxx
 
 # TODO: background_task is not used? At least not tested. Remove it?
 
@@ -122,7 +93,7 @@ class Sensor(port.Port):
         self.proclaim()
         while True:
             if board.PWM_IS_DIMMING and not self.is_fast:
-                # minor delay in order to have smooth dimming. Used for slow sensors
+                # delay sensor polling to ensure smooth dimming. Used for slow sensors
                 await asyncio.sleep_ms(50)
                 continue
             else:
@@ -135,12 +106,11 @@ class Sensor(port.Port):
                         print('Exception from {}: {}'.format(self, e))
                         sys.print_exception(e)
                     await asyncio.sleep_ms(1000)
-
-            if board.DEBUG > 2:
-                print('sensor {} going to sleep for {} ms'.format(self, self.poll_intervall_in_ms))
+            if board.DEBUG > 2: 
+                board.PRINTF('sensor {} going to sleep for {} ms', self, self.poll_intervall_in_ms)
             await asyncio.sleep_ms(self.poll_intervall_in_ms)
             if board.DEBUG > 2:
-                print('sensor {} woke up after {} ms'.format(self, self.poll_intervall_in_ms))
+                board.PRINTF('sensor {} woke up after {} ms', self, self.poll_intervall_in_ms)
 
 
 # ================================= DHT temperature sensors
