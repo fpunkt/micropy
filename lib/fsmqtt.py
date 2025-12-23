@@ -38,8 +38,35 @@ class _Mqttoptions:
         # topic can be either None or a string like "hcm/myname/"
         self.topic = "undefined"
 
+def _start_repl(_, msg):
+    import net
+    if str(msg) == "enable":
+        net.start_repl()
+    elif str(msg) == "disable":
+        net.stop_repl()
+
+def _start_watchdog(_, msg):
+    import watchdog
+    if str(msg) == "enable":
+        watchdog.start()
+    if str(msg) == "TRIGGER_RESTART":
+        utime.sleep(20)
+
+def _restart(_, msg):
+    if str(msg) == "RESTART":
+        board.reset()
+
+
 options = _Mqttoptions()
-_callbacks = dict()
+
+_blessed_topic = ""
+"""Topic that has been sent by ourself, do not process it."""
+
+_callbacks = {
+    "repl": _start_repl,
+    "watchdog": _start_watchdog,
+    "restart": _restart
+}
 
 def _safe_decode(value):
     """Convert bytes to utf-8 string if possible, otherwise return repr(value)."""
@@ -142,7 +169,8 @@ def _subscribe_to_all():
         if 'undefined' in topic:
             cb = _callbacks[topic]
             del _callbacks[topic]
-            topic = topic.replace(b'undefined', options.topic.encode('utf-8'))
+            # topic = topic.replace(b'undefined', options.topic.encode('utf-8'))
+            topic = topic.replace('undefined', options.topic)
             _callbacks[topic] = cb
     for topic in _callbacks:
         board.MQTT.subscribe(topic)
@@ -229,12 +257,14 @@ def xxxconnect(client, name=None, reset_on_error=True, timeout=60):
 
 def publish_raw(topic, message):
     """publish message to topic without prefixing with options.topic"""
-    if board.MQTT:
+    if board.MQTT and board.MQTT.sock != None:
+        global _blessed_topic
+        _blessed_topic = topic
         try:
             board.MQTT.publish(topic, message)
             return True
         except OSError as e:
-            if board.DEBUG:
+            if board.DEBUG: 
                 print('ERROR: MQTT send T="{}" M="{}" failed: {}'.format(topic, message, e))
             if options.reset_on_error:
                 machine.reset()
@@ -245,28 +275,40 @@ def publish(topic, message):
     return publish_raw(options.topic + topic, message)
 
 def _mqtt_callback(topic, message):
-    # board.PRINT("got MQTT message: T='{}, M='{}'".format(topic, message))
+    # board.PRINTF("got MQTT message: T='{}, M='{}'", topic, message)
     # try to decode topic/message to strings for easier handling by callbacks
+    global _blessed_topic
     m_str = _safe_decode(message)
     # prefer exact bytes-key match, fall back to decoded-string key
-    cb = _callbacks.get(topic, None)
+    t_str_full = _safe_decode(topic)
+    if t_str_full == _blessed_topic:
+        _blessed_topic = ""
+        return
+    t_str = t_str_full[len(options.topic):]
+
+    cb = _callbacks.get(t_str, None)
     if cb is not None:
         board.PRINTF('# MQTT running callback for T={}, M={}', topic, m_str)
         # call callback with decoded strings
         cb(message, m_str)
     else:
         # catch all unknown topics
-        t = _safe_decode(topic)[len(options.topic):]
-        # board.PRINT('MQTT unknown topic: T={}, M={}'.format(t, m_str))
-        if t == "connected" or t == "disconnected" or t == "info" or t == "error":
+        global _blessed_topic
+        if t_str == _blessed_topic:
             return
-        if t.startswith("state") or t.startswith("set") or t.startswith("get") or t.startswith("status"):
+        
+        # catch all system topics, should be done by _blessed_topic
+        if t_str == "info" or t_str == "error":
             return
-        if t.startswith("light"):
+        if t_str.startswith("state/") or t_str.startswith("status/"):
             return
 
-        board.PRINTF('ERROR: MQTT no callback for T={}, M={}', topic, m_str)
-        publish("error", "no callback for T='{}', M='{}'".format(topic, m_str))
+        board.PRINTF('MQTT unknown topic: T={}, M={}, full topic: {}, blessed: {}, known topics: {}', 
+            t_str, m_str, t_str_full, _blessed_topic, _callbacks.keys())
+
+        publish("error", "no callback for T='{}', M='{}'".format(t_str, m_str))
+
+    board.PRINTF('MQTT done: T={}, M={}', topic, message)
 
 async def _mqtt_poller_task():
     board.PRINTF('MQTT poller started')
@@ -287,27 +329,20 @@ async def _mqtt_poller_task():
             continue
         await asyncio.sleep_ms(10)
 
+def _subscribe(topic, register, callback):
+    if not isinstance(topic, bytes):
+        topic = bytes(topic, 'utf-8')
+    _callbacks[register] = callback
+    if board.DEBUG:
+        board.PRINTF('MQTT subscribed to {}', topic)
+    if not board.MQTT:
+        return
+    board.MQTT.subscribe(topic)
 
 def subscribe_raw(topic, callback):
     """subscribe to topic without prefixing with options.topic"""
-    if not isinstance(topic, bytes):
-        topic = bytes(topic, 'utf-8')
-
-    _callbacks[topic] = callback
-#    # also store the decoded string form for convenience
-#    try:
-#        _callbacks[_safe_decode(topic)] = callback
-#    except Exception:
-#        pass
-    if board.DEBUG:
-        board.PRINTF('MQTT subscribed to {}', topic)
-
-    if not board.MQTT:
-        return
-
-    board.MQTT.subscribe(topic)
-
+    _subscribe(topic, topic, callback)
 
 def subscribe(topic, callback):
     """subscribe to topic, prefixing with options.topic"""
-    subscribe_raw(options.topic + topic, callback)
+    _subscribe(options.topic + topic, topic, callback)

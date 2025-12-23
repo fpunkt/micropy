@@ -18,6 +18,7 @@ import machine, neopixel
 import fsmqtt
 import time
 import net
+import watchdog
 
 
 NPIXEL = 80
@@ -79,7 +80,7 @@ def set_gradient(msg=4):
         b = int((255 - r)/scale)
         np[i] = (r, g, b) 
     np.write()
-    fsmqtt.publish('state/color', 'gradient')
+    fsmqtt.publish('state/gradient', str(scale))
 
 
 def set_color_string(colorstring: str):
@@ -115,7 +116,7 @@ def set_leds(colorstring: str):
 
 
 def test(topic, msg):
-    fsmqtt.publish('state/test', f'got message t={topic} mt={type(msg)}, msg={msg}')
+    fsmqtt.publish('info/test', f'got message t={topic} mt={type(msg)}, msg={msg}')
     print(f"Got type: {type(msg)} {msg}")
 
 
@@ -142,6 +143,8 @@ fsmqtt.after_connect.append(_blink_green)
 
 net.connect_in_background()
 fsmqtt.connect_in_background()
+
+watchdog.start_later()
 
 
 def r():

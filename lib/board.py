@@ -31,6 +31,9 @@ MQTT_PUBLISH = None     # Set when MQTT is connected
 RESET_ON_HARD_ERRORS = False # mainly CAN Errors
 ENABLE_WATCHDOG_AFTER_SECONDS = 120
 
+I2C = None
+WDT = None
+
 PINGTIME = 300
 MEMSTATTIME = 300
 CANPOLLTIME_MS = 5
@@ -199,7 +202,14 @@ async def arun():
             sys.print_exception(e)
 
 def run():
-    print('start running')
+    global DEBUG
+    # some files use DEBUG as boolean, others as int. Make sure it is an int.
+    if DEBUG is True:
+        DEBUG = 1
+    if DEBUG is None or DEBUG is False:
+        DEBUG = 0
+    if DEBUG > 0:
+        print('start running')
     for f in STARTUP_FUNCTIONS:
         f()
     # run GC once to supress memory messages after startup (because gc will be triggered after initialization ...)
@@ -207,9 +217,18 @@ def run():
     print('start main loop')
     asyncio.run(arun())
 
-def restart():
+def restart_eventloop():
+    """Restart tasks and loop"""
+    PRINTF("Restarting the event loop...")
     gc.collect()
     asyncio.get_event_loop().run_forever()
+
+def reset():
+    """Restart the device"""
+    PRINTF("Resetting the device...")
+    if MQTT:
+        MQTT.disconnect()
+    machine.reset()
 
 
 def reload_module(module_name, run_main=False):

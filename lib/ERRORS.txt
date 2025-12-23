@@ -1,0 +1,39 @@
+reconnect_if_needed: connected
+reconnect_if_needed: connected
+reconnect_if_needed: connected
+ERROR: MQTT poller failed: [Errno 113] ECONNABORTED
+ERROR: MQTT poller failed: [Errno 113] ECONNABORTED
+ERROR: MQTT poller failed: [Errno 128] ENOTCONN
+...
+ERROR: MQTT poller failed: [Errno 128] ENOTCONN
+ERROR: MQTT poller failed: [Errno 128] ENOTCONN
+MQTT ping failed
+waiting for MQTT to connect
+MQTT connected ('192.168.178.114', '255.255.255.0', '192.168.178.1', '192.168.178.5')
+MQTT unknown topic: T=vailability, M={"state":"offline"}, full topic: zigbee2mqtt/thbuero/availability, blessed: hcm/connected, known topics: dict_keys(['restart', 'test', '#', 'set/off', 'set/random', 'set/color', 'set/gradient', 'set/led', 'watchdog', 'repl'])
+MQTT done: T=b'zigbee2mqtt/thbuero/availability', M=b'{"state":"offline"}'
+MQTT unknown topic: T=availability, M={"state":"online"}, full topic: zigbee2mqtt/temphum2/availability, blessed: hcm/eg-wz-kegellampe/error, known topics: dict_keys(['restart', 'test', '#', 'set/off', 'set/random', 'set/color', 'set/gradient', 'set/led', 'watchdog', 'repl'])
+MQTT done: T=b'zigbee2mqtt/temphum2/availability', M=b'{"state":"online"}'
+MQTT unknown topic: T=sauger/availability, M={"state":"online"}, full topic: zigbee2mqtt/zp00-Akkusauger/availability, blessed: hcm/eg-wz-kegellampe/error, known topics: dict_keys(['restart', 'test', '#', 'set/off', 'set/random', 'set/color', 'set/gradient', 'set/led', 'watchdog', 'repl'])
+MQTT done: T=b'zigbee2mqtt/zp00-Akkusauger/availability', M=b'{"state":"online"}'
+MQTT unknown topic: T=h-office/availability, M={"state":"online"}, full topic: zigbee2mqtt/4wayswitch-office/availability, blessed: hcm/eg-wz-kegellampe/error, known topics: dict_keys(['restart', 'test', '#', 'set/off', 'set/random', 'set/color', 'set/gradient', 'set/led', 'watchdog', 'repl'])
+MQTT done: T=b'zigbee2mqtt/4wayswitch-office/availability', M=b'{"state":"online"}'
+MQTT unknown topic: T=vailability, M={"state":"online"}, full topic: zigbee2mqtt/thjulie/availability, blessed: hcm/eg-wz-kegellampe/error, known topics: dict_keys(['restart', 'test', '#', 'set/off', 'set/random', 'set/color', 'set/gradient', 'set/led', 'watchdog', 'repl'])
+MQTT done: T=b'zigbee2mqtt/thjulie/availability', M=b'{"state":"online"}'
+MQTT unknown topic: T=12v/availability, M={"state":"online"}, full topic: zigbee2mqtt/zp03-main12v/availability, blessed: hcm/eg-wz-kegellampe/error, known topics: dict_keys(['restart', 'test', '#', 'set/off', 'set/random', 'set/color', 'set/gradient', 'set/led', 'watchdog', 'repl'])
+MQTT done: T=b'zigbee2mqtt/zp03-main12v/availability', M=b'{"state":"online"}'
+MQTT unknown topic: T=ch01/availability, M={"state":"online"}, full topic: zigbee2mqtt/thermobosch01/availability, blessed: hcm/eg-wz-kegellampe/error, known topics: dict_keys(['restart', 'test', '#', 'set/off', 'set/random', 'set/color', 'set/gradient', 'set/led', 'watchdog', 'repl'])
+MQTT done: T=b'zigbee2mqtt/thermobosch01/availability', M=b'{"state":"online"}'
+MQTT unknown topic: T=ten/availability, M={"state":"offline"}, full topic: zigbee2mqtt/wintergarten/availability, blessed: hcm/eg-wz-kegellampe/error, known topics: dict_keys(['restart', 'test', '#', 'set/off', 'set/random', 'set/color', 'set/gradient', 'set/led', 'watchdog', 'repl'])
+MQTT done: T=b'zigbee2mqtt/wintergarten/availability', M=b'{"state":"offline"}'
+ERROR: MQTT connect failed: memory allocation failed, allocating 59792 bytes
+reconnect_if_needed: connected
+reconnect_if_needed: connected
+waiting for MQTT to connect
+ERROR: MQTT connect failed: 'NoneType' object has no attribute 'connect'
+reconnect_if_needed: connected
+reconnect_if_needed: connected
+waiting for MQTT to connect
+ERROR: MQTT connect failed: 'NoneType' object has no attribute 'connect'
+reconnect_if_needed: connected
+...
