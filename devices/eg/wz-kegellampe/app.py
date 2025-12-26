@@ -19,6 +19,7 @@ import fsmqtt
 import time
 import net
 import watchdog
+import memstat
 
 
 NPIXEL = 80
@@ -129,6 +130,7 @@ fsmqtt.subscribe('set/random', lambda _, msg: set_random(int(msg)))
 fsmqtt.subscribe('set/gradient', lambda _, msg: set_gradient(msg))
 fsmqtt.subscribe('set/off', lambda _, msg: all_off())
 fsmqtt.subscribe('set/led', lambda _, msg: set_leds(msg))
+fsmqtt.subscribe('mem', lambda _, msg: memstat.print_stats())
 
 def _blink_green():
     np[0] = (100, 100, 0)
