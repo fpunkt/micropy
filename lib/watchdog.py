@@ -22,9 +22,7 @@ def start(timeout=5000, interval=4000):
         board.WDT.feed()
         if interval is not None and interval > 0:
             asyncio.create_task(feed(interval))
-            if board.MQTT:
-                import fsmqtt
-                fsmqtt.publish("info", "watchdog enabled")
+            board.MQTT_PUBLISH("info", "watchdog enabled")
 
 async def feed(interval=4000):
     """Feed the watchdog with the given interval in ms."""

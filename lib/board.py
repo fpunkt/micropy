@@ -25,7 +25,10 @@ PERIPH_ID = 0           # PCB version, overwritten in main.py (or by including o
 MQTT = None             # Set when MQTT is connected
 """The MQTT client. This is set in fsmqtt.py"""
 
-MQTT_PUBLISH = None     # Set when MQTT is connected
+def _dummy_mqtt(topic, message):
+    pass
+
+MQTT_PUBLISH = _dummy_mqtt
 """The MQTT publish function. This is set in fsmqtt.py"""
 
 RESET_ON_HARD_ERRORS = False # mainly CAN Errors

@@ -32,9 +32,7 @@ class _aht(sensors.Sensor):
             payload[5] = t >> 8
             payload[6] = t & 0xff
 
-        if board.MQTT is not None:
-            import fsmqtt
-            fsmqtt.publish("state/" + str(self.portid), f'{self.aht.T():.1f} {self.aht.H():.1f}')
+        board.MQTT_PUBLISH("state/" + str(self.portid), f'{self.aht.T():.1f} {self.aht.H():.1f}')
 
 class AHT10(_aht):
     def __init__(self, portid, poll_intervall_in_ms=None, address=0x38, background_task=None) -> None:

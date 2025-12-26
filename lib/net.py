@@ -237,15 +237,11 @@ async def reconnect_if_needed():
 
 def start_repl(password='x'):
     webrepl.start(password=password)
-    if board.MQTT:
-        import fsmqtt
-        fsmqtt.publish("info", "repl enabled")
+    board.MQTT_PUBLISH("info", "repl enabled")
 
 def stop_repl():
     webrepl.stop()
-    if board.MQTT:
-        import fsmqtt
-        fsmqtt.publish("info", "repl disabled")
+    board.MQTT_PUBLISH("info", "repl disabled")
 
 def net(base=32, timeout=30):
     """Start network and repl"""

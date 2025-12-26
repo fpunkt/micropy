@@ -73,9 +73,7 @@ class Sensor(port.Port):
     def mqtt_setup_and_proclaim(self, topic):
         """setup mqtt state and proclaim on MQTT"""
         if board.MQTT:
-            s = '{}/{}/{}/'.format(topic, board.LOCATION, self.sensorid)
-            self._mqtt_state_topic = s + 'state'
-            fsmqtt.publish(s + "status", "ON")
+            board.MQTT_PUBLISH(s + "status", "ON")
 
     async def poll(self): # pylint: disable=no-self-use
         """This function is called periodically. It should prepare a measurement and return

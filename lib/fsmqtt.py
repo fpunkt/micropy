@@ -274,6 +274,8 @@ def publish(topic, message):
     """publish message to topic, prefixing with options.topic"""
     return publish_raw(options.topic + topic, message)
 
+board.MQTT_PUBLISH = publish
+
 def _mqtt_callback(topic, message):
     # board.PRINTF("got MQTT message: T='{}, M='{}'", topic, message)
     # try to decode topic/message to strings for easier handling by callbacks
@@ -299,6 +301,8 @@ def _mqtt_callback(topic, message):
         
         # catch all system topics, should be done by _blessed_topic
         if t_str == "info" or t_str == "error":
+            return
+        if t_str.startswith("info/") or t_str.startswith("error/"):
             return
         if t_str.startswith("state/") or t_str.startswith("status/"):
             return
