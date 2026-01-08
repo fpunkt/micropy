@@ -4,6 +4,7 @@ import aht
 import fsmqtt
 import net
 import watchdog
+import button
 
 board.LOCATION = 'ug-filamentschrank'
 board.VERSION = '2025-12-20'
@@ -18,6 +19,13 @@ board.I2C = machine.I2C(0, scl=machine.Pin(1), sda=machine.Pin(0))
 board.PRINTF('Initializing AHT10 sensor...')
 
 th = aht.AHT10(10, poll_intervall_in_ms=5000)
+b_left = button.Button(1, 2)
+b_right = button.Button(2, 3)
+b_dehumidifier = button.Button(3, 21)
+
+b_left.callback = lambda b: print('Button pressed: {}'.format(b))
+b_right.callback = lambda b: print('Button pressed: {}'.format(b))
+b_dehumidifier.callback = lambda b: print('Button pressed: {}'.format(b))
 
 # Start Networking and MQTT
 net.connect_in_background()
@@ -27,4 +35,4 @@ print(fsmqtt._callbacks.keys())
 
 board.PRINTF("AHT10 initialized. Sensor running in background.")
 
-watchdog.start_later(seconds=120)
+watchdog.start_later(seconds=300)
