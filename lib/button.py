@@ -28,9 +28,9 @@ STATE_AR_ARM = const(1)
 STATE_AR_ACTIVE = const(2)
 
 class Button(irqio.IRQIO):
-    def __init__(self, portid, pinid, inverted=False):
+    def __init__(self, portid, pinid, inverted=False, debounce_ms=20):
         # note that we swap inverted here: buttons are usually inputs pulled to low
-        super().__init__(portid, pinid, inverted=0 if inverted else 1)
+        super().__init__(portid, pinid, inverted=0 if inverted else 1, debounce_ms=debounce_ms)
         self.makemessage(canid.BUTTON_PRESSED)
         self.pwm = None
         self.state = 0
@@ -101,6 +101,9 @@ class Button(irqio.IRQIO):
         self.update_payload_and_send_message()
         if board.DEBUG:
             print('{} new state after toggle is {}'.format(self, self.state))
+        if self.callback is not None:
+            self.callback(self)
+        board.MQTT_PUBLISH('state/{}'.format(self.portid), self.state)
         return self.state != 0
 
     def on(self):

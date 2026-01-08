@@ -72,7 +72,7 @@ def start_wlan(base=0, timeout=30):
     time.sleep(0.1)
     # pylint: disable=no-member
     s, p = c.s(base)
-    PRINTF(f'Connecting to SSID: {s}, password: "{p}"')
+    PRINTF(f'Connecting to SSID: {s}, password: "{p[:3]}..."')
     wlan.connect(s, p) # connect to an AP
     for i in range(timeout):
         s = wlan.status()
@@ -167,7 +167,7 @@ async def _connect_in_background(base=32):
             wlan.disconnect()
             time.sleep_ms(100)
             s, p = c.s(base)
-            PRINTF('Connecting to SSID: {} password: "{}"', s, p)
+            PRINTF('Connecting to SSID: {} password: "{}..."', s, p[:3])
             wlan.connect(s, p)
             STATUS = "connecting"
             connect_count = 0
@@ -214,7 +214,13 @@ def connect_in_background(base=32):
 
 async def reconnect_if_needed():
     global STATUS
-    PRINTF("reconnect_if_needed: {}", STATUS)
+    debug = 3
+    try:
+        debug = board.DEBUG
+    except:
+        pass
+    if debug > 2:
+        PRINTF("reconnect_if_needed: {}", STATUS)
     while True:
         if wlan.isconnected():
             STATUS = "connected"
@@ -231,7 +237,8 @@ async def reconnect_if_needed():
             await asyncio.sleep_ms(500)
             continue
 
-        PRINTF("reconnect_if_needed: unknown status: {}", STATUS)
+        if debug > 0:
+            PRINTF("reconnect_if_needed: unknown status: {}", STATUS)
         await asyncio.sleep_ms(500)
     
 

@@ -81,7 +81,7 @@ class IRQIO(port.Port):
     async def run(self):
         """This function is run when an interrupt is received. It returns true if something has been
         done, False when the event is ignored for whatever reason.
-        You might want to overload this by your for your sensor"""
+        You might want to overload this for your sensor"""
         if board.DEBUG > 2:
             print('{} got interrupt {}/{}'.format(self, self.pinvalue, self.value()))
         # TODO: check who is calling send_message() and update_payload() in the background
@@ -94,12 +94,18 @@ class IRQIO(port.Port):
         while True:
             await self.triggerevent.wait()
             if self.is_disabled:
-                print('port {:02c} is disabled but still receiving events'.format(self.portid))
+                board.PRINTF('port {:02c} is disabled but still receiving events', self.portid)
                 await asyncio.sleep_ms(100)
                 self.triggerevent.clear()
                 continue
 
             # some basic debounding is already done by the scheduler because event is set only once
+            if self.debounce_ms > 0:
+                await asyncio.sleep_ms(self.debounce_ms)
+                #if self.pinvalue == self.value():
+                #    if board.DEBUG > 0:
+                #        print("IRQIO {} still debouncing {}".format(self, self.pinvalue))
+                #    return False
             now = utime.ticks_ms()
             self.last_run_before_ms = utime.ticks_diff(now, self.last_irq)
             self.last_irq = now
