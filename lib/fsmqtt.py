@@ -28,6 +28,7 @@ import net
 import utime
 import machine
 import umqttsimple
+import time
 
 after_connect = []
 
@@ -38,23 +39,49 @@ class _Mqttoptions:
         # topic can be either None or a string like "hcm/myname/"
         self.topic = "undefined"
 
-def _start_repl(_, msg):
+
+def _config(_, msg):
+    """
+    CONFIG: uptime, memstat, restart, watchdog, wrestart, repl, repl-disable, repl-enable
+    commands exposed by MQTT 
+    """
     import net
-    if str(msg) == "enable":
-        net.start_repl()
-    elif str(msg) == "disable":
-        net.stop_repl()
-
-def _start_watchdog(_, msg):
-    import watchdog
-    if str(msg) == "enable":
-        watchdog.start()
-    if str(msg) == "TRIGGER_RESTART":
-        utime.sleep(20)
-
-def _restart(_, msg):
-    if str(msg) == "RESTART":
+    board.PRINTF('CONFIG: {}', msg)
+    msg = str(msg).lower()
+    if msg == "uptime":
+        board.PRINTF('UPTIME: {}', time.time())
+        board.MQTT_PUBLISH('info/uptime', time.time())
+        return
+    if msg == "memstat":
+        board.PRINTF('MEMSTAT: {}', memstat.get())
+        board.MQTT_PUBLISH('info/memstat', memstat.get())
+        return
+    if msg == "restart":
+        board.PRINTF('RESTART')
+        board.MQTT_PUBLISH('info/restart', "going to restart board (using reset)")
         board.reset()
+        return
+    if msg == "watchdog":
+        board.PRINTF('WATCHDOG')
+        board.MQTT_PUBLISH('info/watchdog', "WATCHDOG started")
+        board.watchdog.start()
+        return
+    if msg == "wrestart":
+        board.PRINTF('WATCHDOG restart')
+        board.MQTT_PUBLISH('info/watchdog_restart', "WATCHDOG will trigger restart in 20 seconds")
+        utime.sleep(20)
+        return
+    if msg == "repl":
+        net.start_repl()
+        return
+    if msg == "repl-disable":
+        net.stop_repl()
+        return
+    if msg == "repl-enable":
+        net.start_repl()
+        return
+    board.PRINTF('CONFIG: unknown command: {}', msg)
+    board.MQTT_PUBLISH('info/config', "unknown command: {}".format(msg))
 
 
 options = _Mqttoptions()
@@ -63,9 +90,7 @@ _blessed_topic = ""
 """Topic that has been sent by ourself, do not process it."""
 
 _callbacks = {
-    "repl": _start_repl,
-    "watchdog": _start_watchdog,
-    "restart": _restart
+    "config": _config,
 }
 
 def _safe_decode(value):
@@ -194,6 +219,15 @@ def publish_info():
         pwms = 'none'
     # board.PRINT(pwms)
     info = "version=" + board.VERSION + "; mac=" + mac + "; IP=" + ip + "; pwms=" + pwms
+    compiled = "0000-00-00 00:00:00"
+    try:
+        import lup
+        # microPython uses 2000-01-01 00:00:00 as epoch - magic conversion
+        t = time.localtime(lup.T - 30*31556926 + 8*3600 - 60*35 - 120)
+        compiled = "{:04d}-{:02d}-{:02d} {:02d}:{:02d}:{:02d}".format(t[0], t[1], t[2], t[3], t[4], t[5])
+    except Exception:
+        pass
+    info += "; compiled=" + compiled
     board.PRINTF('publishing info: {}', info)
     publish("info", info)
 
@@ -261,6 +295,10 @@ def publish_raw(topic, message):
         global _blessed_topic
         _blessed_topic = topic
         try:
+            if isinstance(message, int):
+                message = str(message)
+            if isinstance(message, float):
+                message = str(message)
             board.MQTT.publish(topic, message)
             return True
         except OSError as e:
@@ -276,6 +314,13 @@ def publish(topic, message):
 
 board.MQTT_PUBLISH = publish
 
+_ignored_topics = dict()
+
+def ignore_topics(*topics):  
+    """ignore topics, do not pass them to callbacks or raise errors"""
+    for topic in topics:
+        _ignored_topics[topic] = True
+
 def _mqtt_callback(topic, message):
     # board.PRINTF("got MQTT message: T='{}, M='{}'", topic, message)
     # try to decode topic/message to strings for easier handling by callbacks
@@ -287,6 +332,9 @@ def _mqtt_callback(topic, message):
         _blessed_topic = ""
         return
     t_str = t_str_full[len(options.topic):]
+
+    if t_str in _ignored_topics:
+        return
 
     cb = _callbacks.get(t_str, None)
     if cb is not None:
