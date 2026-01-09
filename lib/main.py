@@ -21,6 +21,10 @@ if False:
 
 import app
 import board
+try:
+    import net # for debugging
+except:
+    pass
 
 # Set network status LED if net module has been loaded, send network status to CAN
 try:

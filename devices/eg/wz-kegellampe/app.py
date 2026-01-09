@@ -152,7 +152,6 @@ watchdog.start_later()
 def r():
     board.restart()
 
-
 try:
     if 0 == 1: # pylint: disable=comparison-with-itself
         board.run()

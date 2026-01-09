@@ -108,6 +108,8 @@ def _interval(_, msg):
 
 fsmqtt.subscribe('set/interval', _interval)
 fsmqtt.subscribe('set/heartbeat', _heartbeat)
+
+import wlandebug
     
 
 net.connect_in_background()
@@ -116,8 +118,25 @@ globals()['net'] = net
 
 fsmqtt.connect_in_background()
 
-def _after_connect():
+async def blue_led():
+    last = 0
+    while True:
+        await asyncio.sleep(0.5)
+        if board.MQTT_PUBLISH:
+            blink = 500
+        else:
+            blink = 2000
+        now = utime.ticks_ms()
+        if utime.ticks_diff(now, last) < blink:
+            continue
+        last = now
+        board.LED.toggle()
+
+
+async def _mqtt_connected():
     keller.send_gas_value()
     keller.send_wasser_value()
 
-fsmqtt.after_connect.append(_after_connect)
+fsmqtt.after_connect.append(_mqtt_connected)
+
+watchdog.start_later()

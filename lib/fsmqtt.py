@@ -46,6 +46,7 @@ def _config(_, msg):
     commands exposed by MQTT 
     """
     import net
+    global _rssi_task
     board.PRINTF('CONFIG: {}', msg)
     msg = str(msg).lower()
     if msg == "uptime":
@@ -80,9 +81,57 @@ def _config(_, msg):
     if msg == "repl-enable":
         net.start_repl()
         return
+
+    if msg == "rssi-off":
+        if _rssi_task:
+            _rssi_task.cancel()
+            _rssi_task = None
+        return
+
+    if msg.startswith("rssi"):
+        if _rssi_task:
+            _rssi_task.cancel()
+            _rssi_task = None 
+        try:
+            mx = str(msg).split(" ")
+            if len(mx) < 2:
+                _print_rssi()
+                return
+            try:
+                period_ms = int(mx[1])
+            except Exception:
+                board.MQTT_PUBLISH('error', "Bad RSSI period {}".format(str(msg)))
+                return
+            if period_ms < 500:
+                period_ms = 5000
+            board.PRINTF('RSSI period: {} ms', period_ms)
+            board.MQTT_PUBLISH('info/rssi_period', period_ms)
+            _rssi_task = asyncio.create_task(_print_rssi_task(period_ms))
+            return
+        except Exception:
+            pass
+        
+        _rssi_task = asyncio.create_task(_print_rssi_task())
+        return
+    
     board.PRINTF('CONFIG: unknown command: {}', msg)
     board.MQTT_PUBLISH('info/config', "unknown command: {}".format(msg))
 
+def _print_rssi():
+    try:
+        rssi = net.wlan.status('rssi')
+    except Exception:
+        return
+    board.PRINTF('RSSI: {} dBm', rssi)
+    board.MQTT_PUBLISH('info/rssi', rssi)
+
+
+async def _print_rssi_task(period_ms):
+    while True:
+        await asyncio.sleep_ms(period_ms)
+        _print_rssi()
+
+_rssi_task = asyncio.create_task(_print_rssi_task(5 * 60 * 1000))
 
 options = _Mqttoptions()
 
@@ -130,10 +179,15 @@ async def _connect_in_background(name=None):
     
     while True:
         # board.PRINT('waiting for WLAN to connect, STATUS={} / {}'.format(net.STATUS, STATUS))
-        await net.reconnect_if_needed()
+        if net.STATUS != "connected":
+            # we could do more clever with signals/asyncio events
+            # board.PRINTF('waiting for WLAN to connect, STATUS={} / {}', net.STATUS, STATUS)
+            await asyncio.sleep_ms(500)
+            continue
 
         if STATUS == "connected":
-            await asyncio.sleep_ms(2 * 60 * 1000)
+            # check regularily if we are still connected
+            await asyncio.sleep_ms(1 * 60 * 1000)
             try:
                 board.MQTT.ping()
                 continue
@@ -144,19 +198,21 @@ async def _connect_in_background(name=None):
                 except Exception:
                     pass
                 STATUS = "connecting"
+                continue
 
         if STATUS == "connecting":
             board.PRINTF('waiting for MQTT to connect')
             # trust nobody
             try:
                 board.MQTT.disconnect()
+                board.MQTT_PUBLISH = board._dummy_mqtt
             except Exception:
                 pass
             try:
                 board.MQTT.connect()
                 cfg = net.wlan_ip()
                 board.PRINTF('MQTT connected {}', cfg)
-                publish_raw("hcm/connected", options.name)
+                publish_raw("hcm/connected", options.name) # IP address is published by info topic below
                 board.MQTT.set_callback(_mqtt_callback)
                 board.MQTT_PUBLISH = publish
                 STATUS = "connected"
@@ -213,12 +269,14 @@ def publish_all():
 def publish_info():
     mac = net.get_mac_address()
     ip = net.get_ip_address()
+    rssi = net.wlan.status('rssi')
     if board.PWMs:
         pwms = ','.join([str(p.portid) for p in board.PWMs.pwms])
     else:
         pwms = 'none'
     # board.PRINT(pwms)
-    info = "version=" + board.VERSION + "; mac=" + mac + "; IP=" + ip + "; pwms=" + pwms
+    info = 'version={}; mac={}; IP={}; rssi={}; pwms={}'.format(
+        board.VERSION, mac, ip, rssi, pwms)
     compiled = "0000-00-00 00:00:00"
     try:
         import lup
@@ -377,6 +435,7 @@ async def _mqtt_poller_task():
 
         except Exception as e:
             board.PRINTF('ERROR: MQTT poller failed: {}', e)
+            board.MQTT_PUBLISH = board._dummy_mqtt
             await asyncio.sleep_ms(1000)
             continue
         await asyncio.sleep_ms(10)

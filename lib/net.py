@@ -43,7 +43,7 @@ except:
         print(formatstring.format(*args))
     LED = None
 
-
+network.country('DE')
 wlan = network.WLAN(network.STA_IF) 
 
 after_connect = []
@@ -54,7 +54,35 @@ after_connect = []
 # x = ap.active(True)
 # print('network activated: ', x)
 
-def start_wlan(base=0, timeout=30):
+def _reset_wlan(base, strongest):
+    """reset WLAN and re-connect"""
+    set_status_led()
+    stop_hotspot()
+
+    wlan.active(False)
+    time.sleep_ms(100)
+    wlan.active(True)       # activate the interface
+    wlan.disconnect()  # ensure clean start
+    time.sleep_ms(100)
+    s, p = c.s(base)
+    bs = s.encode('utf-8')
+    bssid = None
+    bssids = None
+    if strongest: 
+        # try to find the strongest AP
+        ap = wlan.scan()
+        # print(f'Found AP: {ap}')
+        ap = list(filter(lambda x: x[0] == bs, ap))
+        # print(f'Filtered AP: {ap}')
+        ap.sort(key=lambda x: x[3], reverse=True)
+        if ap:
+            bssid = ap[0][1]
+            bssids = format_mac(bssid)
+
+    PRINTF('Connecting to SSID: {} BSSID: {} password: "{}..."', s, bssids, p[:1])
+    wlan.connect(bs, p, bssid=bssid)
+
+def start_wlan(base=0, timeout=30, strongest=False):
     """Connect to WLAN using secrets.py for ssid and password"""
     global STATUS
 
@@ -63,17 +91,7 @@ def start_wlan(base=0, timeout=30):
         #print("Already connected to ", cfg)
         return cfg
     gc.collect()
-    stop_hotspot()
-    # need some sleep, otherwise screen disconnects right away (gets reset??)
-    wlan.active(False)
-    time.sleep(0.1)
-    wlan.active(True)       # activate the interface
-    wlan.disconnect()  # ensure clean start
-    time.sleep(0.1)
-    # pylint: disable=no-member
-    s, p = c.s(base)
-    PRINTF(f'Connecting to SSID: {s}, password: "{p[:3]}..."')
-    wlan.connect(s, p) # connect to an AP
+    _reset_wlan(base, strongest)
     for i in range(timeout):
         s = wlan.status()
         PRINTF(f'Waiting for connection ... {i}, status={s}/{hex(s)}, connected={wlan.isconnected()}')
@@ -137,17 +155,21 @@ def stop_wlan():
 
 STATUS = "undefined"
 
-async def _connect_in_background(base=32):
+
+
+async def _connect_in_background(base=32, strongest=False):
     """Connect to WLAN in background"""
     global STATUS
     connect_count = 0
     while True:
         if STATUS == "undefined" or STATUS == "off":
+            board.MQTT_PUBLISH = board._dummy_mqtt  
             await asyncio.sleep_ms(500)
             continue
 
         if STATUS == "connected": 
             if not wlan.isconnected():
+                board.MQTT_PUBLISH = board._dummy_mqtt
                 STATUS = "connecting"
                 connect_count = 0
                 continue
@@ -157,18 +179,7 @@ async def _connect_in_background(base=32):
         PRINTF('WLANconnect_in_background: {}', STATUS)
         if STATUS == "init_wlan":
             # initialize WLAN and try to connect
-            set_status_led()
-            stop_hotspot()
-            wlan.active(False)
-            time.sleep_ms(100)
-            wlan.active(True)
-            time.sleep_ms(100)
-            time.sleep_ms(100)
-            wlan.disconnect()
-            time.sleep_ms(100)
-            s, p = c.s(base)
-            PRINTF('Connecting to SSID: {} password: "{}..."', s, p[:3])
-            wlan.connect(s, p)
+            _reset_wlan(base, strongest)
             STATUS = "connecting"
             connect_count = 0
 
@@ -202,59 +213,38 @@ async def _connect_in_background(base=32):
             continue
 
         PRINTF('connect_in_background: unknown status: {}', STATUS)
-        await asyncio.sleep(1)
+        await asyncio.sleep_ms(1000)
 
 
-def connect_in_background(base=32):
+def connect_in_background(base=32, strongest=False):
     global STATUS
     start_task = STATUS == "undefined"
     STATUS = "init_wlan"
     if start_task:
-        asyncio.create_task(_connect_in_background(base))
+        asyncio.create_task(_connect_in_background(base, strongest))
 
-async def reconnect_if_needed():
-    global STATUS
-    debug = 3
-    try:
-        debug = board.DEBUG
-    except:
-        pass
-    if debug > 2:
-        PRINTF("reconnect_if_needed: {}", STATUS)
-    while True:
-        if wlan.isconnected():
-            STATUS = "connected"
-            return
-
-        if STATUS == "undefined":
-            STATUS = "init_wlan"
-            asyncio.create_task(_connect_in_background())
-
-        if STATUS == "off":
-            STATUS = "init_wlan"
-
-        if STATUS == "connecting" or STATUS == "init_wlan":
-            await asyncio.sleep_ms(500)
-            continue
-
-        if debug > 0:
-            PRINTF("reconnect_if_needed: unknown status: {}", STATUS)
-        await asyncio.sleep_ms(500)
-    
 
 def start_repl(password='x'):
     webrepl.start(password=password)
-    board.MQTT_PUBLISH("info", "repl enabled")
+    try:
+        board.MQTT_PUBLISH("info", "repl enabled")
+    except:
+        pass
 
 def stop_repl():
     webrepl.stop()
-    board.MQTT_PUBLISH("info", "repl disabled")
+    try:
+        board.MQTT_PUBLISH("info", "repl disabled")
+    except:
+        pass
 
-def net(base=32, timeout=30):
+def net(base=32, timeout=30, strongest=False):
     """Start network and repl"""
-    ip = start_wlan(base, timeout=timeout)
-    # print("# Connected to ", ip[0])
-    start_repl()
+    ip = start_wlan(base, timeout=timeout, strongest=strongest)
+    if ip != None:
+        start_repl()    
+    else:
+        PRINTF("net: cannot connect to WLAN")
 
 
 def format_mac(mac_bytes, sep=":"):

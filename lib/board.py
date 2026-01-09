@@ -22,6 +22,7 @@ CPU_ID = 1              # ESP32 per default
 BOARD_ID = 0            # PCB version, overwritten in bconf
 PERIPH_ID = 0           # PCB version, overwritten in main.py (or by including other .py files)
 
+
 MQTT = None             # Set when MQTT is connected
 """The MQTT client. This is set in fsmqtt.py"""
 
@@ -69,6 +70,11 @@ class Led:
         if self.led is None:
             return
         self.led.value(1-self.onvalue)
+
+    def toggle(self):
+        if self.led is None:
+            return
+        self.led.value(1-self.led.value())
 
 
 LED = Led(-1)              # overwritten in bconf
