@@ -30,7 +30,7 @@ import machine
 import sensors
 import pwm
 import button
-import uasyncio as asyncio
+import asyncio
 
 p1 = pwm.PWM(1, bconf.AUX1_YELLOW)
 p2 = pwm.PWM(2, bconf.AUX1_WHITE)

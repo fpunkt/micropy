@@ -40,7 +40,7 @@ import machine
 import sensors
 import pwm
 import button
-import uasyncio as asyncio
+import asyncio
 import neopixel
 
 if board.CAN and board.DEBUG:

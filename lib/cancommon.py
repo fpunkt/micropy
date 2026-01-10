@@ -2,7 +2,7 @@ import board
 import canid
 import canerror
 import canconf
-import uasyncio as asyncio
+import asyncio
 import gc
 import machine
 import net

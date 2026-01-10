@@ -23,7 +23,7 @@ p
 # pylint: disable=too-many-instance-attributes, global-statement
 
 import machine
-import uasyncio as asyncio
+import asyncio
 import board
 import can
 import canid
@@ -99,6 +99,7 @@ class PWM(port.Port):
         # allocate message once to avoid garbage collection
         self.msg = can.Message(canid.PWM_VALUE, [0, 0, 0, 0, 0, 0, 0])
         self.msg.setsender(self.portid)
+        board.MQTT.subscribe(f'set/{self.portid}', self.mqtt_callback)
 
     def __repr__(self):
         return '<{} {}.{}>'.format(self.__class__.__name__, self.portid, self.pwm)
@@ -208,9 +209,8 @@ class PWM(port.Port):
             payload[6] = i16 & 0xff
             self.msg.send()
         # board.PRINT('Sending status to CAN for PWM {} - {} / {} - {} '.format(self.portid, self, ival, i16))
-        if board.MQTT_PUBLISH:
-            # board.MQTT_PUBLISH('light/{}/{}/set'.format(board.LOCATION, self.portid), i16)
-            board.MQTT_PUBLISH('state/{}'.format(self.portid), str(i16>>8)) 
+        # board.MQTT_PUBLISH('light/{}/{}/set'.format(board.LOCATION, self.portid), i16)
+        board.MQTT.publish('state/{}'.format(self.portid), str(i16>>8)) 
 
     def run_next_dimstep(self):
         """Set next dimlevel for smooth dimming to finally reach self.dimtovalue."""
@@ -589,8 +589,9 @@ async def _next_dim_step_task():
                 print('return from start_dimming waiter')
 
 
-board.BACKGROUND_RUNNERS.append(_next_dim_step_task())
+# board.BACKGROUND_RUNNERS.append(_next_dim_step_task())
 
+asyncio.create_task(_next_dim_step_task())
 
 ### Handle PWM callbacks
 

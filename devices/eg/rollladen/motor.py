@@ -3,7 +3,7 @@
 
 import pwm
 import board
-import uasyncio as asyncio
+import asyncio
 import machine
 
 

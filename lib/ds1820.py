@@ -2,7 +2,7 @@ import machine
 import ds18x20
 import onewire
 import sensors
-import uasyncio as asyncio
+import asyncio
 import can
 import canid
 

@@ -9,7 +9,7 @@ RGB is using 3 PWM.
 import machine
 from net import DEBUG
 import utime
-import uasyncio as asyncio
+import asyncio
 import board
 import can
 import canid

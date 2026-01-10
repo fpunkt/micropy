@@ -11,7 +11,7 @@ import board
 import canerror
 import net
 import utime
-import uasyncio as asyncio
+import asyncio
 import cancommon
 import sys
 

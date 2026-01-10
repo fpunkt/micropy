@@ -10,11 +10,8 @@ Use IRQ for debouncing and async polling for event processing.
 import port
 import machine
 import utime
-import sensors
-import can
-import canerror
 import board
-import uasyncio as asyncio
+import asyncio
 import sys
 
 class IRQIO(port.Port):
@@ -40,16 +37,18 @@ class IRQIO(port.Port):
         self.last_irq = utime.ticks_ms()
         self.last_run_before_ms = 0
         self.is_disabled = False
-        self.triggerevent = asyncio.Event()
+        self.triggerevent = asyncio.ThreadSafeFlag()
         # store the current value in pinvalue to ensure a consistant behaviour while callbacks
         # are running (might be confusing if value changes ...)
         self.pinvalue = self.value()
         self.enable()
-        board.BACKGROUND_RUNNERS.append(self._runner())
+        # board.BACKGROUND_RUNNERS.append(self._runner())
+        asyncio.create_task(self._runner())
 
     def makemessage(self, canid):
         """Create CAN message for use and store in self.msg"""
-        self.msg = can.makemessage(canid, 5, portid=self.portid)
+        if board.CAN:
+            self.msg = board.CAN.makemessage(canid, 5, portid=self.portid)
 
     def value(self):
         """Return pin value (respecting the value of self.inverted)"""
@@ -69,14 +68,17 @@ class IRQIO(port.Port):
         self.pin.irq(trigger=self.trigger, handler=self._irq_handler)
 
     def set_changed_status(self, status):
-        self.msg.payload[4] = 1 if status else 0
+        if board.CAN:
+            self.msg.payload[4] = 1 if status else 0
 
     def update_telemetry(self):
-        self.set_changed_status(0)
+        if board.CAN:
+            self.set_changed_status(0)
 
     def update_payload(self):
-        self.set_changed_status(1)
-        self.msg.payload[3] = self.pinvalue
+        if board.CAN:
+            self.set_changed_status(1)
+            self.msg.payload[3] = self.pinvalue
 
     async def run(self):
         """This function is run when an interrupt is received. It returns true if something has been
@@ -85,8 +87,9 @@ class IRQIO(port.Port):
         if board.DEBUG > 2:
             print('{} got interrupt {}/{}'.format(self, self.pinvalue, self.value()))
         # TODO: check who is calling send_message() and update_payload() in the background
-        self.update_payload()
-        self.send_message()
+        if board.CAN:
+            self.update_payload()
+            self.send_message()
         self.set_changed_status(0)
         return True
 

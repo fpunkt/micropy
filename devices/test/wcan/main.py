@@ -6,7 +6,7 @@ import time
 import sys
 
 try:
-    import uasyncio as asyncio
+    import asyncio
 except:
     import asyncio
 

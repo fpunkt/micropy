@@ -11,7 +11,7 @@ import board
 import canid
 import irqio
 import utime
-import uasyncio as asyncio
+import asyncio
 import sys
 
 if 0 == 1:
@@ -103,7 +103,7 @@ class Button(irqio.IRQIO):
             print('{} new state after toggle is {}'.format(self, self.state))
         if self.callback is not None:
             self.callback(self)
-        board.MQTT_PUBLISH('state/{}'.format(self.portid), self.state)
+        board.MQTT.publish('state/{}'.format(self.portid), self.state)
         return self.state != 0
 
     def on(self):

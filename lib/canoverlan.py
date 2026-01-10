@@ -8,7 +8,7 @@ import net
 import cancommon
 
 try:
-    import uasyncio as asyncio
+    import asyncio
 except:
     import asyncio
 

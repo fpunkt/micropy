@@ -25,4 +25,4 @@ def rssi():
         time.sleep(0.5)
         rssi = wlan.status('rssi')
         board.PRINTF('RSSI: {} dBm', rssi)
-        board.MQTT_PUBLISH('info/rssi', rssi)
+        board.MQTT.publish('info/rssi', rssi)

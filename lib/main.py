@@ -4,6 +4,11 @@
 
 import board
 
+import asyncio
+
+def run():
+    asyncio.get_event_loop().run_forever()
+
 # Always start up with network on and basic debugging enabled.
 # You can overwrite this by providing a main.py for your application
 # or you can overwrite it by sending a CAN command after receiving a power on message
@@ -20,19 +25,9 @@ if False:
 # Init Watchdog
 
 import app
-import board
-try:
-    import net # for debugging
-except:
-    pass
-
-# Set network status LED if net module has been loaded, send network status to CAN
-try:
-    import sys
-    sys.modules['net'].set_status_led()
-    sys.modules['cancommon'].send_wlan_connected()
-except:
-    pass
+# For conveniece debugging: Set net and mqtt as global variables
+NET = board.NET
+MQTT = board.MQTT
 
 def r():
     board.restart()
@@ -48,7 +43,6 @@ except AttributeError:
 except Exception as e:
     board.PRINTF('Exception in main loop: {}', e)
     board.PRINTF('Try to connect to WLAN')
-    import net
-    net.net()
+    board.NET.start_wlan()
     
  

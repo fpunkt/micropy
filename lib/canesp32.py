@@ -2,7 +2,7 @@
 
 import machine
 import board
-import uasyncio as asyncio
+import asyncio
 import utime
 import cancommon
 

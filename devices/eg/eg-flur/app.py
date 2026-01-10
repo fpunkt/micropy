@@ -63,7 +63,7 @@ import canerror
 # import machine
 # import sensors
 import pwm
-import uasyncio as asyncio
+import asyncio
 import i2cdevice
 # import tsl2561
 import motionsensor

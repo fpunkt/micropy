@@ -35,7 +35,7 @@ def mem(msg):
         print("mem: ", gc.mem_free())
 
 mem('asyncio')
-import uasyncio as asyncio
+import asyncio
 
 # mem('bconf')
 # import bconf

@@ -14,7 +14,7 @@ def print_stats():
     alloc_after = gc.mem_alloc()
     freed = free_after - free_before
     allocated = alloc_after - alloc_before
-    board.MQTT_PUBLISH("info/mem", "free_before: {} alloc_before: {} free_after: {} alloc_after: {}, freed: {}, allocated: {}".format(
+    board.MQTT.publish("info/mem", "free_before: {} alloc_before: {} free_after: {} alloc_after: {}, freed: {}, allocated: {}".format(
         free_before, alloc_before, free_after, alloc_after, freed, allocated))
     board.PRINTF("free_before: {} alloc_before: {} free_after: {} alloc_after: {}".format(
         free_before, alloc_before, free_after, alloc_after))

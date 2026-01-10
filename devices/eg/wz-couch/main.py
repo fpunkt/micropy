@@ -39,7 +39,7 @@ import machine
 import sensors
 import pwm
 import button
-import uasyncio as asyncio
+import asyncio
 
 if board.CAN and board.DEBUG:
     board.CAN.cancommon.send_wlan_connected()

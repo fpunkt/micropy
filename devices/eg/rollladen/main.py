@@ -24,7 +24,7 @@ import sensors
 import pwm
 import motor
 import relais
-import uasyncio as asyncio
+import asyncio
 import utime
 import bconf
 import can

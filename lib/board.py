@@ -10,7 +10,7 @@ import gc
 import sys
 import machine
 import utime
-import uasyncio as asyncio
+import asyncio
 
 # If DEBUG is set, additinoal messages will be printed. Set in main.py
 DEBUG = False
@@ -22,15 +22,42 @@ CPU_ID = 1              # ESP32 per default
 BOARD_ID = 0            # PCB version, overwritten in bconf
 PERIPH_ID = 0           # PCB version, overwritten in main.py (or by including other .py files)
 
+class _net:
+    async def wait_for_connection(self):
+        # Pretend to wait for connection. We could sleep forever here .. BUT: 
+        # Network might be loaded later, so we return False to indicate that we are not connected.
+        # The client should loop over `wait_for_connection` until it returns True.
+        await asyncio.sleep_ms(1000) 
+        return False
 
-MQTT = None             # Set when MQTT is connected
+    def connect(self, timeout=30):
+        pass
+
+
+NET = _net()
+"""The network client. This is set in net.py when net is imported"""
+
+class _mqtt:
+    def __init__(self):
+        self.callbacks = {}
+        self.after_connect = []
+    def connected(self):
+        return False
+    def connect(self, timeout=30):
+        pass
+    def publish(self, topic: str, message):
+        pass
+    def subscribe(self, topic: str, callback):
+        self.callbacks[topic] = callback
+    def after_connect(self, callback):
+        self.after_connect.append(callback)
+
+DUMMY_MQTT = _mqtt()
+"""Used by fsmqtt to collect callbacks that have been registered before fsmqtt was loaded.
+This is e.g. done by sensors.py when they register their callbacks."""
+
+MQTT = DUMMY_MQTT             # Set when MQTT is connected
 """The MQTT client. This is set in fsmqtt.py"""
-
-def _dummy_mqtt(topic, message):
-    pass
-
-MQTT_PUBLISH = _dummy_mqtt
-"""The MQTT publish function. This is set in fsmqtt.py"""
 
 RESET_ON_HARD_ERRORS = False # mainly CAN Errors
 ENABLE_WATCHDOG_AFTER_SECONDS = 120
@@ -176,13 +203,6 @@ VERSION = "unknown"
 # The actual value is set when can.py is loaded/initialized
 CAN = None
 
-# the global watchdog
-class _dummy_watchdoc():
-    def enable(self): pass
-    def trigger(self): pass
-
-WD = _dummy_watchdoc()
-
 run_gc = None
 
 def good_time_for_gc():
@@ -190,16 +210,11 @@ def good_time_for_gc():
     if run_gc and gc.mem_free() < 6000:
         run_gc() # pylint: disable=not-callable
 
-async def _enable_watchdog():
-    await asyncio.sleep(ENABLE_WATCHDOG_AFTER_SECONDS)
-    if ENABLE_WATCHDOG_AFTER_SECONDS == 0:
-        return
-    WD.enable()
-
 
 # Run async processes
 
 async def arun():
+    """Run all background tasks"""
     try:
         await asyncio.gather(*BACKGROUND_RUNNERS)
     except asyncio.TimeoutError:
@@ -224,9 +239,10 @@ def run():
     # run GC once to supress memory messages after startup (because gc will be triggered after initialization ...)
     gc.collect()
     print('start main loop')
-    asyncio.run(arun())
+#     asyncio.run(arun())
+    asyncio.get_event_loop().run_forever()
 
-def restart_eventloop():
+def restart_eventloop(): 
     """Restart tasks and loop"""
     PRINTF("Restarting the event loop...")
     gc.collect()
@@ -239,6 +255,10 @@ def reset():
         MQTT.disconnect()
     machine.reset()
 
+def set_global(key, value):
+    """Set a global variable at the board level"""
+    import builtins
+    setattr(builtins, key, value)
 
 def reload_module(module_name, run_main=False):
 	"""

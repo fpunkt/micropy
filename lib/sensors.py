@@ -21,7 +21,7 @@ import board
 import can
 import canid
 import canerror
-import uasyncio as asyncio
+import asyncio
 import sys
 try:
     import fsmqtt
@@ -72,8 +72,7 @@ class Sensor(port.Port):
 
     def mqtt_setup_and_proclaim(self, topic):
         """setup mqtt state and proclaim on MQTT"""
-        if board.MQTT:
-            board.MQTT_PUBLISH(s + "status", "ON")
+        board.MQTT.publish("status", "ON")
 
     async def poll(self): # pylint: disable=no-self-use
         """This function is called periodically. It should prepare a measurement and return
