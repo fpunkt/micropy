@@ -113,8 +113,8 @@ class IRQIO(port.Port):
             self.last_run_before_ms = utime.ticks_diff(now, self.last_irq)
             self.last_irq = now
 
-            if board.DEBUG > 1:
-                print('IRQ triggered for {:02x} (now: {}, prev: {})'.format(self.portid, self.last_run_before_ms, utime.ticks_ms(), self.last_irq))
+            if board.DEBUG > 5:
+                print('IRQ triggered for port 0x{:02x} (now: {}, prev: {})'.format(self.portid, self.last_run_before_ms, utime.ticks_ms(), self.last_irq))
             try:
                 self.triggerevent.clear()
                 self.pinvalue = self.value()
