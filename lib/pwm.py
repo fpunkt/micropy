@@ -25,7 +25,6 @@ p
 import machine
 import asyncio
 import board
-import can
 import canid
 import pwmcode
 import port
@@ -97,9 +96,11 @@ class PWM(port.Port):
         self.mqttstate = None # cache to avoid gc
 
         # allocate message once to avoid garbage collection
-        self.msg = can.Message(canid.PWM_VALUE, [0, 0, 0, 0, 0, 0, 0])
-        self.msg.setsender(self.portid)
-        board.MQTT.subscribe(f'set/{self.portid}', self.mqtt_callback)
+        if board.CAN is not None:
+            self.msg = board.CAN.Message(canid.PWM_VALUE, [0, 0, 0, 0, 0, 0, 0])
+            self.msg.setsender(self.portid)
+        if board.MQTT is not None:
+            board.MQTT.subscribe(f'set/{self.portid}', self.mqtt_callback)
 
     def __repr__(self):
         return '<{} {}.{}>'.format(self.__class__.__name__, self.portid, self.pwm)
@@ -219,10 +220,10 @@ class PWM(port.Port):
         ds = (2*ival) // dimstep_scale
         ds = min(dimstep_max, max(dimstep_min, ds)) # about 200 ms when min step is 10
         remaining_counts = self.dimtovalue - ival
-        if board.DEBUG > 2:
+        if board.DEBUG > 3:
             print('pwm: {:2d}, iv: {:4d}, ds: {:3d}, remaining: {:4d}'.format(self.portid, ival, ds, remaining_counts))
         if abs(remaining_counts) <= ds:
-            if board.DEBUG > 1:
+            if board.DEBUG > 4:
                 print('  end of dimming - remaining = {}, setting to {}'.format(remaining_counts, self.dimtovalue))
             # Accepting the PWM value takes a while, probably until the end of the phase.
             # So in the order of a few milliseconds (up to 10 with 100 Hz pwm frequency)
@@ -249,7 +250,7 @@ class PWM(port.Port):
             self.seti(value)
             return False
         self.dimtovalue = value
-        if board.DEBUG > 2:
+        if board.DEBUG > 4:
             print('Start dimming {}'.format(self.portid))
         start_dimming.set()
         return True
@@ -528,7 +529,7 @@ async def _next_dim_step_task():
     # dimdelay = max(1, 1100 // pwm_freq)
 
     dimdelay_when_dimming = max(1, 1000 // pwm_freq)
-    if board.DEBUG:
+    if board.DEBUG > 4:
         print('dimdelay when dimming = {}'.format(dimdelay_when_dimming))
     was_dimming = False
 
@@ -630,9 +631,10 @@ def _getpwm(msg):
         i += 1
     return pwms
 
-can.register(pwmcode.SET_INTENSITY16, 4, 4, lambda msg: _getpwm(msg).dimi16(msg.u16(2)))
-can.register(pwmcode.SET_INTENSITY_NATIVE, 4, 4, lambda msg: _getpwm(msg).dimi(msg.u16(2)))
-can.register(pwmcode.ON, 2, 2, lambda msg: _getpwm(msg).on())
-can.register(pwmcode.OFF, 2, 2, lambda msg: _getpwm(msg).off())
-can.register(pwmcode.TOGGLE, 2, 2, lambda msg: _getpwm(msg).toggle())
+if board.CAN is not None:
+    board.CAN.register(pwmcode.SET_INTENSITY16, 4, 4, lambda msg: _getpwm(msg).dimi16(msg.u16(2)))
+    board.CAN.register(pwmcode.SET_INTENSITY_NATIVE, 4, 4, lambda msg: _getpwm(msg).dimi(msg.u16(2)))
+    board.CAN.register(pwmcode.ON, 2, 2, lambda msg: _getpwm(msg).on())
+    board.CAN.register(pwmcode.OFF, 2, 2, lambda msg: _getpwm(msg).off())
+    board.CAN.register(pwmcode.TOGGLE, 2, 2, lambda msg: _getpwm(msg).toggle())
 
