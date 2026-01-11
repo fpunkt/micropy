@@ -3,10 +3,11 @@
 # Connect using   picocom --baud 115420 /dev/tty.usbserial-0001
 
 import board
-
+import machine
 import asyncio
 
 def run():
+    """Run the main event loop forever"""
     asyncio.get_event_loop().run_forever()
 
 # Always start up with network on and basic debugging enabled.
@@ -29,8 +30,9 @@ import app
 NET = board.NET
 MQTT = board.MQTT
 
-def r():
-    board.restart()
+def restart():
+    """Restart the board"""
+    machine.reset()
 
 # check whether app has defined its own main function. If so: run main()
 # Otherwise start the main eventloop which starts all registered services (e.g. sensors, PWM, etc.)
