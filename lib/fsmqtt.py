@@ -153,9 +153,9 @@ class _MQTT:
         self.publish("error", "no callback for T='{}', M='{}'".format(t_str, m_str))
 
 
-    def _config_command(self, msg):
+    def _config_command(self, topic, msg):
         """
-        CONFIG: uptime, memstat, restart, watchdog, wrestart, repl, repl-disable, repl-enable
+        CONFIG: uptime, memstat, restart, watchdog, reset, repl, repl-disable, repl-enable
         commands exposed by MQTT 
         """
         board.PRINTF('CONFIG: {}', msg)
@@ -168,9 +168,14 @@ class _MQTT:
             board.PRINTF('MEMSTAT: {}', memstat.get())
             self.publish('info/memstat', memstat.get())
             return
-        if msg == "restart":
+        if msg == "restart" or msg == "reboot" or msg == "soft-reset":
             board.PRINTF('RESTART')
-            self.publish('info/restart', "going to restart board (using reset)")
+            self.publish('info/restart', "going to restart board (using soft reset)")
+            board.restart()
+            return
+        if msg == "reset" or msg == "hard-reset":
+            board.PRINTF('RESET')
+            self.publish('info/reset', "going to reset board (using hard reset)")
             board.reset()
             return
         if msg == "watchdog":
@@ -252,6 +257,11 @@ class _MQTT:
 
         self._keepalive_task = asyncio.create_task(self._keepalive())
         asyncio.create_task(self._poll_for_new_messages())
+
+    def disconnect(self):
+        if self.client:
+            self.client.disconnect()
+            self.client = None
 
     async def _keepalive(self):
         self.status = "connecting"
