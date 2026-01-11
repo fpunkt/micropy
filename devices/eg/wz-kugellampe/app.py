@@ -14,7 +14,7 @@ board.VERSION = '2025-12-12'
 import fsmqtt
 import pwm
 import machine
-import bconf
+import bconf # setup LED
 import net
 
 bconf.board.LED.on() # access bconf to avoid warnings
@@ -25,23 +25,7 @@ p3 = pwm.PWM(3, machine.Pin(7))
 p4 = pwm.PWM(4, machine.Pin(9))
 
 #p5 = pwm.PWM(55, machine.Pin(8))
+board.NET.connect()
+board.MQTT.connect()
 
-net.connect_in_background()
-fsmqtt.connect_in_background()
-
-
-def r():
-    board.restart()
-
-try:
-    if 1 == 1: # pylint: disable=comparison-with-itself
-        board.run()
-    else:
-        print('# run  restart   (or board.run()) to start event handler')
-
-except Exception as e: # pylint: disable=bare-except, broad-except
-    print('Exception in main loop: ', e)
-    print("Try to connect to WLAN")
-    import net
-    net.net()
-
+board.MQTT.run_forever(lambda: board.LED.off())
