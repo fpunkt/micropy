@@ -255,6 +255,13 @@ def reset():
         MQTT.disconnect()
     machine.reset()
 
+def restart():
+    """Restart the device"""
+    PRINTF("Restarting the device...")
+    if MQTT:
+        MQTT.disconnect()
+    machine.soft_reset()
+
 def set_global(key, value):
     """Set a global variable at the board level"""
     import builtins
