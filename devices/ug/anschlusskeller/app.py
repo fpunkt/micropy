@@ -17,6 +17,14 @@ import memstat
 import asyncio
 import irqio
 import utime
+import pwm
+
+p1 = pwm.PWM(0x01, 16)
+p2 = pwm.PWM(0x02, 17)
+
+PIN_GAS = 23        # corner PIN upper row towards 5V supply
+PIN_WASSER = 22     # 2nd to corner
+PIN_DOOR = 21       # 2 FREE (RX/TX) then 4th to corner
 
 class Anschlusskeller:
     def __init__(self):
@@ -26,8 +34,15 @@ class Anschlusskeller:
         self.last_gas_timestamp = 0
         self.last_wasser_timestamp = 0
 
-        self.gas = IRQIO(0x01, machine.Pin(22, machine.Pin.IN), pullup=None)
-        self.wasser = IRQIO(0x02, machine.Pin(23, machine.Pin.IN), pullup=True)
+        #self.gas = IRQIO(0x11, machine.Pin(PIN_GAS, machine.Pin.IN), pullup=None)
+        #self.wasser = IRQIO(0x12, machine.Pin(PIN_WASSER, machine.Pin.IN), pullup=True)
+        #self.door = DoorSensor(0x13, machine.Pin(PIN_DOOR, machine.Pin.IN))
+        self.gas = IRQIO(0x11, PIN_GAS, pullup=None)
+        self.wasser = IRQIO(0x12, PIN_WASSER, pullup=True)
+        self.door = DoorSensor(0x13, PIN_DOOR, debounce_ms=150)
+
+        self.auto_off_task = None
+        self.auto_off_delay_s = 1800
 
         # send a heartbeat every 5 minutes
         self.heartbeat = 5 * 60 * 1000
@@ -63,7 +78,36 @@ class Anschlusskeller:
         self.last_wasser_value = self.wasser.counter
         board.MQTT.publish('wasser', self.wasser.counter)
         board.PRINTF('Wasser: {}', self.wasser.counter)
+
+    def light_on(self):
+        p1.dimi16(0xffff)
+        p2.dimi16(0xffff)
+        board.MQTT.publish('info/light', 'on')
+
+    def light_off(self):
+        p1.off()
+        p2.off()
+        board.MQTT.publish('info/light', 'off')
+
+    def door_open(self):
+        if self.auto_off_task is not None:
+            self.auto_off_task.cancel()
+            self.auto_off_task = None
+        self.auto_off_task = asyncio.create_task(self.auto_off())
+        self.light_on()
+        board.MQTT.publish('info/door', 'open')
+
+    def door_closed(self):
+        if self.auto_off_task is not None:
+            self.auto_off_task.cancel()
+            self.auto_off_task = None
+        self.light_off()
+        board.MQTT.publish('info/door', 'closed')
         
+    async def auto_off(self):
+        await asyncio.sleep(self.auto_off_delay_s)
+        self.light_off()
+        self.auto_off_task = None
 
 class IRQIO(irqio.IRQIO):
     def __init__(self, portid, pinid, inverted=False, debounce_ms=20, pullup=True):
@@ -74,6 +118,18 @@ class IRQIO(irqio.IRQIO):
         board.PRINTF('IRQIO {} {}', self.portid, self.pinvalue)
         if self.pinvalue == 1:
             self.counter += 1
+        return True
+
+class DoorSensor(irqio.IRQIO):
+    def __init__(self, portid, pinid, inverted=False, debounce_ms=50):
+        super().__init__(portid, pinid, inverted=inverted, debounce_ms=debounce_ms, pullup=True)
+
+    async def run(self):
+        board.PRINTF('DoorSensor {} {}', self.portid, self.pinvalue)
+        if self.pinvalue == 1:
+            keller.door_open()
+        else:
+            keller.door_closed()
         return True
 
 print("going to create anschlusskeller")
@@ -107,8 +163,37 @@ def _interval(_, msg):
     keller.interval = value * 1000
     board.MQTT.publish('info/interval', value)
 
+def _door_autooff(_, msg):
+    """set door autooff delay in seconds"""
+    value = _getvalue(_, msg, min=10, max=3600)
+    board.PRINTF('Door autooff: {}', value)
+    keller.auto_off_delay_s = value
+    board.MQTT.publish('info/door_autooff', value)
+
+def _light_on_off(_, msg):
+    """set light on or off"""
+    if msg.tolower() == 'on':
+        keller.light_on()
+    elif msg.tolower() == 'off':
+        keller.light_off()
+    else:
+        board.PRINTF('Light: {}', msg)
+        board.MQTT.publish('error/light', 'Invalid value: ' + msg)
+
+def _door_open_close(_, msg):
+    if msg.tolower() == 'open':
+        keller.door_open()
+    elif msg.tolower() == 'close':
+        keller.door_closed()
+    else:
+        board.PRINTF('Door: {}', msg)
+        board.MQTT.publish('error/door', 'Invalid value: ' + msg)
+
 board.MQTT.subscribe('set/interval', _interval)
 board.MQTT.subscribe('set/heartbeat', _heartbeat)
+board.MQTT.subscribe('set/door_autooff', _door_autooff)
+board.MQTT.subscribe('set/light', _light_on_off)
+board.MQTT.subscribe('set/door_open', _door_open_close)
 
 print("going to connect to network")
 board.NET.connect()
