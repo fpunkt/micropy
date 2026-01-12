@@ -6,7 +6,7 @@ MQTT Client for Anschlusskeller, Gas- und Wasserzähler, ggf Licht.
 
 import board
 board.LOCATION = 'ug-anschlusskeller'
-board.VERSION = '2025-12-14'
+board.VERSION = '2026-01-12'
 board.DEBUG = 2
 import fsmqtt
 
@@ -19,12 +19,12 @@ import irqio
 import utime
 import pwm
 
-p1 = pwm.PWM(0x01, 16)
-p2 = pwm.PWM(0x02, 17)
+p1 = pwm.PWM(0x01, 22)
+p2 = pwm.PWM(0x02, 23)
 
-PIN_GAS = 23        # corner PIN upper row towards 5V supply
-PIN_WASSER = 22     # 2nd to corner
-PIN_DOOR = 21       # 2 FREE (RX/TX) then 4th to corner
+PIN_GAS = 32        # corner PIN upper row towards 5V supply
+PIN_WASSER = 34     # 2nd to corner
+PIN_DOOR = 35       # 2 FREE (RX/TX) then 4th to corner
 
 class Anschlusskeller:
     def __init__(self):
@@ -172,18 +172,18 @@ def _door_autooff(_, msg):
 
 def _light_on_off(_, msg):
     """set light on or off"""
-    if msg.tolower() == 'on':
+    if msg.lower() == 'on':
         keller.light_on()
-    elif msg.tolower() == 'off':
+    elif msg.lower() == 'off':
         keller.light_off()
     else:
         board.PRINTF('Light: {}', msg)
         board.MQTT.publish('error/light', 'Invalid value: ' + msg)
 
 def _door_open_close(_, msg):
-    if msg.tolower() == 'open':
+    if msg.lower() == 'open':
         keller.door_open()
-    elif msg.tolower() == 'close':
+    elif msg.lower() == 'close':
         keller.door_closed()
     else:
         board.PRINTF('Door: {}', msg)
