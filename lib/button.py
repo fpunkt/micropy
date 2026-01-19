@@ -38,7 +38,7 @@ class Button(irqio.IRQIO):
         self._arevent.clear()
         self.callback = None
         self.all_off_mode = False
-        self.update_payload() # ensure that calls to send_telemetry have a valid status
+        self.update_payload()
 
     def __repr__(self):
         return self._repr('{}, state={}'.format(self.pwm, self.state))
@@ -177,7 +177,7 @@ class ARButton(Button):
 
         # autorepeat is active, do next step
         self.pwm.disable_dimming()
-        ival = self.pwm.current_value()
+        ival = self.pwm.current_raw_value()
 
         # step = max(1, (ival * ival) // 500)
         # step = max(1, ival // 100)
@@ -193,6 +193,6 @@ class ARButton(Button):
         newval = ival + step
         newval = min(1023, max(1, newval))
         # print('dim to {}, iv={}, step={}'.format(newval, ival, step))
-        self.pwm.seti_no_can_message(newval)
+        self.pwm.set_raw_no_telemetry(newval)
         self.autorepeat_last_action_timestamp = now
         return True

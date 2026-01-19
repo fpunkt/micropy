@@ -21,10 +21,10 @@ def pwmmessage(count=100):
     """check GC usage for PWM messages"""
     for _ in range(count):
         m1 = gc.mem_free()
-        pp.send_status_to_can()
-        pp.send_status_to_can()
-        pp.send_status_to_can()
-        pp.send_status_to_can()
+        pp.send_telemetry()
+        pp.send_telemetry()
+        pp.send_telemetry()
+        pp.send_telemetry()
         m2 = gc.mem_free()
         delay_between_loops()
         print('Mem Used: {}'.format(m1-m2))

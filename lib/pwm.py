@@ -22,16 +22,13 @@ p
 # pylint: disable=import-error, missing-docstring
 # pylint: disable=too-many-instance-attributes, global-statement
 
+import math
 import machine
 import asyncio
 import board
 import canid
 import pwmcode
 import port
-try:
-    import fsmqtt
-except:
-    fsmqtt = None
 
 
 # Wakeup dimmer loop when needed
@@ -44,13 +41,30 @@ if 0 == 1:
 _FINISHED_DIMMING = const(-1)
 NODIMMING = const(-99)
 
-# Minimum step size - dimming takes about 350 ms for dimstep_min=5 and 200 ms for dimstep_min = 10
-dimstep_min = 10
+ALL_ON = 2
+ALL_OFF = 0
+SOME_ON = 1
 
-dimstep_max = 100
+# Minimum step size - dimming takes about 350 ms for dimstep_min=5 and 200 ms for dimstep_min = 10
+dimstep_min = 20
+
+dimstep_max = 200
 
 # Calculate size for next dimstep to 2*val / dimstep_scale
 dimstep_scale = 7
+
+
+# Micropython does not expose the PWM resolution but sets it depending on the H/W and the
+# choosen PWM frequency.
+#
+# Rule of thumb (ESP32 family)
+# | PWM frequency | Effective resolution |
+# | ------------- | -------------------- |
+# | 500–1 kHz     | ~13–15 bits          |
+# | 5 kHz         | ~11–12 bits          |
+# | 20 kHz        | ~9–10 bits           |
+# | 40 kHz        | ~8 bits              |
+
 
 # PWM freq defines the overall frequency of the device in Hz.
 # 100 Hz is a good no-flicker number, but dimming is not as smooth as it could be
@@ -58,27 +72,73 @@ dimstep_scale = 7
 # for higher change rates when setting the PWM, e.g. smoother dimming.
 # 200 Hz has nicer dimming.
 # pwm_freq = 100
-pwm_freq = 200
+pwm_freq = 400
 
-_nbit_pwm = const(10)
-_max_raw_value = const((1 << _nbit_pwm)-1)
+#_nbit_pwm = const(12)
+# _xxxmax_raw_value = const((1 << _nbit_pwm)-1)
 
-def i16_to_raw(v):
-    vv = v >> (16-_nbit_pwm)
-    if vv == 0 and v > 0:
-        return 1
-    return vv
 
-def valid(i):
-    """Return value in range 0..1023, accepts raw integers (0..1023) or floating point numbers 0.0 .. 1.0"""
-    if isinstance(i, float):
-        return int(i*_max_raw_value)
-    return min(_max_raw_value, max(i, 0))
+def _xxxxraw_to_16(i: int) -> int:
+    """expand _nbit_pwm (e.g. 12 bit) to a 16 bit value such that the lower bits are fill
+    reasonably with the expected value, e.g. 0xfff should not result in 0xfff0 but 0xffff"""
+    lshift = 16 - _nbit_pwm
+    return (i << lshift) | (i >> (_nbit_pwm - lshift))
+
+def xxxgamma_correct(value, gamma=2.2):
+    """
+    Apply gamma correction to a normalized brightness value.
+
+    value: float (0.0 to 1.0)
+    gamma: float (typically 2.0–2.4)
+    """
+    value = max(0.0, min(1.0, value))  # clamp
+    return value ** gamma
+
+# 2.0 is considered a reasonable value for indoor, 2.2 for architectural lighting, 2.4 for stage/film lighting
+GAMMA = 1.6 
+FLOOR = 0.0015
+
+def set_gamma(g: float):
+    global GAMMA
+    GAMMA = max(1.0, min(3.0, g))
+
+def set_floor(f: float):
+    global FLOOR
+    FLOOR = max(0.0, min(1.0, f))
+
+board.MQTT.subscribe(f'set/gamma', lambda _, msg: set_gamma(float(msg)))
+board.MQTT.subscribe(f'set/floor', lambda _, msg: set_floor(float(msg)))
+
+def gamma_corrected_float_to_u16(v: float, maxint=0xffff) -> int:
+    """
+    Apply gamma correction to a normalized brightness value.
+
+    value: float (0.0 to 1.0)
+    gamma: float (typically 2.0–2.4)
+    Output: 0..1023
+    """
+    v = min(1.0, max(v, 0.0))
+    if v == 0.0:
+        return 0
+    # return int((v ** gamma) * 0xffff)
+    # according to ChatGPT a math.pow() is faster than **, takes about 30 µs vs 40 µs
+    p = math.pow(v, GAMMA)
+    x = FLOOR + (1-FLOOR)*p
+    return int(x * maxint)
+
+def valid_u16(i: int) -> int:
+    """Return value in range 0..0xffff"""
+    return min(0xffff, max(i, 0))
+
+def valid_f(f: float) -> float:
+    """Return value in range 0..1"""
+    return min(1.0, max(f, 0.0))
 
 class PWM(port.Port):
     """TODO: fix docstring? Wrapper for system PWM, using numbers from 0..1 and provide dimming"""
-    def __init__(self, portid, pinid, lastintensity=100):
+    def __init__(self, portid, pinid, lastintensity=100, maxu16=0xffff):
         super().__init__(portid, pinid)
+        self.maxu16 = maxu16
         self.lastintensity = lastintensity
         self.button = None
         self.pwm = None
@@ -90,20 +150,26 @@ class PWM(port.Port):
             board.PWMs.append(self)
         if pinid is None:
             return
-
-        self.seti_no_can_message(0) # power off
+        self._fval = 0.0
+        self.set_u16_no_telemetry(0) # power off
         self.dimtovalue = 0
+        self._dimfvalue = 0.0
+        self._dimstepf = 0.0
         self.mqttstate = None # cache to avoid gc
 
         # allocate message once to avoid garbage collection
         if board.CAN is not None:
             self.msg = board.CAN.Message(canid.PWM_VALUE, [0, 0, 0, 0, 0, 0, 0])
             self.msg.setsender(self.portid)
-        if board.MQTT is not None:
-            board.MQTT.subscribe(f'set/{self.portid}', self.mqtt_callback)
+
+        board.MQTT.subscribe(f'set/{self.portid}', self.mqtt_callback)
 
     def __repr__(self):
         return '<{} {}.{}>'.format(self.__class__.__name__, self.portid, self.pwm)
+
+    def f_to_u16(self, f: float) -> int:
+        """Convert value 0..1 to U16 send to the H/W. This corrects for Gamma and respects clamping"""
+        return gamma_corrected_float_to_u16(max(0.0, min(1.0, f)), maxint=self.maxu16)
 
     def set_button(self, button):
         if self.button is not None:
@@ -111,94 +177,110 @@ class PWM(port.Port):
             self.button.set_pwm(None)
         self.button = button
 
-    def send_telemetry(self):
-        pass
-
-    def current_value(self):
+    def current_u16_value(self):
         """Return current pwm value"""
-        return self.pwm.duty()
+        return self.pwm.duty_u16()
+
+    def current_f(self):
+        """Return current float value 0..1"""
+        return self._fval
 
     def disable_dimming(self):
         self.dimtovalue = NODIMMING
 
     def enable_dimming(self):
         # set a valid value but prevent dimming to it -> use the current value
-        self.dimtovalue = self.current_value()
+        self.dimtovalue = self.current_value_u16()
 
-    def seti_no_can_message(self, ival):
+    def set_u16_no_telemetry(self, u16):
         """Set PWM value. NOTE: the actual value may not be the one that has been commanded.
         Call wait_until_set() if you need the value to be correct.
         (This is not the case for dimming, because dimming reads the value read back
         from the H/W. Value might be different if commands are send too fast).
         Function returns the value used (does some error checking for bad input)"""
-        ival = valid(ival)
-        self.pwm.duty(ival)
-        return ival
+        self.pwm.duty_u16(u16)
+        return u16
 
-    def wait_until_set(self, value):
+    def setf_no_telemetry(self, fval: float):
+        """Set PWM to value from 0..1. This intensity will we converted to u16 values using gamma
+        and other corrections"""
+        self.set_u16_no_telemetry(self.f_to_u16(fval))
+
+    def set_u16(self, u16: int):
+        """Set integer duty from 0 .. 0xffff and update telemetry (send status to CAN and MQTT)"""
+        u16 = self.set_u16_no_telemetry(u16)
+        if u16 != 0:
+            self.lastintensity = u16
+        self.send_telemetry_u16(u16)
+        if self.button is not None:
+            self.button.set_state(u16)
+        self.wait_until_set_u16(u16)
+
+    def setf(self, fval: float):
+        """Set value 0..1"""
+        self.set_u16(self.f_to_u16(fval))
+
+    def wait_until_set_u16(self, u16) -> int:
         """Make sure PWM has taken the correct value (can take up to about 1 ms,
-        could be an issue when changing PWM speed in short intervalls)"""
+        could be an issue when changing PWM speed in short intervalls).
+        The function returns the value that was actually choosen by MicroPython. The
+        actual value depends on the H/W and the choosen PWM frequency.
+        """
+        self.pwm.duty_u16(u16)
         maxtry = 10
-        while maxtry > 0 and self.pwm.duty() != value:
+        while maxtry > 0 and self.pwm.duty_u16() != u16:
             maxtry -= 1
-            self.pwm.duty(value)
+        return self.pwm.duty_u16()
 
-    def maxi(self):
+    def max_u16(self):
         """maximum value currently set (actually useful for lists, to see whether at one light is on)"""
-        return self.current_value()
+        return self.current_u16_value()
 
-    def mini(self):
+    def min_u16(self):
         """minimum value currently set (actually useful for lists, to see whether all lights are on)"""
-        return self.current_value()
+        return self.current_u16_value()
 
-    def is_on(self):
-        """Return if PWM is considered ON.
-        May behave differently for Lists and Scence (e.g. one vs all are on)"""
-        maxi = self.maxi()
-        mini = self.mini()
-        if board.DEBUG:
-            print('{} is_on maxi={}, mini={}, toggle_prefer_off={}'.format(self, maxi, mini, self.toggle_prefer_off))
-        if maxi == 0:
-            return False
-        if mini > 0:
+    def pwm_state(self) -> int:
+        """Return on of ALL_ON, ALL_OFF, SOME_ON. The latter value is only interesting for a list of PWM"""
+        if self.current_u16_value() == 0:
+            return ALL_OFF
+        return ALL_ON
+
+    def is_on(self) -> bool:
+        """Return True if PWM (list of PWM) is considdered on. For a list of PWM this depends the setting of
+        toggle_prefer_off"""
+        state = self.pwm_state()
+        if state == ALL_ON:
             return True
-        # some are on, some are off
+        if state == ALL_OFF:
+            return False
         return self.toggle_prefer_off
 
-    def one_is_on(self) -> bool:
+    def at_least_one_is_on(self) -> bool:
         """Return True if at least one light is on"""
-        return self.maxi() > 0
+        return self.max_u16() > 0
 
     def all_are_on(self) -> bool:
         """Return True if all lights are on"""
-        return self.mini() > 0
+        return self.min_u16() > 0
 
     def all_are_off(self) -> bool:
         """Return True if all lights are off"""
-        return self.mini() == 0
+        return self.min_u16() == 0
 
-    def seti(self, ival):
-        """Set raw integer duty from 0 .. 1023 and send status to CAN"""
-        ival = self.seti_no_can_message(ival)
-        if ival != 0:
-            self.lastintensity = ival
-        self.send_status_to_can_value(ival)
-        if self.button is not None:
-            self.button.set_state(ival)
-        self.wait_until_set(ival)
+    def send_telemetry(self):
+        self.send_telemetry_u16(self.current_u16_value())
 
-    def seti16(self, i16):
-        """Set integer 0..0xffff"""
-        self.seti(i16_to_raw(i16))
-
-    def send_status_to_can(self):
-        self.send_status_to_can_value(self.current_value())
- 
-    def send_status_to_can_value(self, ival):
+    def send_telemetry_f(self, value: float):
         if self.portid is None:
             return
-        # extend a 12 bit value to 16 bit, so that 1023 is 0xffff
-        i16 = (ival << 6) | (ival >> 4)
+        self.send_telemetry_u16(int(0xffff * value))
+
+    def send_telemetry_u16(self, u16: int):
+        if self.portid is None:
+            return
+        # TODO - fix resolution
+        ival = u16 >> 6 # assume a 10bit PWM for now
         if board.CAN:
             # self.msg.setsender(self.id)
             payload = self.msg.payload
@@ -206,18 +288,24 @@ class PWM(port.Port):
             # self.msg[1] = board.CAN.canid & 0xff
             payload[3] = ival >> 8
             payload[4] = ival & 0xff
-            payload[5] = i16 >> 8
-            payload[6] = i16 & 0xff
+            payload[5] = u16 >> 8
+            payload[6] = u16 & 0xff
             self.msg.send()
         # board.PRINT('Sending status to CAN for PWM {} - {} / {} - {} '.format(self.portid, self, ival, i16))
         # board.MQTT_PUBLISH('light/{}/{}/set'.format(board.LOCATION, self.portid), i16)
-        board.MQTT.publish('state/{}'.format(self.portid), str(i16>>8)) 
+        board.MQTT.publish('state/{}'.format(self.portid), str(u16>>8))
 
     def run_next_dimstep(self):
         """Set next dimlevel for smooth dimming to finally reach self.dimtovalue."""
-        ival = self.pwm.duty()
+        ival = self.pwm.duty_u16()
         # Pick nice step size for smooth dimming
-        ds = (2*ival) // dimstep_scale
+        if self._dimstepf == 0.0:
+            ds = (2*ival) // dimstep_scale
+        else:
+            self._dimfvalue += self._dimstepf
+            ival = self.f_to_u16(self._dimfvalue)
+            ds = ival - self.pwm.duty_u16()
+
         ds = min(dimstep_max, max(dimstep_min, ds)) # about 200 ms when min step is 10
         remaining_counts = self.dimtovalue - ival
         if board.DEBUG > 3:
@@ -228,26 +316,29 @@ class PWM(port.Port):
             # Accepting the PWM value takes a while, probably until the end of the phase.
             # So in the order of a few milliseconds (up to 10 with 100 Hz pwm frequency)
             # However, simply setting is OK, it will come there sooner or later.
-            self.seti_no_can_message(self.dimtovalue)
-            if remaining_counts == 0:
-                # reached target
-                self.send_status_to_can()
-                self.dimtovalue = _FINISHED_DIMMING
+            self.set_u16(self.dimtovalue)
+            self.dimtovalue = _FINISHED_DIMMING
+            self._dimstepf = 0.0
+            # if remaining_counts == 0:
+            #     # reached target
+            #     self.send_telemetry()
+            #     self.dimtovalue = _FINISHED_DIMMING
             return
         if remaining_counts > 0:
-            self.seti_no_can_message(ival + ds)
+            self.set_u16_no_telemetry(ival + ds)
         else:
-            self.seti_no_can_message(ival - ds)
+            self.set_u16_no_telemetry(ival - ds)
 
-    def dimi(self, value):
-        """dim in raw units, return False if value is directly set, return True otherwise (dimming)"""
-        value = valid(value)
+    def dim_u16(self, u16: int):
+        """dim in u16 units (0..0xffff), return False if value is directly set, return True otherwise (dimming)"""
+        value = valid_u16(u16)
         if self.dimtovalue == NODIMMING:
-            self.seti(value)
+            self.set_u16(value)
             return False
-        if abs(self.current_value()-value) < 5:
+        if abs(self.current_u16_value()-value) < 20: # arbritary number, but less then 1% change of intensity
             self.dimtovalue = _FINISHED_DIMMING
-            self.seti(value)
+            self._dimstepf = 0.0
+            self.set_u16(value)
             return False
         self.dimtovalue = value
         if board.DEBUG > 4:
@@ -255,17 +346,22 @@ class PWM(port.Port):
         start_dimming.set()
         return True
 
-    def dimi16(self, i16):
-        """dim to values from 0..0xffff"""
-        return self.dimi(i16_to_raw(i16))
+    def dimf(self, v):
+        """dim to values from 0..1"""
+        self._dimfvalue = self._fval
+        self._fval = v
+        self._dimstepf = (v - self._dimfvalue) / 20
+        u16 = self.f_to_u16(v)
+        board.PRINTF("dimf {:.2f} -> {}", v, u16)
+        return self.dim_u16(u16)
 
     def on(self):
         """Set intensity to lastintensity"""
-        self.dimi(self.lastintensity)
+        self.dim_u16(self.lastintensity)
 
     def off(self):
         """Set intensity to 0"""
-        self.dimi(0)
+        self.dim_u16(0)
 
     def toggle(self) -> bool:
         """Turn PWM on if it was off or vice versa.
@@ -287,7 +383,7 @@ class PWM(port.Port):
         try:
             value = int(msg)
             value = min(255, max(0, value))
-            self.dimi16(((value & 0xff) << 8) | value)
+            self.dimf(value / 255.0)
             return
         except Exception as e:
             board.PRINTF('MQTT callback for PWM {} got called by MQTT: {} - {}', self.portid, msg, e)
@@ -295,7 +391,7 @@ class PWM(port.Port):
         # print('PWM {} got called by MQTT: {}'.format(self.id, msg))
         msg = msg.upper()
         if msg == '{"STATE": "OFF"}' or msg == 'OFF':
-            self.dimi(0)
+            self.dim_u16(0)
             return
         if msg == '{"STATE": "ON"}' or msg == 'ON':
             self.on()
@@ -311,7 +407,7 @@ class PWM(port.Port):
         board.PRINTF('PWM callback got value "{}"', msg[l:-1])
         value = int(msg[l:-1])
         board.PRINTF('Setting PWM {} to {}', self.portid, value)
-        self.dimi16(((value & 0xff) << 8) | value)
+        self.dim_u16(((value & 0xff) << 8) | value)
         return
 
 
@@ -328,49 +424,50 @@ class List(PWM):
     def __repr__(self):
         return '<pwm.List with {} entries>'.format(len(self.pwms))
 
-    def current_value(self):
+    def current_u16_value(self):
         """Current value of a PWM List it the maximum of all its PWMs"""
-        return self.maxi()
+        return self.max_u16()
 
     def append(self, pwm):
         self.pwms.append(pwm)
 
-    def seti_no_can_message(self, ival):
+    def set_u16_no_telemetry(self, u16):
         for p in self.pwms:
-            p.seti_no_can_message(ival)
-        return ival
+            p.set_u16_no_telemetry(u16)
+        return u16
 
-    def send_status_to_can(self):
+    def send_telemetry(self):
         for p in self.pwms:
-            p.send_status_to_can()
+            p.send_telemetry()
 
-    def maxi(self):
+    def max_u16(self):
         """get max value of all PWMs"""
-        return max([p.current_value() for p in self.pwms])
+        return max([p.current_u16_value() for p in self.pwms])
 
-    def mini(self):
+    def min_u16(self):
         """Return min value of all PWMs"""
-        return min([p.current_value() for p in self.pwms])
+        return min([p.current_u16_value() for p in self.pwms])
 
-    def dimi(self, value):
+    def pwm_state(self) -> int:
+        """Return on of ALL_ON, ALL_OFF, SOME_ON. The latter value is only interesting for a list of PWM"""
+        min = self.min_u16()
+        if mini > 0:
+            return ALL_ON
+        max = self.max_u16()
+        if max == 0:
+            return ALL_OFF
+        return SOME_ON
+
+
+    def dim_u16(self, value):
         ret = False
         for p in self.pwms:
-            ret |= p.dimi(value)
+            ret |= p.dim_u16(value)
         return ret
 
-    def dimi16(self, i16):
-        ret = False
+    def set_u16(self, ival):
         for p in self.pwms:
-            ret |= p.dimi16(i16)
-        return ret
-
-    def seti(self, ival):
-        for p in self.pwms:
-            p.seti(ival)
-
-    def seti16(self, i16):
-        for p in self.pwms:
-            p.seti16(i16)
+            p.set_u16(ival)
 
     def enable_dimming(self):
         for p in self.pwms:
@@ -416,12 +513,12 @@ class List(PWM):
         for p in self.pwms:
             p.mqtt_callback(topic, msg)
 
-class SceneEntry:
+class xxxxSceneEntry:
     def __init__(self, pwm, rawvalue):
         self.pwm = pwm
         self.rawvalue =  rawvalue
 
-class Scene(PWM):
+class xxxxScene(PWM):
     """A scene is a collection of PWMs that will be set to predefined levels.
     A scene itself can be on or off"""
     def __init__(self, portid, *values) -> None:
@@ -433,12 +530,12 @@ class Scene(PWM):
     def on(self):
         """turn scene on"""
         for e in self.entries.values():
-            e.pwm.dimi(e.rawvalue)
+            e.pwm.dim_raw(e.rawvalue)
 
     def off(self):
         """turn scene off"""
         for e in self.entries.values():
-            e.pwm.dimi(0)
+            e.pwm.dim_raw(0)
 
     def is_on(self) -> bool:
         """Return true when each PWM matches its predefined value"""
@@ -463,27 +560,27 @@ class Scene(PWM):
             self.on()
         return not state
 
-    def dimi(self, value):
+    def dim_raw(self, value):
         if value > 0:
             self.on()
         else:
             self.off()
 
-    def seti(self, value):
-        self.dimi(value)
+    def set_raw(self, value):
+        self.dim_raw(value)
 
-    def current_value(self):
+    def current_raw_value(self):
         return self.maxi()
 
     def maxi(self):
-        return max([p.pwm.current_value() for p in self.entries.values()])
+        return max([p.pwm.current_raw_value() for p in self.entries.values()])
 
     def mini(self):
         """Get min intensity, ignore LEDs that are switched off in this scene"""
         mini = 0xffff
         for p in self.entries.values():
             if p.rawvalue > 0:
-                mini = min(mini, p.pwm.current_value())
+                mini = min(mini, p.pwm.current_raw_value())
         return mini
 
     def define_value(self, pwm, value):
@@ -518,7 +615,7 @@ async def _next_dim_step_task():
     # set all dimto values to current values, otherwise we can't initialize PWM values for poweron
     for p in board.PWMs.pwms:
         if p.dimtovalue >= 0:
-            p.dimtovalue = p.current_value()
+            p.dimtovalue = p.current_u16_value()
 
     # since we have just set the PWM we can tell how long it will take until the next value
     # will be accepted
@@ -531,7 +628,6 @@ async def _next_dim_step_task():
     dimdelay_when_dimming = max(1, 1000 // pwm_freq)
     if board.DEBUG > 4:
         print('dimdelay when dimming = {}'.format(dimdelay_when_dimming))
-    was_dimming = False
 
     while True:
         isdimming = False
@@ -541,13 +637,11 @@ async def _next_dim_step_task():
                 p.run_next_dimstep()
         # ask other async tasks to delay their execution to ensure smooth and uniterrupted dimming
         board.PWM_IS_DIMMING = isdimming
-        if isdimming:
-            was_dimming = True
-        else:
-            if was_dimming:
-                for cb in eod_callbacks:
-                    cb()
-                was_dimming = False
+
+        # if we are not dimming anymore, call the end of dimming callbacks
+        if not isdimming:
+            for cb in eod_callbacks:
+                cb()
 
 
         #if not isdimming and dimsteps > 1:
@@ -582,6 +676,7 @@ async def _next_dim_step_task():
         if isdimming:
             await asyncio.sleep_ms(dimdelay_when_dimming)
         else:
+            # seems that we have finished dimming, wait for next dimming command
             start_dimming.clear()
             if board.DEBUG > 2:
                 print('stopped dimming, waiting for start_dimming event()')
@@ -597,7 +692,7 @@ asyncio.create_task(_next_dim_step_task())
 ### Handle PWM callbacks
 
 class _badPWMClass: # used to avoid the need of error catching in CAN callbacks
-    def dimi16(self, _):
+    def dim_u16(self, _):
         pass
     def on(self):
         pass
@@ -632,8 +727,8 @@ def _getpwm(msg):
     return pwms
 
 if board.CAN is not None:
-    board.CAN.register(pwmcode.SET_INTENSITY16, 4, 4, lambda msg: _getpwm(msg).dimi16(msg.u16(2)))
-    board.CAN.register(pwmcode.SET_INTENSITY_NATIVE, 4, 4, lambda msg: _getpwm(msg).dimi(msg.u16(2)))
+    board.CAN.register(pwmcode.SET_INTENSITY16, 4, 4, lambda msg: _getpwm(msg).dim_u16(msg.u16(2)))
+    board.CAN.register(pwmcode.SET_INTENSITY_NATIVE, 4, 4, lambda msg: _getpwm(msg).dim_raw(msg.u16(2)))
     board.CAN.register(pwmcode.ON, 2, 2, lambda msg: _getpwm(msg).on())
     board.CAN.register(pwmcode.OFF, 2, 2, lambda msg: _getpwm(msg).off())
     board.CAN.register(pwmcode.TOGGLE, 2, 2, lambda msg: _getpwm(msg).toggle())

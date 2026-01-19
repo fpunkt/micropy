@@ -37,7 +37,7 @@ class RGB:
     def __init__(self, portid, rpin, gpin, bpin) -> None:
         self.id = portid
         self.r, self.g, self.b = pwm.PWM(None, rpin), pwm.PWM(None, gpin), pwm.PWM(None, bpin)
-        self.seti_no_can_message(0, 0, 0) # poweroff
+        self.off_no_telemetry(0, 0, 0) # poweroff
         board.PORTs.register(portid, self)
         # allocate message once to avoid garbage collection
         self.msg = can.Message(canid.PWM_RGB_VALUE, [0, 0, 0, 0, 0, 0, 0, 0])
@@ -46,64 +46,55 @@ class RGB:
         # self.rv = 0
         # self.bv = 0
         # self.gv = 0
-        self.can_message_pending = False
-       #  pwm.eod_callbacks.append(self.send_status_to_can_if_needed)
+        # self.can_message_pending = False
+       #  pwm.eod_callbacks.append(self.send_telemetry())
 
-    def send_status_to_can_if_needed(self):
-        if not self.can_message_pending:
-            return
-        self._send_to_can()
-        # just to make sure dimming didn't screw up
-        print('fixing to {}, {}, {}'.format(self.r.current_value(), self.g.current_value(), self.b.current_value()))
-        self.seti_no_can_message(self.r.current_value(), self.g.current_value(), self.b.current_value())
-        self.can_message_pending = False
+    #def send_telemetry_if_needed(self):
+    #    if not self.can_message_pending:
+    #        return
+    #    self._send_to_can()
+    #    # just to make sure dimming didn't screw up
+    #    print('fixing to {}, {}, {}'.format(self.r.current_raw_value(), self.g.current_raw_value(), self.b.current_raw_value()))
+    #    self.set_raw_no_telemetry(self.r.current_raw_value(), self.g.current_raw_value(), self.b.current_raw_value())
+    #    self.can_message_pending = False
 
-    def seti_no_can_message(self, r, g, b):
-        self.r.seti_no_can_message(r)
-        self.g.seti_no_can_message(g)
-        self.b.seti_no_can_message(b)
+    def off_no_telemetry(self):
+        """turn device off"""
+        self.r.off_no_telemetry()
+        self.g.off_no_telemetry()
+        self.b.off_no_telemetry()
 
-    def seti10(self, r, g, b):
-        """Set raw integer duty from 0 .. 1023 and send status to CAN"""
+    def setf_no_telemetry(self, r: float, g: float, b: float):
+        self.r.setf_no_telemetry(r)
+        self.g.setf_no_telemetry(g)
+        self.b.setf_no_telemetry(b)
+
+    def setf(self, r, g, b):
+        """Set float duty from 0 .. 1 and send status to CAN"""
         if board.DEBUG:
-            print('seti10 {}, {}, {}'.format(r, g, b))
-        self.seti_no_can_message(r, g, b)
-        self.send_status_to_can(r, g, b)
+            print('setf {}, {}, {}'.format(r, g, b))
+        self.setf_no_telemetry(r, g, b)
+        self.send_telemetry(r, g, b)
         #self._send_to_can()
 
-    # def seti16(self, r, g, b):
-    #     """Set raw integer duty from 0 .. 0xffff and send status to CAN"""
-    #     self.seti10(_rshift(r), _rshift(g), _rshift(b))
-
-    def dimi10xxx(self, r, g, b):
+    def dimf(self, r, g, b):
         """dim in raw units"""
         if board.DEBUG:
             print('dim10 {}, {}, {}'.format(r, g, b))
-        if self.r.dimi(r) or self.g.dimi(g) or self.b.dimi(b):
-            if board.DEBUG:
-                print('schedule CAN message')
-            self.can_message_pending = True
-        else:
-            self._send_to_can()
+        self.r.dimf(r)
+        self.g.dimf(g)
+        self.b.dimf(b)
+        self.send_telemetry(r, g, b)
 
-    def dimi10(self, r, g, b):
-        """dim in raw units"""
-        if board.DEBUG:
-            print('dim10 {}, {}, {}'.format(r, g, b))
-        self.r.dimi(r)
-        self.g.dimi(g)
-        self.b.dimi(b)
-        self.send_status_to_can(r, g, b)
+    #def dimi16(self, r, g, b):
+    #    """dim in 16-bit units"""
+    #    #self.send_status_to_can(r, g, b) # send even the device is still working
+    #    self.dimi10(_rshift(r), _rshift(g), _rshift(b))
 
-    def dimi16(self, r, g, b):
-        """dim in 16-bit units"""
-        #self.send_status_to_can(r, g, b) # send even the device is still working
-        self.dimi10(_rshift(r), _rshift(g), _rshift(b))
+    def _telemetry(self):
+        self.send_telemetry(self.r.currentf_raw(), self.g.current_raw(), self.b.current_raw())
 
-    def _send_to_can(self):
-        self.send_status_to_can(self.r.current_value(), self.g.current_value(), self.b.current_value())
-
-    def send_status_to_can(self, r, g, b):
+    def send_telemetry(self, r, g, b):
         # Message format is
         #  senderid/16
         #  portid/8
@@ -114,8 +105,8 @@ class RGB:
         if self.id is None or not board.CAN:
             return
 
-        # r, g, b = self.r.current_value()<<6, self.g.current_value()<<6, self.b.current_value()<<6
-        # print("r = {}/{:04x}  -->  {}/{:04x}".format(self.r.current_value(), self.r.current_value(), r, r))
+        # r, g, b = self.r.current_raw_value()<<6, self.g.current_raw_value()<<6, self.b.current_raw_value()<<6
+        # print("r = {}/{:04x}  -->  {}/{:04x}".format(self.r.current_raw_value(), self.r.current_raw_value(), r, r))
         payload = self.msg.payload
         payload[3] = r >> 2
         payload[4] = g >> 2

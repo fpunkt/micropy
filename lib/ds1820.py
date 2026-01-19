@@ -46,7 +46,7 @@ class DS1820(sensors.Sensorxxx):
             payload[offset+0] |= (ival>>8)&0xf
             payload[offset+1] = ival&0xff
 
-    def send_status_to_can(self):
+    def send_telemetry(self):
         if board.CAN is None:
             return
         for i in range(2, 7):
@@ -84,7 +84,7 @@ class DS1820(sensors.Sensorxxx):
             #         print('ERR', end=' ')
             # print()
             #print(self.data)
-            self.send_status_to_can()
+            self.send_telemetry()
             if self.callback is not None:
                 try:
                     self.callback(self.data)

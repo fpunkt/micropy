@@ -66,9 +66,9 @@ p1 = pwm.PWM(1, 14)
 p2 = pwm.PWM(2, 12)
 p3 = pwm.PWM(3, 13)
 
-p1.seti(1023)
-p2.seti(1023)
-p3.seti(1023)
+p1.set_raw(1023)
+p2.set_raw(1023)
+p3.set_raw(1023)
 
 #t1 = sensors.DHT(0x30, 5, poll_intervall_in_ms=5000 if board.DEBUG else None)
 temperature = sensors.DHT(0x31, 5, poll_intervall_in_ms=7000 if board.DEBUG else None)

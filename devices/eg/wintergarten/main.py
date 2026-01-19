@@ -68,8 +68,8 @@ def callback(msg):
 # board.CAN.subscribe(True, callback)
 
 def dd(a, b):
-    p1.dimi(a)
-    p2.dimi(b)
+    p1.dim_raw(a)
+    p2.dim_raw(b)
 
 def d1(): dd(0, 1000)
 def d2(): dd(1000, 0)
@@ -87,7 +87,7 @@ def ddloop():
         print('Mem Used: {}'.format(m1-m2))
 
 def alloff():
-    pwm.ALL.dimi(0)
+    pwm.ALL.dim_raw(0)
 
 def tmqtt(id, t, h):
     fsmqtt.publish('wg/'+id, '{:.1f} {:.1f}'.format(t/10.0, h/10.0))

@@ -54,8 +54,8 @@ class Motor:
         self.sensorcount += 1
 
     def fullstop(self) -> None:
-        self.m1.seti_no_can_message(0)
-        self.m2.seti_no_can_message(0)
+        self.m1.off_no_telemetry()
+        self.m2.off_no_telemetry()
         self.status = STOPPED
         self.motor = None
         self.currentspeed = 0
@@ -75,7 +75,7 @@ class Motor:
     def setspeed(self, speed) -> None:
         """Set speed of current motor immediately. Motor must already be set (choose direction) """
         self.currentspeed = speed
-        self.motor.seti_no_can_message(speed)
+        self.motor.set_raw_no_telemetry(speed)
         if speed == 0:
             self.fullstop()
 

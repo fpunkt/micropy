@@ -68,7 +68,7 @@ def dscallback(t):
     prevspeed = speed
     if speed >= 0:
         print('Fan on, speed {:4d}'.format(speed))
-        pall.seti(speed)
+        pall.set_raw(speed)
         pp.on()
     else:
         print('Fan OFF')
@@ -83,7 +83,7 @@ def setspeed(msg):
         msg.bad_sensor_id()
         return
     power = int(1023*msg.payload[2]/255)
-    pall[msg.payload[1]].seti(power)
+    pall[msg.payload[1]].set_raw(power)
 
 can.register(0, 1, 1, lambda msg: pp.off())
 can.register(1, 1, 1, lambda msg: pp.on())

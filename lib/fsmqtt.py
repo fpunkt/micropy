@@ -95,13 +95,13 @@ class _MQTT:
             self.client.publish(topic, message)
             return True
         except OSError as e:
-            if board.DEBUG: 
+            if board.DEBUG:
                 print('ERROR: MQTT send T="{}" M="{}" failed: {}'.format(topic, message, e))
             try:
                 self.client.ping()
-                # hm, ping worked but publish failed --> strange error 
+                # hm, ping worked but publish failed --> strange error
                 print('ERROR: MQTT send but ping still working')
-                return False 
+                return False
             except Exception:
                 board.PRINTF('MQTT ping failed, reconnecting')
                 self.status = "connecting"
@@ -109,7 +109,7 @@ class _MQTT:
                 machine.reset()
         return False
 
-    def ignore_topics(self, *topics):  
+    def ignore_topics(self, *topics):
         """ignore topics, do not pass them to callbacks or raise errors"""
         for topic in topics:
             self.ignored_topics.add(topic)
@@ -147,7 +147,7 @@ class _MQTT:
         if t_str.startswith("state/") or t_str.startswith("status/"):
             return
 
-        board.PRINTF('MQTT unknown topic: T={}, M={}, full topic: {}, blessed: {}, known topics: {}', 
+        board.PRINTF('MQTT unknown topic: T={}, M={}, full topic: {}, blessed: {}, known topics: {}',
             t_str, m_str, t_str_full, self.blessed_topic, self.callbacks.keys())
 
         self.publish("error", "no callback for T='{}', M='{}'".format(t_str, m_str))
@@ -156,7 +156,7 @@ class _MQTT:
     def _config_command(self, topic, msg):
         """
         CONFIG: uptime, memstat, restart, watchdog, reset, repl, repl-disable, repl-enable
-        commands exposed by MQTT 
+        commands exposed by MQTT
         """
         board.PRINTF('CONFIG: {}', msg)
         msg = str(msg).lower()
@@ -216,7 +216,7 @@ class _MQTT:
             self.publish('info/rssi_period', period_ms)
             self.start_rssi_reporting(period_ms)
             return
-        
+
         board.PRINTF('CONFIG: unknown command: {}', msg)
         self.publish('info/config', "unknown command: {}".format(msg))
 
@@ -286,7 +286,7 @@ class _MQTT:
             if self.status == "connecting":
                 board.PRINTF('waiting for MQTT to connect')
                 # trust nobody
-                try:    
+                try:
                     self.client.disconnect()
                 except Exception:
                     pass
@@ -333,7 +333,7 @@ class _MQTT:
         if board.MQTT.callbacks:
             board.PRINTF('MQTT: warning: callbacks registered before MQTT was loaded')
             # for topic, callback in board.MQTT.callbacks.items():
-            #     self.subscribe(topic, callback) 
+            #     self.subscribe(topic, callback)
         # TODO: PWMs - this should go into the pwm module
         # if board.PWMs:
         #     for p in board.PWMs.pwms:
@@ -417,8 +417,8 @@ def connect():
     # copy callbacks from dummy mqtt
     _CLIENT.callbacks.update(board.MQTT.callbacks)
     _CLIENT.after_connect.extend(board.MQTT.after_connect)
-    asyncio.create_task(_CLIENT.connect_in_background())  
-    asyncio.create_task(_CLIENT._poll_for_new_messages())  
+    asyncio.create_task(_CLIENT.connect_in_background())
+    asyncio.create_task(_CLIENT._poll_for_new_messages())
     _rssi_task = asyncio.create_task(_print_rssi_task(5 * 60 * 1000))
     board.MQTT = _CLIENT
 
@@ -436,13 +436,13 @@ def _safe_decode(value):
 # def publish_all():
 #     if board.PWMs:
 #         for p in board.PWMs.pwms:
-#             p.send_status_to_can()
+#             p.send_telemetry()
 
 def connect_in_background(name=None):
     if False:
         asyncio.create_task(_connect_in_background(name))
         asyncio.create_task(_mqtt_poller_task())
-    else:  
+    else:
         board.BACKGROUND_RUNNERS.append(_connect_in_background(name))
         board.BACKGROUND_RUNNERS.append(_mqtt_poller_task())
 
@@ -462,7 +462,7 @@ def xxpublish_raw(topic, message):
             board.MQTT.publish(topic, message)
             return True
         except OSError as e:
-            if board.DEBUG: 
+            if board.DEBUG:
                 print('ERROR: MQTT send T="{}" M="{}" failed: {}'.format(topic, message, e))
             if options.reset_on_error:
                 machine.reset()
@@ -475,7 +475,7 @@ def xxpublish(topic, message):
 
 xxx_ignored_topics = dict()
 
-def xxxignore_topics(*topics):  
+def xxxignore_topics(*topics):
     """ignore topics, do not pass them to callbacks or raise errors"""
     for topic in topics:
         _ignored_topics[topic] = True
@@ -505,7 +505,7 @@ def _mqtt_callback(topic, message):
         global _blessed_topic
         if t_str == _blessed_topic:
             return
-        
+
         # catch all system topics, should be done by _blessed_topic
         if t_str == "info" or t_str == "error":
             return
@@ -514,7 +514,7 @@ def _mqtt_callback(topic, message):
         if t_str.startswith("state/") or t_str.startswith("status/"):
             return
 
-        board.PRINTF('MQTT unknown topic: T={}, M={}, full topic: {}, blessed: {}, known topics: {}', 
+        board.PRINTF('MQTT unknown topic: T={}, M={}, full topic: {}, blessed: {}, known topics: {}',
             t_str, m_str, t_str_full, _blessed_topic, _callbacks.keys())
 
         publish("error", "no callback for T='{}', M='{}'".format(t_str, m_str))

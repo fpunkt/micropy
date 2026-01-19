@@ -51,14 +51,6 @@ class Port:
             print('Called update_telemetry - not overloaded for {}'.format(self))
         pass
 
-    def send_telemetry(self):
-        """Might be called regulary by some background task in order to send telemetry.
-        Packages sent by this call should clearly indicate that nothing changed, i.e. no action is required
-        """
-        if self.can_is_active():
-            self.update_telemetry()
-            self.msg.send()
-
     def can_is_active(self):
         """Return true when CAN bus is up and running and message sending is enabled"""
         return board.CAN is not None and  self.msg is not None

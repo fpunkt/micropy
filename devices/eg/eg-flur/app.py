@@ -197,22 +197,22 @@ class xPWM(pwm.PWM):
         if v > 0:
             if board.DEBUG > 2:
                 print('egflur:  ** switching DCDC on')
-            p6.seti(DCDCON_Value)
+            p6.set_raw(DCDCON_Value)
 
-    def seti(self, ival):
-        self._dbg('seti', ival)
+    def set_raw(self, ival):
+        self._dbg('set_raw', ival)
         self._dcdcon(ival)
-        return super().seti(ival)
+        return super().set_raw(ival)
 
     def seti16(self, i16):
         self._dbg('seti16', i16)
         self._dcdcon(i16)
         return super().seti16(i16)
 
-    def dimi(self, value):
-        self._dbg('dimi', value)
+    def dim_raw(self, value):
+        self._dbg('dim_raw', value)
         self._dcdcon(value)
-        return super().dimi(value)
+        return super().dim_raw(value)
 
     def dimi16(self, i16):
         self._dbg('dimi16', i16)
@@ -260,7 +260,7 @@ async def poweroff_dcdc():
         if board.DEBUG > 2:
             print('egflur: checking DCDC duty {} / {}, newval={}'.format(p7.pwm.duty(), p8.pwm.duty(), newval))
         if newval != p6.pwm.duty():
-            p6.seti(newval)
+            p6.set_raw(newval)
 
 board.BACKGROUND_RUNNERS.append(poweroff_dcdc())
 
