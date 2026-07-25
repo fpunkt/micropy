@@ -40,6 +40,7 @@ class _MQTT:
         self.client = None
         self.topic = None
         self.reset_on_error = False
+        self._is_connected_event = asyncio.Event()
 
         self.blessed_topic = ""
         """Topic that has been sent by ourself, do not process it."""
@@ -281,6 +282,7 @@ class _MQTT:
                 except Exception:
                     board.PRINTF('MQTT ping failed, reconnecting')
                     self.status = "connecting"
+                    self._is_connected_event.clear()
                     # fall through to reconnect
 
             # connection down, try to reconnect
@@ -307,6 +309,7 @@ class _MQTT:
                 # self.subscribe('#', lambda topic, msg: board.PRINTF('MQTT: {} / {}', topic, msg))
                 self.publish_info()
                 self.publish_all()
+                self._is_connected_event.set()
                 for func in self.after_connect:
                     try:
                         func()
@@ -322,6 +325,7 @@ class _MQTT:
                 continue
 
             # huh? undefined status? try to reconnect
+            self._is_connected_event.clear()
             self.status = "connecting"
             await asyncio.sleep_ms(1000)
             continue
@@ -378,14 +382,29 @@ class _MQTT:
     async def _poll_for_new_messages(self):
         board.PRINTF('MQTT poller started')
         while True:
-            try:
-                # check for incoming messages
-                # this will call the callback for each message
-                self.client.check_msg()
-            except Exception as e:
-                board.PRINTF('ERROR: MQTT poller failed: {}', e)
-                self.status = "connecting"
-                await asyncio.sleep_ms(2000)
+            if self.client is None:
+                await self._is_connected_event.wait()
+                board.PRINTF('MQTT poller: client is now available')
+                continue
+            if self.client.sock is None:
+                # still waiting for network connection
+                await self._is_connected_event.wait()
+                board.PRINTF('MQTT poller: still waiting for MQTT client to open socket')
+                continue
+            if self.status == "connected":
+                try:
+                    # check for incoming messages
+                    # this will call the callback for each message
+                    self.client.check_msg()
+                except Exception as e:
+                    board.PRINTF('ERROR: MQTT poller failed: {}', e)
+                    self.status = "connecting"
+                    await asyncio.sleep_ms(2000)
+            else:
+                #
+                await asyncio.sleep_ms(1000)
+
+            # always sleep a bit to avoid busy loop if no messages are coming in
             await asyncio.sleep_ms(10)
 
 
