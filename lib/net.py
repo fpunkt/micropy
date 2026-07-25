@@ -299,6 +299,15 @@ def scan_wlan():
         rssi = net[3]
         print(f"Network: {ssid}, RSSI: {rssi} dBm")
 
+def status():
+    """Print WLAN status"""
+    wlan = network.WLAN(network.STA_IF)
+    if wlan.isconnected():
+        print("Connected to WLAN")
+        print("IP address:", wlan.ifconfig()[0])
+        print("RSSI:", wlan.status("rssi"), "dBm")
+    else:
+        print("Not connected to WLAN")
 
 try:
     board.NET = NET()
