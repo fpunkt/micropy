@@ -238,11 +238,12 @@ class _MQTT:
             self._rssi_task.cancel()
             self._rssi_task = None
 
-    def connect(self, topic=None, reset_on_error=False, name=None, repl=True):
+    def connect_in_background(self, topic=None, reset_on_error=False, name=None, repl=True):
+        """Connect to MQTT in background, keep connection alive and publish info/status topics."""
         if self.client:
             board.PRINTF('WARNING: MQTT already connected')
             return
-        board.NET.connect(repl=repl)
+        board.NET.connect_in_background(repl=repl)
         self.reset_on_error = reset_on_error
         self.name = name if name is not None else board.LOCATION
         self.topic = topic if topic is not None else 'hcm/' + self.name + '/'
@@ -261,7 +262,7 @@ class _MQTT:
     def disconnect(self):
         if self.client:
             self.client.disconnect()
-            self.client = None
+            # self.client = None
 
     async def _keepalive(self):
         self.status = "connecting"
@@ -273,7 +274,7 @@ class _MQTT:
 
             if self.status == "connected":
                 # check regularily if we are still connected
-                await asyncio.sleep_ms(1 * 60 * 1000)
+                await asyncio.sleep_ms(20 * 1000)
                 try:
                     self.client.ping()
                     continue # all good
@@ -292,7 +293,7 @@ class _MQTT:
                     pass
 
             try:
-                # should that be an await?
+                # an async function would be nice here
                 self.client.connect()
                 self.status = "connected"
                 ipstring = board.NET.ipstring()
@@ -384,7 +385,7 @@ class _MQTT:
             except Exception as e:
                 board.PRINTF('ERROR: MQTT poller failed: {}', e)
                 self.status = "connecting"
-                await asyncio.sleep_ms(1000)
+                await asyncio.sleep_ms(2000)
             await asyncio.sleep_ms(10)
 
 
