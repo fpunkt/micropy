@@ -130,11 +130,11 @@ class NET:
                             PRINTF("ERROR: cannot run after_connect function: {}", e)
                 # keep alive, check every 1 second
                 await asyncio.sleep_ms(1000)
-            continue
+                continue
 
             self._isconnected_event.clear()
 
-            if self.status == "disconnected":
+            if self.status == "connected":
                 await self._reset_wlan()
                 self.status = "connecting"
 
@@ -145,8 +145,8 @@ class NET:
                 await asyncio.sleep_ms(100)
                 continue
 
-            if self.status == "connected":
-                PRINTF("Huh? connected?")
+            if self.status == "disconnected":
+                PRINTF("Huh? disconnected?")
                 await asyncio.sleep_ms(100)
                 continue
 

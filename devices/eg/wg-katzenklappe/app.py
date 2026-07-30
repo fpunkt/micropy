@@ -23,6 +23,8 @@ i2c = machine.I2C(0, scl=machine.Pin(7), sda=machine.Pin(5), freq=400000)
 AS5600_ADDR = 0x36
 ANGLE_REG = 0x0E  # High-Byte, 2 Bytes lesen
 
+FLAP_ZERO_ANGLE = 292.0  # Winkel, bei dem die Klappe geschlossen ist
+
 print(i2c.scan())
 print("I2C Geräte gefunden:", [hex(a) for a in i2c.scan()])
 
@@ -30,7 +32,8 @@ def read_angle():
     data = i2c.readfrom_mem(AS5600_ADDR, ANGLE_REG, 2)
     raw = (data[0] << 8) | data[1]
     raw &= 0x0FFF  # nur untere 12 Bit sind gültig
-    return raw / 4096.0 * 360.0
+    angle = raw / 4096.0 * 360.0
+    return angle - FLAP_ZERO_ANGLE
 
 def read_status():
     status = i2c.readfrom_mem(AS5600_ADDR, 0x0B, 1)[0]
@@ -79,6 +82,7 @@ async def flap_angle_reader():
         except Exception as e:
             board.PRINTF("Error reading flap angle: {}", e)
             angle = 0
+        print_status()
         board.PRINTF("Flap angle: {:.2f}°", angle)
         board.MQTT.publish('flap_angle', angle)
         await asyncio.sleep_ms(1000)
