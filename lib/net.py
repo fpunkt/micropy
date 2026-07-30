@@ -60,7 +60,7 @@ class NET:
         import net
         n = net.NET()
         n.start_wlan()
-    """
+   """
 
     def __init__(self, base=32, strongest=False):
         self.after_connect = []
@@ -76,14 +76,15 @@ class NET:
         """Return True if connected to WLAN"""
         return self.wlan.isconnected()
 
-    async def wait_for_connection(self):
+    async def wait_for_connection(self, caller=None):
         """Wait until network is connected"""
+        board.PRINTF("wait_for_connection called by {}. Current status: {}", caller, self.status)
         if self.wlan.isconnected():
             return True
         if self._keepalive_task is None:
             self.connect()
 
-        await self._isconnected.wait()
+        await self._isconnected_event.wait()
         return True
 
     def connect_in_background(self, timeout=30, repl=True):
@@ -129,7 +130,7 @@ class NET:
                             PRINTF("ERROR: cannot run after_connect function: {}", e)
                 # keep alive, check every 1 second
                 await asyncio.sleep_ms(1000)
-                continue
+            continue
 
             self._isconnected_event.clear()
 
@@ -160,7 +161,7 @@ class NET:
         self.wlan.active(True)
         self._reset_wlan_after_activating()
 
-    def _reset_wlan(self):
+    def _xxxreset_wlan(self):
         """reset WLAN and start connecting. Note: the function does not wait for connection"""
         self.wlan.active(False)
         time.sleep_ms(100)

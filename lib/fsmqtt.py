@@ -270,7 +270,8 @@ class _MQTT:
 
         # endless loop to keep the connection alive
         while True:
-            if not await board.NET.wait_for_connection():
+            if not board.NET.isconnected():
+                await board.NET.wait_for_connection("fsmqtt._keepalive"):
                 continue
 
             if self.status == "connected":

@@ -23,11 +23,16 @@ BOARD_ID = 0            # PCB version, overwritten in bconf
 PERIPH_ID = 0           # PCB version, overwritten in main.py (or by including other .py files)
 
 class _net:
-    async def wait_for_connection(self):
-        # Pretend to wait for connection. We could sleep forever here .. BUT: 
+    """Stub for network client. This is set in net.py when net is imported"""
+    async def wait_for_connection(self, caller=None):
+        # Pretend to wait for connection. We could sleep forever here .. BUT:
         # Network might be loaded later, so we return False to indicate that we are not connected.
         # The client should loop over `wait_for_connection` until it returns True.
-        await asyncio.sleep_ms(1000) 
+        board.PRINTF("wait_for_connection called by {}. No network available, returning False", caller)
+        await asyncio.sleep_ms(1000)
+        return False
+
+    def isconnected(self):
         return False
 
     def connect(self, timeout=30):
@@ -242,7 +247,7 @@ def run():
 #     asyncio.run(arun())
     asyncio.get_event_loop().run_forever()
 
-def restart_eventloop(): 
+def restart_eventloop():
     """Restart tasks and loop"""
     PRINTF("Restarting the event loop...")
     gc.collect()

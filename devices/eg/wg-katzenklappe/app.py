@@ -80,6 +80,7 @@ async def flap_angle_reader():
             board.PRINTF("Error reading flap angle: {}", e)
             angle = 0
         board.PRINTF("Flap angle: {:.2f}°", angle)
+        board.MQTT.publish('flap_angle', angle)
         await asyncio.sleep_ms(1000)
 
 
