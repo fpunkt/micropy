@@ -90,7 +90,10 @@ class NET:
     def connect_in_background(self, timeout=30, repl=True):
         """Connect to WLAN in background and keep connection alive, i.e. reconnect if connection is lost
         The function does not wait for connection and a keepalive task is started."""
+        PRINTF("connect_in_background called. Current status: {}", self.status)
         self._wants_repl = repl
+        if self.status != "connected":
+            self.status = "start-connecting"
         if self._keepalive_task is not None:
             # already connected or connecting, do not start another task
             return
@@ -107,12 +110,17 @@ class NET:
             self.start_repl()
 
     async def _keepalive(self):
+        """Keep WLAN connection alive, reconnect if connection is lost"""
+        PRINTF("Starting keepalive task for WLAN connection")
         last_print = utime.ticks_ms()
         while True:
             if self.wlan.isconnected():
                 self._isconnected_event.set()
                 if self.status != "connected":
                     PRINTF("Connected to {}", self.wlan.ifconfig())
+                    PRINTF("Re-enabling default Wi-Fi Power Save mode...")
+                    # 1 = PM_MIN_MODEM (MicroPython default power saving)
+                    self.wlan.config(pm=1)
                     self.status = "connected"
                     try:
                         sys.modules['cancommon'].send_wlan_connected()
@@ -135,8 +143,14 @@ class NET:
             self._isconnected_event.clear()
 
             if self.status == "connected":
+                PRINTF("Lost connection to WLAN, trying to reconnect...")
+                self.status = "start-connecting"
+
+            if self.status == "start-connecting":
+                PRINTF("Starting connection to WLAN...")
                 await self._reset_wlan()
                 self.status = "connecting"
+
 
             if self.status == "connecting":
                 if utime.ticks_diff(utime.ticks_ms(), last_print) > 5000:
@@ -147,7 +161,7 @@ class NET:
 
             if self.status == "disconnected":
                 PRINTF("Huh? disconnected?")
-                await asyncio.sleep_ms(100)
+                await asyncio.sleep_ms(1000)
                 continue
 
             PRINTF("Huh? unknown status: {}", self.status)
@@ -159,13 +173,19 @@ class NET:
         self.wlan.active(False)
         await asyncio.sleep_ms(100)
         self.wlan.active(True)
+        # !!! CRITICAL: Disable power saving (0 = PM_NONE)
+        # This forces the radio to stay on and reliably process the FRITZ!Box handshake
+        PRINTF("Disabling Wi-Fi Power Save mode...")
+        self.wlan.config(pm=0)
         self._reset_wlan_after_activating()
 
-    def _xxxreset_wlan(self):
+    def _sync_reset_wlan(self):
         """reset WLAN and start connecting. Note: the function does not wait for connection"""
         self.wlan.active(False)
         time.sleep_ms(100)
         self.wlan.active(True)
+        # This forces the radio to stay on and reliably process the FRITZ!Box handshake
+        PRINTF("Disabling Wi-Fi Power Save mode...")
         self._reset_wlan_after_activating()
 
     def _reset_wlan_after_activating(self):
@@ -209,7 +229,7 @@ class NET:
 
     def start_wlan(self, timeout=30, repl=True, password='x'):
         """Connect to WLAN (start task and wait for connection, no background monitoring of connection)"""
-        self._reset_wlan()
+        self._sync_reset_wlan()
         now = utime.ticks_ms()
         last_print = now - 5001
         while not self.wlan.isconnected():
