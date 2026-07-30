@@ -23,7 +23,7 @@ i2c = machine.I2C(0, scl=machine.Pin(7), sda=machine.Pin(5), freq=400000)
 AS5600_ADDR = 0x36
 ANGLE_REG = 0x0E  # High-Byte, 2 Bytes lesen
 
-FLAP_ZERO_ANGLE = 292.0  # Winkel, bei dem die Klappe geschlossen ist
+FLAP_ZERO_ANGLE = 306.0  # Winkel, bei dem die Klappe geschlossen ist
 
 print(i2c.scan())
 print("I2C Geräte gefunden:", [hex(a) for a in i2c.scan()])
