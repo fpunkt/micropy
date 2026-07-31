@@ -306,6 +306,9 @@ def start_repl(self, password='x'):
     """Start REPL"""
     webrepl.start(password=password)
 
+def net():
+    return start_wlan()
+
 
 def scan_wlan():
     """Scan for WLANs and return list of (ssid, bssid, channel, RSSI, authmode, hidden)"""
