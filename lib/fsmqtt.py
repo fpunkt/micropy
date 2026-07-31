@@ -140,12 +140,8 @@ class _MQTT:
                 board.PRINTF('MQTT callback failed: {}', e)
             return
 
-        # catch all system topics, should be done by _blessed_topic
-        if t_str == "info" or t_str == "error":
-            return
-        if t_str.startswith("info/") or t_str.startswith("error/"):
-            return
-        if t_str.startswith("state/") or t_str.startswith("status/"):
+        xtopic = t_str.split("/")[0]
+        if xtopic in ("info", "error", "status", "state", "debug"):
             return
 
         board.PRINTF('MQTT unknown topic: T={}, M={}, full topic: {}, blessed: {}, known topics: {}',
