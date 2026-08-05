@@ -100,6 +100,7 @@ async def flap_angle_reader_task():
         except Exception as e:
             board.PRINTF("Error reading flap angle: {}", e)
             angle = 0
+            await asyncio.sleep_ms(1000)
         now = time.ticks_ms()
 
         if DEBUG:
@@ -185,14 +186,15 @@ async def uart_reader_task():
                 if b == 0x03:
                     rfid = parse_rfid(buf)
                     if rfid is not None:
-                        known = known_rfids.get(rfid, "UNKNOWN")
-                        if known != "UNKNOWN":
+                        known = known_rfids.get(rfid, None)
+                        if known is None:
+                            board.MQTT.publish('alert', 'ALERT: Alien Cat Invader!')
+                            board.MQTT.publish('xrfid', rfid)
+                        else:
                             id_is_valid.set()
                             id_check_requested.clear()
-                        else:
-                            board.MQTT.publish('invalid', 'ALERT: Alien Cat Invader!')
-                        board.PRINTF("RFID read: {} --> {}", rfid, known)
-                        board.MQTT.publish('rfid', known)
+                            board.PRINTF("RFID read: {} --> {}", rfid, known)
+                            board.MQTT.publish('rfid', known)
                     else:
                         board.PRINTF("RFID read: {} --> INVALID", buf)
                         board.MQTT.publish('invalid', 'RFID read: {} bytes'.format(len(buf)))
