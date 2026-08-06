@@ -55,8 +55,9 @@ flap_status = 'closed'  # 'closed', 'cat_entering', 'cat_leaving', 'swinging'
 
 
 known_rfids = {
-    '2E01A18A405830110000000000': 'Orange Chip',
+    '2E01A18A405830110000000000': 'Orange Katze',
     'AD01A18A405830110000000000': 'Stoffkatze',
+    '1A249E24614110010000000000': 'Schwarzeweiße Katze',
 }
 
 
@@ -93,6 +94,7 @@ def read_loop():
 
 async def flap_angle_reader_task():
     global flap_status
+    last_error_time = 0
     while True:
         await asyncio.sleep_ms(100)
         try:
@@ -178,28 +180,44 @@ async def uart_reader_task():
         while uart.any():
             board.LED.on()
             b = uart.read(1)
-            if b is not None:
-                b = b[0]
-                if b == 0x02:
-                    buf = bytearray()
-                buf.append(b)
-                if b == 0x03:
-                    rfid = parse_rfid(buf)
-                    if rfid is not None:
-                        known = known_rfids.get(rfid, None)
-                        if known is None:
-                            board.MQTT.publish('alert', 'ALERT: Alien Cat Invader!')
-                            board.MQTT.publish('xrfid', rfid)
-                        else:
-                            id_is_valid.set()
-                            id_check_requested.clear()
-                            board.PRINTF("RFID read: {} --> {}", rfid, known)
-                            board.MQTT.publish('rfid', known)
-                    else:
-                        board.PRINTF("RFID read: {} --> INVALID", buf)
-                        board.MQTT.publish('invalid', 'RFID read: {} bytes'.format(len(buf)))
-        # the chip is sending with 9600 baud, so about 1 ms per byte
-        await asyncio.sleep_ms(10)
+            if b is None:
+                # timeout on uart.read(), wait a bit and try again
+                # although this should not happen because UART.any() returned True, but just in case
+                await asyncio.sleep_ms(1)
+                continue
+
+            b = b[0]
+            if b == 0x02:
+                # start of RFID message
+                buf = bytearray()
+            buf.append(b)
+            if b != 0x03:
+                # keep reading until we get the end of message byte
+                # the chip is sending with 9600 baud, so about 1 ms per byte
+                asyncio.sleep_ms(2)  # wait a bit for the next byte
+                continue  # wait for end of message
+
+            rfid = parse_rfid(buf)
+            if rfid is None:
+                board.PRINTF("RFID read: {} --> INVALID", buf)
+                board.MQTT.publish('invalid', 'RFID read: {} bytes'.format(len(buf)))
+                # await asyncio.sleep_ms(10)  # wait a bit before reading the next RFID
+                break
+
+            board.MQTT.publish('rfid', rfid)
+            known = known_rfids.get(rfid, None)
+            if known is None:
+                board.MQTT.publish('alert', 'ALERT: Alien Cat Invader!')
+                break
+
+            id_is_valid.set()
+            id_check_requested.clear()
+            board.PRINTF("RFID read: {} --> {}", rfid, known)
+            board.MQTT.publish('hello', known)
+
+        # waiting for the next byte to arrive, but don't block the event loop
+        await asyncio.sleep_ms(10)  # wait a bit before reading the next byte
+
 
 
 ###############################################################################
@@ -240,7 +258,7 @@ def r():
 board.NET.connect_in_background()
 board.MQTT.connect_in_background()
 
-board.MQTT.ignore_topics('invalid', 'rfid', 'flap')
+board.MQTT.ignore_topics('invalid', 'rfid', 'flap', 'xrfid', 'alert', 'debug', 'hello')
 
 asyncio.create_task(uart_reader_task())
 asyncio.create_task(flap_angle_reader_task())
