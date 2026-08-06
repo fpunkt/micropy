@@ -363,10 +363,7 @@ class _MQTT:
         try:
             # try to get compile time from lup module (if available)
             import lup
-            # microPython uses 2000-01-01 00:00:00 as epoch - magic conversion
-            t = time.localtime(lup.T - 30*31556926 + 8*3600 - 60*35 - 120)
-            compiled = "{:04d}-{:02d}-{:02d} {:02d}:{:02d}:{:02d}".format(t[0], t[1], t[2], t[3], t[4], t[5])
-            info += "; compiled=" + compiled
+            info += "; compiled=" + lup.T
         except Exception:
             pass
         board.PRINTF('publishing info: {}', info)
