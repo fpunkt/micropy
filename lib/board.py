@@ -12,11 +12,14 @@ import machine
 import utime
 import asyncio
 
-# If DEBUG is set, additinoal messages will be printed. Set in main.py
+# If DEBUG is set, additinoal messages will be printed. Set in app.py
 DEBUG = False
 
-# CANID of the application. Set in main.py
+# CANID of the application. Set in app.py
 CANID = None
+
+# Hostname as seen by the DHCP server. Set in app.py before loading the network.
+HOSTNAME = None
 
 CPU_ID = 1              # ESP32 per default
 BOARD_ID = 0            # PCB version, overwritten in bconf

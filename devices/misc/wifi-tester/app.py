@@ -1,46 +1,48 @@
-# Copyright (c) 2025 Alex Yeryomin
-# The demo program for ESP32-С3 with OLED display 72x40 pixels.
+import board
+board.DEBUG = 2
+board.LOCATION = 'rssi_display'
+board.HOSTNAME = 'rssi_display'
+board.VERSION = '1.0'
 
 from machine import Pin, I2C
 from time import sleep
 from sh1106 import SH1106_I2C # Install SH1106 driver.
 from random import randint
+import asyncio
 
-i2c_display = I2C(0, sda=Pin(5), scl=Pin(6), freq=400000)
-display = SH1106_I2C(128, 64, i2c_display)
-display.contrast(255)
+import net
+import fsmqtt
 
-# SSD1306 controller has 132x64 pixel buffer
-BufferWidth, BufferHeight = 132, 64
-ScreenWidth, ScreenHeight = 72, 40
-xOffset, yOffset = (BufferWidth - ScreenWidth) // 2, (BufferHeight - ScreenHeight) // 2
+board.PRINTF("Starting network in background")
 
-for r in range(display.height // 2):
-    display.hline(xOffset, yOffset + r * 2, ScreenWidth, 1)
-    display.show()
-for c in range(display.width // 2):
-    display.vline(xOffset + c * 2, yOffset, ScreenHeight, 1)
-    display.show()
+net.connect_in_background()
+fsmqtt.connect_in_background()
 
-while True:
-    x, y = randint(0, ScreenWidth - 1), randint(0, ScreenHeight - 1)
-    dx, dy = randint(-3, 3), randint(-3, 3)
+import oledi2c
+oled = oledi2c.oled
+#oled.fill(0)
+#oled.text("Hallo Frank", 0, 0, 1)
+#oled.show()
 
-    display.invert(0)
-    display.fill(0)
+async def rssi_loop():
+    i = 0
+    while True:
+        try:
+            rssi = board.NET.rssi()
+            board.PRINTF("rssi: {}", rssi)
+            msg = 'RSSI {}'.format(rssi)
+            board.MQTT.publish("rssi", rssi)
+        except:
+            msg = 'wait {}'.format(i)
+            i += 1
+        oled.fill(0)
+        oled.text(msg, 0, 0, 1)
+        oled.show()
+        await asyncio.sleep_ms(500)
 
-    for _ in range(200):
-        display.fill(0)
-        display.ellipse(xOffset + x, yOffset + y, 3, 3, 1)
-        display.show()
-        x += dx
-        if x < 0 or x >= ScreenWidth:
-            dx = -dx
-        y += dy
-        if y < 0 or y >= ScreenHeight:
-            dy = -dy
 
-    for i in range(6):
-        display.invert(i % 2)
-        display.show()
-        sleep(0.2)
+board.PRINTF("Starting RSSI loop")
+board.MQTT.ignore_topics('rssi')
+
+asyncio.create_task(rssi_loop())
+

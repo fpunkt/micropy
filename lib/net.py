@@ -41,7 +41,22 @@ try:
 except ImportError:
     PRINTF = print
 
+
+def format_mac(mac_bytes, sep=":"):
+    """Format bytes/iterable as hex MAC (xx:xx:...)."""
+    try:
+        return sep.join("{:02X}".format(b) for b in mac_bytes)
+    except Exception:
+        return str(mac_bytes)
+
+
 network.country('DE')
+if board.HOSTNAME is None:
+    w = network.WLAN(network.STA_IF)
+    mac = w.config('mac')
+    board.HOSTNAME = 'mpy' + format_mac(mac, sep='-')[5:]
+
+network.hostname(board.HOSTNAME)
 
 class NET:
     """Class to manage network connection and webrepl.
@@ -234,7 +249,12 @@ class NET:
         last_print = now - 5001
         while not self.wlan.isconnected():
             if utime.ticks_diff(utime.ticks_ms(), last_print) > 5000:
-                PRINTF("Waiting for connection..., status: {}", self.wlan.status())
+                status = self.wlan.status()
+                PRINTF("Waiting for connection..., status: {}", status)
+                # 1001 = CONNECTING
+                if status == 202:  # AUTH_FAIL -> lohnt sich, kurz zu warten und neu zu versuchen
+                    utime.sleep_ms(100)
+                    continue
                 last_print = utime.ticks_ms()
             if utime.ticks_diff(utime.ticks_ms(), now) > timeout * 1000:
                 break
@@ -333,16 +353,11 @@ def status():
     else:
         print("Not connected to WLAN")
 
+def connect_in_background():
+    board.NET.connect_in_background()
+
 try:
     board.NET = NET()
 except NameError:
     pass
-
-def format_mac(mac_bytes, sep=":"):
-    """Format bytes/iterable as hex MAC (xx:xx:...)."""
-    try:
-        return sep.join("{:02X}".format(b) for b in mac_bytes)
-    except Exception:
-        return str(mac_bytes)
-
 

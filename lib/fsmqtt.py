@@ -32,13 +32,19 @@ import umqttsimple
 import time
 import sys
 
+import c
+
+BROKER = '192.168.178.5'
+BROKER = '192.168.178.7'
+#BROKER = '192.168.30.1'
+
 class _MQTT:
     """MQTT client wrapper"""
 
     def __init__(self):
         self.status = "disconnected"
         self.client = None
-        self.topic = None
+        self.topic = "hcm/" + board.LOCATION + "/"
         self.reset_on_error = False
         self._is_connected_event = asyncio.Event()
 
@@ -51,6 +57,10 @@ class _MQTT:
         self.callbacks = {
             "config": self._config_command,
         }
+        """Registered callbacks for topics.
+        A callback is a function that takes two arguments: topic and message.
+        The topic is the topic that was received, without the prefix.
+        The message is the message that was received, as a string."""
 
         """Registered callbacks for topics."""
 
@@ -235,23 +245,36 @@ class _MQTT:
             self._rssi_task.cancel()
             self._rssi_task = None
 
-    def connect_in_background(self, topic=None, reset_on_error=False, name=None, repl=True):
+    def _make_client(self, name):
+        clientid = board.NET.mac_address()
+        # limit client id to 23 characters for compatibility
+        if len(clientid) > 23:
+            clientid = clientid[-23:]
+        board.PRINTF('MQTT client id: {}', clientid)
+        s = c.s(0)
+        self.client = umqttsimple.MQTTClient(clientid, BROKER, user=s[0], password=s[1])
+        self.name = name if name is not None else board.LOCATION
+        self.client.set_last_will(self.topic + "disconnected", self.name)
+        board.PRINTF('MQTT topic: {}', self.topic)
+
+    def conncect_in_foreground(self, name=None):
+        """Connect in foreground, WLAN must already be connected, no task for keeping the connection
+        alive will be spawned"""
+        self._make_client(name)
+        self.client.connect()
+        ipstring = board.NET.ipstring()
+        board.PRINTF('MQTT connected to {} {}', BROKER, ipstring)
+        self.status = "connected"
+
+
+    def connect_in_background(self, reset_on_error=False, name=None, repl=True):
         """Connect to MQTT in background, keep connection alive and publish info/status topics."""
         if self.client:
             board.PRINTF('WARNING: MQTT already connected')
             return
         board.NET.connect_in_background(repl=repl)
         self.reset_on_error = reset_on_error
-        self.name = name if name is not None else board.LOCATION
-        self.topic = topic if topic is not None else 'hcm/' + self.name + '/'
-        board.PRINTF('MQTT topic: {}', self.topic)
-        clientid = board.NET.mac_address()
-        # limit client id to 23 characters for compatibility
-        if len(clientid) > 23:
-            clientid = clientid[-23:]
-        board.PRINTF('MQTT client id: {}', clientid)
-        self.client = umqttsimple.MQTTClient(clientid, '192.168.178.5')
-        self.client.set_last_will(self.topic + "disconnected", self.name)
+        self._make_client(name)
 
         self._keepalive_task = asyncio.create_task(self._keepalive())
         asyncio.create_task(self._poll_for_new_messages())
@@ -382,8 +405,9 @@ class _MQTT:
                 continue
             if self.client.sock is None:
                 # still waiting for network connection
-                await self._is_connected_event.wait()
+                # await self._is_connected_event.wait()
                 board.PRINTF('MQTT poller: still waiting for MQTT client to open socket')
+                await asyncio.sleep_ms(250)
                 continue
             if self.status == "connected":
                 try:
@@ -393,13 +417,12 @@ class _MQTT:
                 except Exception as e:
                     board.PRINTF('ERROR: MQTT poller failed: {}', e)
                     self.status = "connecting"
-                    await asyncio.sleep_ms(2000)
+                    await asyncio.sleep_ms(1000)
             else:
-                #
-                await asyncio.sleep_ms(1000)
+                # still waiting for connection
+                await asyncio.sleep_ms(500)
 
-            # always sleep a bit to avoid busy loop if no messages are coming in
-            await asyncio.sleep_ms(10)
+            await asyncio.sleep_ms(20)
 
 
 def _print_rssi():
@@ -416,25 +439,36 @@ async def _print_rssi_task(period_ms):
         await asyncio.sleep_ms(period_ms)
         _print_rssi()
 
-def register_mqtt_client(client):
-    board.MQTT = client
+# def xxxregister_mqtt_client(client):
+#     board.MQTT = client
 
-register_mqtt_client(_MQTT())
+# register_mqtt_client(_MQTT())
 
-def connect():
+board.MQTT = _MQTT()
+
+
+def connect_in_foreground():
+    board.MQTT.conncect_in_foreground()
+
+def connect_in_background():
     """Connect to MQTT and setup async functions that keep the connection alive and report RSSI, etc."""
-    global _CLIENT
     global _rssi_task
-    if _CLIENT:
-        return
-    _CLIENT = _MQTTClient()
+    # if board.MQTT and isinstance(board.MQTT, _MQTT):
+    #     return
+    # board.MQTT = _MQTT()
+    board.MQTT.connect_in_background()
     # copy callbacks from dummy mqtt
-    _CLIENT.callbacks.update(board.MQTT.callbacks)
-    _CLIENT.after_connect.extend(board.MQTT.after_connect)
-    asyncio.create_task(_CLIENT.connect_in_background())
-    asyncio.create_task(_CLIENT._poll_for_new_messages())
+    board.MQTT.callbacks.update(board.MQTT.callbacks)
+    board.MQTT.after_connect.extend(board.MQTT.after_connect)
+    # if False:
+    #      asyncio.create_task(_connect_in_background(name))
+    #      asyncio.create_task(_mqtt_poller_task())
+    # else:
+    #      board.BACKGROUND_RUNNERS.append(_connect_in_background(name))
+    #      board.BACKGROUND_RUNNERS.append(_mqtt_poller_task())
+    # asyncio.create_task(board.MQTT.connect_in_background())
+    # asyncio.create_task(board.MQTT._poll_for_new_messages())
     _rssi_task = asyncio.create_task(_print_rssi_task(5 * 60 * 1000))
-    board.MQTT = _CLIENT
 
 
 def _safe_decode(value):
@@ -452,13 +486,13 @@ def _safe_decode(value):
 #         for p in board.PWMs.pwms:
 #             p.send_telemetry()
 
-def connect_in_background(name=None):
-    if False:
-        asyncio.create_task(_connect_in_background(name))
-        asyncio.create_task(_mqtt_poller_task())
-    else:
-        board.BACKGROUND_RUNNERS.append(_connect_in_background(name))
-        board.BACKGROUND_RUNNERS.append(_mqtt_poller_task())
+# def connect_in_background(name=None):
+#     if False:
+#         asyncio.create_task(_connect_in_background(name))
+#         asyncio.create_task(_mqtt_poller_task())
+#     else:
+#         board.BACKGROUND_RUNNERS.append(_connect_in_background(name))
+#         board.BACKGROUND_RUNNERS.append(_mqtt_poller_task())
 
 
 
@@ -504,7 +538,7 @@ def _mqtt_callback(topic, message):
     if t_str_full == _blessed_topic:
         _blessed_topic = ""
         return
-    t_str = t_str_full[len(options.topic):]
+    t_str = t_str_full[len(self.topic):]
 
     if t_str in _ignored_topics:
         return
@@ -536,19 +570,22 @@ def _mqtt_callback(topic, message):
     board.PRINTF('MQTT done: T={}, M={}', topic, message)
 
 def _subscribe(topic, register, callback):
-    if not isinstance(topic, bytes):
-        topic = bytes(topic, 'utf-8')
-    _callbacks[register] = callback
+    #if not isinstance(topic, bytes):
+    #    topic = bytes(topic, 'utf-8')
     if board.DEBUG:
         board.PRINTF('MQTT subscribed to {}', topic)
-    if not board.MQTT:
-        return
-    board.MQTT.subscribe(topic)
+    board.MQTT.subscribe(topic, callback)
 
-def subscribe_raw(topic, callback):
-    """subscribe to topic without prefixing with options.topic"""
-    _subscribe(topic, topic, callback)
+# def subscribe_raw(topic, callback):
+#     """subscribe to topic without prefixing"""
+#     _subscribe(topic, topic, callback)
 
 def subscribe(topic, callback):
-    """subscribe to topic, prefixing with options.topic"""
-    _subscribe(options.topic + topic, topic, callback)
+    """subscribe to topic, prefixing with MQTT.topic"""
+    # _subscribe(board.MQTT.topic + topic, topic, callback)
+    board.MQTT.subscribe(topic, callback)
+    board.PRINTF('MQTT subscribed to {}', topic)
+
+def publish(topic, payload):
+    """Publish a message, topic is prefixed by board.MQTT.topic"""
+    board.MQTT.publish(topic, payload)

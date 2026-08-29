@@ -16,3 +16,4 @@ Attic
 .DS_Store
 .vscode/settings.json
 hidepw/sentinel_1.py
+devices/eg/wz-kegellampe/.espip-xx

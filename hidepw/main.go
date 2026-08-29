@@ -12,17 +12,15 @@ package main
 //
 
 // go run main.go    192.168.178.2   meinpasswort-1   10.10.4.2    deinpw-2
-//
 // go run main.go -m -o c.py iot-ssid iot-pw   alternate-ssid alternate-pw
+// mpy-cross c.py
 //
-// will generate a Python file where you can call
+// will generate a compiled MicroPython file where you can call
 //
-// import xx
+// import c
 //
-// xx.i(0)  -> first IP as string (192.168.178.2)
-// xx.s(4)  -> first PW as string (meinpasswort-1)
-// xx.i(21) -> second IP as string
-// xx.s(25) -> second PW
+// c.s(0)  -> first IP, first PW as string (192.168.178.2, meinpasswort-1)
+// c.s(32) -> second IP, second PW as string (10.10.4.2, deinpw-2)
 
 import (
 	"bytes"
@@ -175,7 +173,9 @@ func main() {
 		fd.WriteString(detab(mainCode))
 	}
 
-	fmt.Print("\n", strings.Join(use, "\n"), "\n")
+	fmt.Printf("# Use    mpy-cross %s     to compile\n", *outputFile)
+	fmt.Printf("# Use    mpremote fs cp %s.mpy :c.mpy\n", strings.TrimSuffix(*outputFile, ".py"))
+	fmt.Print(strings.Join(use, "\n"), "\n")
 }
 
 const (

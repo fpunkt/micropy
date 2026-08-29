@@ -11,6 +11,7 @@ Der DC/DC Wandler (4A angegeben) wird nicht warm --> kein Kühlkörper nötig.
 
 import board
 board.LOCATION = 'eg-wz-kegellampe'
+board.HOSTNAME = 'kegellampe'
 board.VERSION = '2025-12-14'
 board.DEBUG = True
 
@@ -44,7 +45,7 @@ def _set_pixel(index: int, r: int, g: int, b: int):
 
 _set_pixel(0, 0, 50, 0) # green dot to show we are alive
 # show blue dot on WIFI connect
-net.after_connect.append(lambda: _set_pixel(0, 0, 0, 50))
+board.NET.after_connect.append(lambda: _set_pixel(0, 0, 0, 50))
 
 
 def set_color(r: int, g: int, b: int):
@@ -79,7 +80,7 @@ def set_gradient(msg=4):
         r = (i - DARK_Pixels) * 255 // (NPIXEL - DARK_Pixels)
         g = 128
         b = int((255 - r)/scale)
-        np[i] = (r, g, b) 
+        np[i] = (r, g, b)
     np.write()
     fsmqtt.publish('state/gradient', str(scale))
 
@@ -140,8 +141,8 @@ def _blink_green():
     np.write()
     time.sleep_ms(500)
     all_off() # turn off all pixels and send status to MQTT
-    
-fsmqtt.after_connect.append(_blink_green)
+
+board.MQTT.after_connect.append(_blink_green)
 
 net.connect_in_background()
 fsmqtt.connect_in_background()
@@ -155,7 +156,7 @@ def r():
 try:
     if 0 == 1: # pylint: disable=comparison-with-itself
         board.run()
-    else: 
+    else:
         print('# run  restart   (or board.run()) to start event handler')
 
 except Exception as e: # pylint: disable=bare-except, broad-except

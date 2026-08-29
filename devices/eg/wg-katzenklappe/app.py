@@ -100,7 +100,12 @@ async def flap_angle_reader_task():
         try:
             angle = read_angle()
         except Exception as e:
-            board.PRINTF("Error reading flap angle: {}", e)
+            time_since_last_error = time.ticks_diff(time.ticks_ms(), last_error_time)
+            if time_since_last_error > 60000:  # only print error every 10 seconds
+                last_error_time = time.ticks_ms()
+                if DEBUG:
+                    board.PRINTF("Error reading flap angle: {}", e)
+                    board.MQTT.publish('error', 'Error reading flap angle: {}'.format(e))
             angle = 0
             await asyncio.sleep_ms(1000)
         now = time.ticks_ms()
@@ -252,13 +257,28 @@ async def servo_control_task():
         set_angle(SERVO_OPEN_ANGLE)
         id_is_valid.clear()  # clear the event after opening the flap
 
+def set_barrier_angle(topic, angle):
+    """
+    Set the barrier angle based on MQTT command.
+    :param topic: The MQTT topic (not used here)
+    :param angle: The angle in degrees (0-180)
+    """
+    iangle = int(angle)
+    if iangle < 0 or iangle > 180:
+        board.PRINTF("Invalid barrier angle: {}. Must be between 0 and 180.", iangle)
+        return
+    board.PRINTF("Setting barrier angle to {}°", iangle)
+    set_angle(iangle)
+
 def r():
     board.restart()
+
+board.MQTT.subscribe('barrier/set_angle', set_barrier_angle)
 
 board.NET.connect_in_background()
 board.MQTT.connect_in_background()
 
-board.MQTT.ignore_topics('invalid', 'rfid', 'flap', 'xrfid', 'alert', 'debug', 'hello')
+board.MQTT.ignore_topics('invalid', 'rfid', 'flap', 'xrfid', 'alert', 'debug', 'hello', 'error')
 
 asyncio.create_task(uart_reader_task())
 asyncio.create_task(flap_angle_reader_task())
