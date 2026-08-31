@@ -1,6 +1,7 @@
 
 import board
 board.LOCATION = 'eg-wg-katzenklappe'
+board.HOSTNAME = 'katzenklappe'
 board.VERSION = '2026-07-23'
 board.DEBUG = True
 
