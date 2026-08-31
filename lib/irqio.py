@@ -42,7 +42,6 @@ class IRQIO(port.Port):
         # are running (might be confusing if value changes ...)
         self.pinvalue = self.value()
         self.enable()
-        # board.BACKGROUND_RUNNERS.append(self._runner())
         asyncio.create_task(self._runner())
 
     def makemessage(self, canid):

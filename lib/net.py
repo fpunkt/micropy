@@ -63,7 +63,7 @@ class NET:
     Use board.NET to access the network from everywhere.
     The class will try to connect to the WLAN in background and keep the connection alive.
     You can add functions to be called after the connection is established by appending them
-    to board.arun
+    to board.NET.after_connect
 
     To connect manually use board.NET.start_wlan() or
     board.NET.connect() to connect in background and keep the connection alive.

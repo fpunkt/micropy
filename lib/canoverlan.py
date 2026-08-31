@@ -82,7 +82,7 @@ async def can_receiver():
         except:
             sys.exit(1)
 
-board.BACKGROUND_RUNNERS.append(can_receiver())
+asyncio.create_task(can_receiver())
 
 
 sendbuffer = bytearray([0]*22)

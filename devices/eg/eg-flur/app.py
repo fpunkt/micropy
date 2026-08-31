@@ -245,7 +245,8 @@ async def send_pwm_status():
             await asyncio.sleep_ms(100)
         await asyncio.sleep(30 * 60)
 
-# board.BACKGROUND_RUNNERS.append(send_pwm_status())
+# send status every 30 minutes
+# asyncio.create_task(send_pwm_status())
 
 
 
@@ -262,7 +263,7 @@ async def poweroff_dcdc():
         if newval != p6.pwm.duty():
             p6.set_raw(newval)
 
-board.BACKGROUND_RUNNERS.append(poweroff_dcdc())
+asyncio.create_task(poweroff_dcdc())
 
 def main():
     if 1 != 0: # pylint: disable=comparison-with-itself

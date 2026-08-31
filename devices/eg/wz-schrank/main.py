@@ -85,7 +85,7 @@ async def dingdongtask():
         await asyncio.sleep_ms(ddMS)
         dindongping.off()
 
-board.BACKGROUND_RUNNERS.append(dingdongtask())
+asyncio.create_task(dingdongtask())
 
 def dingdonghandler(msg):
     global ddMS

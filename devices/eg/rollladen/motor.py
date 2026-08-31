@@ -133,4 +133,4 @@ async def _motor_accellerator():
             m.next_speedup_step_or_monitor()
         await asyncio.sleep_ms(10)
 
-board.BACKGROUND_RUNNERS.append(_motor_accellerator())
+asyncio.create_task(_motor_accellerator())

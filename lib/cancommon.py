@@ -137,7 +137,7 @@ async def _ping_job():
                     print('Cannot send ping: {}'.format(e))
         await asyncio.sleep(board.PINGTIME)
 
-board.BACKGROUND_RUNNERS.append(_ping_job())
+asyncio.create_task(_ping_job())
 
 def _send_ping_or_change_rate(m):
     if len(m.payload) == 1:
@@ -237,7 +237,7 @@ async def _memstat_reporter_task():
         _send_memstat()
         await asyncio.sleep(board.MEMSTATTIME)
 
-board.BACKGROUND_RUNNERS.append(_memstat_reporter_task())
+asyncio.create_task(_memstat_reporter_task())
 
 
 # Regiser CAN commands known by this device
@@ -290,7 +290,7 @@ async def _report_net_status():
         except:
             pass
 
-board.BACKGROUND_RUNNERS.append(_report_net_status())
+asyncio.create_task(_report_net_status())
 
 def _connect_to_wlan(m):
     if len(m.payload) == 2:

@@ -183,9 +183,6 @@ PWM_IS_DIMMING = False
 # modules can register STARTUP_FUNCTIONS that are called at the beginning of the run loop
 STARTUP_FUNCTIONS = []
 
-# BACKGROUND_RUNNERS is a list of all tasks that run (indefinitely) as independent async task
-BACKGROUND_RUNNERS = []
-
 # I2C holds the globally initialized I2C device
 I2C = None
 I2C_SDA_PIN = 0
@@ -221,7 +218,7 @@ def good_time_for_gc():
 
 # Run async processes
 
-async def arun():
+async def xxxarun():
     """Run all background tasks"""
     try:
         await asyncio.gather(*BACKGROUND_RUNNERS)

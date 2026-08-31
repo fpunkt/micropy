@@ -92,7 +92,7 @@ async def phall():
         c = m1.sensorcount
         await asyncio.sleep_ms(mssleep)
 
-board.BACKGROUND_RUNNERS.append(phall())
+asyncio.create_task(phall())
 
 def r():
     board.run()

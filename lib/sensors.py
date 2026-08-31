@@ -61,7 +61,7 @@ class Sensor(port.Port):
         self.is_fast = False # can interrupt PWM dimming
         if background_task is None:
             background_task = self.sensor_task
-        board.BACKGROUND_RUNNERS.append(background_task())
+        asyncio.create_task(background_task())
 
     def __repr__(self) -> str:
         return self._repr('poll_intervall: {} ms'.format(self.poll_intervall_in_ms))
@@ -103,7 +103,7 @@ class Sensor(port.Port):
                         print('Exception from {}: {}'.format(self, e))
                         sys.print_exception(e)
                     await asyncio.sleep_ms(1000)
-            if board.DEBUG > 2: 
+            if board.DEBUG > 2:
                 board.PRINTF('sensor {} going to sleep for {} ms', self, self.poll_intervall_in_ms)
             await asyncio.sleep_ms(self.poll_intervall_in_ms)
             if board.DEBUG > 2:

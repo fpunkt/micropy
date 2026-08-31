@@ -124,7 +124,7 @@ async def _poll_CAN():
             mcount = 0
         await asyncio.sleep_ms(board.CANPOLLTIME_MS)
 
-board.BACKGROUND_RUNNERS.append(_poll_CAN())
+asyncio.create_task(_poll_CAN())
 
 # Since we can set a CAN input filter it is not obvious that we receive messages on a regular basis.
 # Can't use for Watchdog
