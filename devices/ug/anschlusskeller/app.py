@@ -6,7 +6,8 @@ MQTT Client for Anschlusskeller, Gas- und Wasserzähler, ggf Licht.
 
 import board
 board.LOCATION = 'ug-anschlusskeller'
-board.VERSION = '2026-01-12'
+board.HOSTNAME = 'gaszaehler'
+board.VERSION = '2026-08-31'
 board.DEBUG = 2
 import fsmqtt
 
@@ -47,7 +48,7 @@ class Anschlusskeller:
         # send a heartbeat every 5 minutes
         self.heartbeat = 5 * 60 * 1000
         self.interval = 5000
-        
+
     async def run(self):
         # say hello
         board.PRINTF('Anschlusskeller started')
@@ -103,7 +104,7 @@ class Anschlusskeller:
             self.auto_off_task = None
         self.light_off()
         board.MQTT.publish('info/door', 'closed')
-        
+
     async def auto_off(self):
         await asyncio.sleep(self.auto_off_delay_s)
         self.light_off()
@@ -196,10 +197,8 @@ board.MQTT.subscribe('set/light', _light_on_off)
 board.MQTT.subscribe('set/door_open', _door_open_close)
 
 print("going to connect to network")
-board.NET.connect()
-print("connected to network")
-board.MQTT.connect()
-print("connected to mqtt")
+net.connect_in_background()
+fsmqtt.connect_in_background()
 
 async def blue_led():
     last = 0
