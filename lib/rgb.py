@@ -124,7 +124,7 @@ def _dimrgb16(msg):
         return
     if board.DEBUG:
         print('setting r/g/b {}/{}/{}'.format(msg.u16(2), msg.u16(4), msg.u16(6)))
-    rgb.dimi16(msg.u16(2), msg.u16(4), msg.u16(6))
+    rgb.dim_u16(msg.u16(2), msg.u16(4), msg.u16(6))
 
 def _dimrgb10(msg):
     rgb = board.PORTs.find(msg, RGB, 0xa1)

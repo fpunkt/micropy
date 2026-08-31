@@ -81,8 +81,8 @@ class Anschlusskeller:
         board.PRINTF('Wasser: {}', self.wasser.counter)
 
     def light_on(self):
-        p1.dimi16(0xffff)
-        p2.dimi16(0xffff)
+        p1.dim_u16(0xffff)
+        p2.dim_u16(0xffff)
         board.MQTT.publish('info/light', 'on')
 
     def light_off(self):

@@ -214,10 +214,10 @@ class xPWM(pwm.PWM):
         self._dcdcon(value)
         return super().dim_raw(value)
 
-    def dimi16(self, i16):
-        self._dbg('dimi16', i16)
+    def dim_u16(self, i16):
+        self._dbg('dim_u16', i16)
         self._dcdcon(i16)
-        return super().dimi16(i16)
+        return super().dim_u16(i16)
 
 p7 = xPWM(7, bconf.ML10_PWM_7)
 """EXPORT:
