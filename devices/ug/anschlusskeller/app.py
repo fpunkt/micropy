@@ -27,6 +27,8 @@ PIN_GAS = 32        # corner PIN upper row towards 5V supply
 PIN_WASSER = 34     # 2nd to corner
 PIN_DOOR = 35       # 2 FREE (RX/TX) then 4th to corner
 
+counter_offset = 0   # offset used to calculate the current value of the counter, since the counter is reset to 0 on each boot
+
 class Anschlusskeller:
     def __init__(self):
         self.last_gas_value = 0
@@ -73,6 +75,10 @@ class Anschlusskeller:
         self.last_gas_value = self.gas.counter
         board.MQTT.publish('gas', self.gas.counter)
         board.PRINTF('Gas: {}', self.gas.counter)
+        if counter_offset != 0:
+            m3 = counter_offset + 0.01 * self.gas.counter
+            board.PRINTF('Gas: {} m3', m3)
+            board.MQTT.publish('m3', m3)
 
     def send_wasser_value(self):
         self.last_wasser_timestamp = utime.ticks_ms()
@@ -190,11 +196,18 @@ def _door_open_close(_, msg):
         board.PRINTF('Door: {}', msg)
         board.MQTT.publish('error/door', 'Invalid value: ' + msg)
 
+def _set_offset(_, msg):
+    global counter_offset
+    counter_offset = float(msg)
+    board.PRINTF('Offset: {}', counter_offset)
+    keller.send_gas_value()
+
 board.MQTT.subscribe('set/interval', _interval)
 board.MQTT.subscribe('set/heartbeat', _heartbeat)
 board.MQTT.subscribe('set/door_autooff', _door_autooff)
 board.MQTT.subscribe('set/light', _light_on_off)
 board.MQTT.subscribe('set/door_open', _door_open_close)
+board.MQTT.subscribe('set/offset', _set_offset)
 
 print("going to connect to network")
 net.connect_in_background()
