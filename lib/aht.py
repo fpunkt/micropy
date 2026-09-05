@@ -1,3 +1,8 @@
+"""
+AHT10/AHT20 sensor interface, sensor connected via I2C bus.
+This module uses ahti2c and sends the data via CAN bus to the datalogger.
+"""
+
 import board
 import can
 import canid
