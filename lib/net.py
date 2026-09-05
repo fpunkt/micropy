@@ -51,12 +51,16 @@ def format_mac(mac_bytes, sep=":"):
 
 
 network.country('DE')
-if board.HOSTNAME is None:
-    w = network.WLAN(network.STA_IF)
-    mac = w.config('mac')
-    board.HOSTNAME = 'mpy' + format_mac(mac, sep='-')[5:]
 
-network.hostname(board.HOSTNAME)
+try:
+    if board.HOSTNAME is None:
+        w = network.WLAN(network.STA_IF)
+        mac = w.config('mac')
+        board.HOSTNAME = 'mpy' + format_mac(mac, sep='-')[5:]
+
+    network.hostname(board.HOSTNAME)
+except Exception as e:
+    PRINTF("Cannot set hostname: ", e)
 
 class NET:
     """Class to manage network connection and webrepl.

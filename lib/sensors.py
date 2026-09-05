@@ -52,13 +52,14 @@ class Sensor(port.Port):
     update_payload() patch self.msg so it can be send
     """
     def __init__(self, portid, pin, poll_intervall_in_ms, background_task=None) -> None:
-        super().__init__(portid, pin)
+        # initialize the slot first so we get an error message if something else fails
         if poll_intervall_in_ms is None or poll_intervall_in_ms == 0:
             poll_intervall_in_ms = poll_5_minutes
-
         self.poll_intervall_in_ms = poll_intervall_in_ms
-        # TODO: do we really need fast? Go and write your own async() if needed.
         self.is_fast = False # can interrupt PWM dimming
+
+        super().__init__(portid, pin)
+        # TODO: do we really need fast? Go and write your own async() if needed.
         if background_task is None:
             background_task = self.sensor_task
         asyncio.create_task(background_task())
