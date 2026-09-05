@@ -51,8 +51,19 @@ dimstep_min = 20
 dimstep_max = 200
 
 # Calculate size for next dimstep to 2*val / dimstep_scale
-dimstep_scale = 7
+dimstep_scale = 0.2
 
+def set_dimstep(value: float):
+    global dimstep_min
+    global dimstep_max
+    global dimstep_scale
+    value = min(200.0, max(1.0, value))
+    dimstep_min = int(max(10, (value * 20) / 100.0))
+    dimstep_max = int(max(200, min(16000, (value * 1000) / 100.0)))
+    dimstep_scale = max(0.1, (value * 10) / 100.0)
+    board.MQTT.publish('info/dimstep', f'min:{dimstep_min:.1f} max:{dimstep_max:.1f} scale:{dimstep_scale:.1f}')
+
+set_dimstep(150.0) # default value
 
 # Micropython does not expose the PWM resolution but sets it depending on the H/W and the
 # choosen PWM frequency.
@@ -74,28 +85,9 @@ dimstep_scale = 7
 # pwm_freq = 100
 pwm_freq = 400
 
-#_nbit_pwm = const(12)
-# _xxxmax_raw_value = const((1 << _nbit_pwm)-1)
-
-
-def _xxxxraw_to_16(i: int) -> int:
-    """expand _nbit_pwm (e.g. 12 bit) to a 16 bit value such that the lower bits are fill
-    reasonably with the expected value, e.g. 0xfff should not result in 0xfff0 but 0xffff"""
-    lshift = 16 - _nbit_pwm
-    return (i << lshift) | (i >> (_nbit_pwm - lshift))
-
-def xxxgamma_correct(value, gamma=2.2):
-    """
-    Apply gamma correction to a normalized brightness value.
-
-    value: float (0.0 to 1.0)
-    gamma: float (typically 2.0–2.4)
-    """
-    value = max(0.0, min(1.0, value))  # clamp
-    return value ** gamma
 
 # 2.0 is considered a reasonable value for indoor, 2.2 for architectural lighting, 2.4 for stage/film lighting
-GAMMA = 1.6 
+GAMMA = 1.6
 FLOOR = 0.0015
 
 def set_gamma(g: float):
@@ -106,8 +98,9 @@ def set_floor(f: float):
     global FLOOR
     FLOOR = max(0.0, min(1.0, f))
 
-board.MQTT.subscribe(f'set/gamma', lambda _, msg: set_gamma(float(msg)))
-board.MQTT.subscribe(f'set/floor', lambda _, msg: set_floor(float(msg)))
+board.MQTT.subscribe('set/gamma', lambda _, msg: set_gamma(float(msg)))
+board.MQTT.subscribe('set/floor', lambda _, msg: set_floor(float(msg)))
+board.MQTT.subscribe('set/dimstep', lambda _, msg: set_dimstep(float(msg)))
 
 def gamma_corrected_float_to_u16(v: float, maxint=0xffff) -> int:
     """
@@ -162,7 +155,7 @@ class PWM(port.Port):
             self.msg = board.CAN.Message(canid.PWM_VALUE, [0, 0, 0, 0, 0, 0, 0])
             self.msg.setsender(self.portid)
 
-        board.MQTT.subscribe(f'set/{self.portid}', self.mqtt_callback)
+        board.MQTT.subscribe(f'set/{self.portid}', self.mqtt_set_callback)
 
     def __repr__(self):
         return '<{} {}.{}>'.format(self.__class__.__name__, self.portid, self.pwm)
@@ -293,14 +286,15 @@ class PWM(port.Port):
             self.msg.send()
         # board.PRINT('Sending status to CAN for PWM {} - {} / {} - {} '.format(self.portid, self, ival, i16))
         # board.MQTT_PUBLISH('light/{}/{}/set'.format(board.LOCATION, self.portid), i16)
-        board.MQTT.publish('state/{}'.format(self.portid), str(u16>>8))
+        # board.MQTT.publish('state/{}'.format(self.portid), str(u16>>8))
+        board.MQTT.publish('state/{}'.format(self.portid), f'{{"state": "{u16 == 0 and "OFF" or "ON"}", "brightness": {u16>>8}}}')
 
     def run_next_dimstep(self):
         """Set next dimlevel for smooth dimming to finally reach self.dimtovalue."""
         ival = self.pwm.duty_u16()
         # Pick nice step size for smooth dimming
         if self._dimstepf == 0.0:
-            ds = (2*ival) // dimstep_scale
+            ds = int(ival * dimstep_scale)
         else:
             self._dimfvalue += self._dimstepf
             ival = self.f_to_u16(self._dimfvalue)
@@ -346,6 +340,11 @@ class PWM(port.Port):
         start_dimming.set()
         return True
 
+    def dim_u8(self, u8: int):
+        """dim in u8 units (0..0xff), return False if value is directly set, return True otherwise (dimming)"""
+        value = valid_u16(u8 << 8 | u8)
+        return self.dim_u16(value)
+
     def dimf(self, v):
         """dim to values from 0..1"""
         self._dimfvalue = self._fval
@@ -378,36 +377,57 @@ class PWM(port.Port):
             self.on()
         return not t
 
-    def mqtt_callback(self, _, msg):
-        board.PRINTF('MQTT callback for PWM {} got called by MQTT: {} - {}', self.portid, msg, self)
+    def mqtt_set_callback(self, topic, msg):
+        board.PRINTF('MQTT callback for PWM {} got called by MQTT: {} // {} - {}', self.portid, topic, msg, self)
         try:
             value = int(msg)
             value = min(255, max(0, value))
-            self.dimf(value / 255.0)
+            self.dim_u16(value << 8 | value) # convert to 0..0xffff
             return
-        except Exception as e:
-            board.PRINTF('MQTT callback for PWM {} got called by MQTT: {} - {}', self.portid, msg, e)
+        except:
             pass
-        # print('PWM {} got called by MQTT: {}'.format(self.id, msg))
-        msg = msg.upper()
-        if msg == '{"STATE": "OFF"}' or msg == 'OFF':
-            self.dim_u16(0)
-            return
-        if msg == '{"STATE": "ON"}' or msg == 'ON':
+        try:
+            msg = msg.upper()
+            if msg == '{"STATE": "OFF"}' or msg == 'OFF':
+                self.dim_u16(0)
+                return
+            if msg == '{"STATE": "ON"}' or msg == 'ON':
+                self.on()
+                return
+        except:
+            pass
+
+        # simple JSON parser for  {"state":"ON","brightness":69}
+        msg = msg.upper().replace(' ', '')
+
+        statepos = msg.find('"STATE":"')
+        if statepos >= 0:
+            board.PRINTF('MQTT callback for PWM {} got STATE: {}', self.portid, msg[statepos+9:statepos+12])
+            if msg[statepos+9:statepos+12] == 'OFF':
+                self.dim_u16(0)
+                return
+
+        brightnesspos = msg.find('"BRIGHTNESS":')
+        if brightnesspos >= 0:
+            try:
+                apos = brightnesspos + 13
+                epos = apos
+                while epos < len(msg) and msg[epos] in '0123456789':
+                    epos += 1
+                value = int(msg[apos:epos])
+                value = min(255, max(0, value))
+                self.dim_u8(value)
+                return
+            except:
+                pass
+
+        if statepos >= 0:
+            # got STATE != "OFF" but not BRIGHTNESS, so just set the state
             self.on()
             return
-        # {"state": "ON", "brightness": 97}
-        l = len(msg) - 1
-        if l < 5:
-            board.PRINTF('Bad MQTT message {}', msg)
-            return
-        # search for blank
-        while l > 0 and msg[l] != ord(' ') and msg[l] != ord(':'):
-            l -= 1
-        board.PRINTF('PWM callback got value "{}"', msg[l:-1])
-        value = int(msg[l:-1])
-        board.PRINTF('Setting PWM {} to {}', self.portid, value)
-        self.dim_u16(((value & 0xff) << 8) | value)
+
+        board.PRINTF('MQTT callback ERROR for PWM {}: {} // {}', self.portid, topic, msg)
+        board.MQTT.publish('error/{}'.format(self.portid), 'BAD payload for set // {} - {}'.format(self.portid, msg))
         return
 
 
@@ -699,6 +719,10 @@ class _badPWMClass: # used to avoid the need of error catching in CAN callbacks
     def off(self):
         pass
     def toggle(self):
+        pass
+    def set_dimstep(self, _):
+        pass
+    def set_gamma(self, _):
         pass
 
 _dummyPWM = _badPWMClass()
