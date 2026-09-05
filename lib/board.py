@@ -206,7 +206,7 @@ def uptime_hms():
 LOCATION = "unknown"
 
 # Version of the board firmware, overwritten by main.py or app.py
-VERSION = "unknown"
+VERSION = "undefined"
 
 # Global CAN device. Use board.CAN to access the CAN bus from everywhere.
 # The actual value is set when can.py is loaded/initialized
