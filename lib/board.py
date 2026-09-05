@@ -55,6 +55,10 @@ class _mqtt:
         pass
     def publish(self, topic: str, message):
         pass
+    def notify(self, topic: str, message):
+        pass
+    def publish_raw(self, topic: str, message):
+        pass
     def subscribe(self, topic: str, callback):
         self.callbacks[topic] = callback
     def after_connect(self, callback):

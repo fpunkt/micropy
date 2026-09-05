@@ -93,6 +93,12 @@ class _MQTT:
             return False
         return self.publish_raw(self.topic + topic, message)
 
+    def notify(self, topic: str, message):
+        """publish a message for the notify sevice (e.g. pushover)"""
+        if not self.connected():
+            return False
+        return self.publish_raw("hcm/notify/" + topic, message)
+
     def publish_raw(self, topic: str, message):
         """publish message to topic without prefixing with self.topic"""
         if not self.connected():
