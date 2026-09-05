@@ -13,19 +13,32 @@ import machine
 import fsmqtt
 import time
 import net
+
 # import watchdog
 import memstat
 import asyncio
 import time
+import am2302
 
 # ── Hardware ─────────────────────────────────────────────
-uart = machine.UART(1, baudrate=9600, rx=6, tx=21)
-# i2c = machine.I2C(0, sda=machine.Pin(8), scl=machine.Pin(9), freq=400000)
-# i2c = machine.I2C(0, scl=machine.Pin(6), sda=machine.Pin(5), freq=400000)
-i2c = machine.I2C(0, scl=machine.Pin(7), sda=machine.Pin(5), freq=400000)
 
-PIN_SERVO = 10
-servo = machine.PWM(machine.Pin(PIN_SERVO), freq=50, duty=0)
+if False: # ESP32C3 super mini
+    uart = machine.UART(1, baudrate=9600, rx=6, tx=21)
+    # i2c = machine.I2C(0, sda=machine.Pin(8), scl=machine.Pin(9), freq=400000)
+    # i2c = machine.I2C(0, scl=machine.Pin(6), sda=machine.Pin(5), freq=400000)
+    i2c = machine.I2C(0, scl=machine.Pin(7), sda=machine.Pin(5), freq=400000)
+    servo = machine.PWM(machine.Pin(10), freq=50, duty=0)
+    dht_pin = machine.Pin(11, machine.Pin.IN)  # DHT22 sensor pin
+
+else: # ESP32 WROOM32
+    uart = machine.UART(1, baudrate=9600, rx=16, tx=17)
+    #i2c = machine.I2C(0, scl=machine.Pin(22), sda=machine.Pin(21), freq=400000)
+    i2c = machine.I2C(0, scl=machine.Pin(21), sda=machine.Pin(22), freq=400000)
+    servo = machine.PWM(machine.Pin(10), freq=50, duty=0)
+    dht_pin = machine.Pin(13, machine.Pin.IN)  # DHT22 sensor pin
+
+board.I2C = i2c
+
 
 AS5600_ADDR = 0x36
 ANGLE_REG = 0x0E  # High-Byte, 2 Bytes lesen
@@ -33,12 +46,21 @@ ANGLE_REG = 0x0E  # High-Byte, 2 Bytes lesen
 FLAP_ZERO_ANGLE_OFFSET = 306.0  # Winkel, bei dem die Klappe geschlossen ist
 FLAP_CLOSE_MIN_ANGLE = -10  # Minimaler Winkel, bei dem die Klappe geschlossen ist
 FLAP_CLOSE_MAX_ANGLE = 10  # Maximaler Winkel, bei dem die Klappe geschlossen ist
-FLAP_CAT_ENTERING_ANGLE = 25  # oder größer: Winkel, bei dem die Klappe geöffnet ist, wenn die Katze reingeht
-FLAP_CAT_LEAVING_ANGLE = -FLAP_CAT_ENTERING_ANGLE  # oder kleiner: Winkel, bei dem die Klappe geöffnet ist, wenn die Katze rausgeht
+FLAP_ENTERING_ANGLE = 25  # oder größer: Winkel, bei dem die Klappe geöffnet ist, wenn die Katze reingeht
+FLAP_LEAVING_ANGLE = -FLAP_ENTERING_ANGLE  # oder kleiner: Winkel, bei dem die Klappe geöffnet ist, wenn die Katze rausgeht
 
 
 SERVO_OPEN_ANGLE = 80  # Winkel, bei dem die Klappe geöffnet ist
 SERVO_CLOSED_ANGLE = 20  # Winkel, bei dem die Klappe geschlossen ist
+
+
+###############################################################################
+### DHT22 Sensor
+
+dht22 = am2302.AM2302(portid=0x11, pin=dht_pin, poll_intervall_in_ms=5*60*1000)  # Poll every 5 minutes
+
+
+
 
 id_check_requested = asyncio.Event()
 id_check_requested.clear()
@@ -52,13 +74,13 @@ print("I2C Geräte gefunden:", [hex(a) for a in i2c.scan()])
 ###############################################################################
 ### Angular encoder AS5600
 
-flap_status = 'closed'  # 'closed', 'cat_entering', 'cat_leaving', 'swinging'
+flap_status = 'closed'  # 'closed', 'entering', 'leaving', 'swinging'
 
 
 known_rfids = {
     '2E01A18A405830110000000000': 'Orange Katze',
     'AD01A18A405830110000000000': 'Stoffkatze',
-    '1A249E24614110010000000000': 'Schwarzeweiße Katze',
+    '1A249E24614110010000000000': 'Schwarzweiße Katze',
 }
 
 
@@ -123,6 +145,7 @@ async def flap_angle_reader_task():
                 id_check_requested.clear()  # clear the event if flap is closed
                 id_is_valid.set()  # clear the event if flap is closed
                 board.PRINTF("Flap closed (angle {:.2f}°)", angle)
+                board.MQTT.publish('access', 'reset')
                 board.MQTT.publish('flap', 'closed')
                 continue
 
@@ -138,22 +161,22 @@ async def flap_angle_reader_task():
             await asyncio.sleep_ms(1000)  # wait for flap to settle
             continue  # flap is swinging, ignore entering/leaving status until it settles
 
-        if angle >= FLAP_CAT_ENTERING_ANGLE:
-            if flap_status != 'cat_entering':
-                flap_status = 'cat_entering'
+        if angle >= FLAP_ENTERING_ANGLE:
+            if flap_status != 'entering':
+                flap_status = 'entering'
                 board.PRINTF("Flap cat entering (angle {:.2f}°)", angle)
-                board.MQTT.publish('flap', 'cat_entering')
+                board.MQTT.publish('flap', 'entering')
                 id_is_valid.clear()
                 id_check_requested.set()
-
                 await asyncio.sleep_ms(1000)  # wait for flap to settle
-        elif angle <= FLAP_CAT_LEAVING_ANGLE:
-            if flap_status != 'cat_leaving':
-                flap_status = 'cat_leaving'
+
+        elif angle <= FLAP_LEAVING_ANGLE:
+            if flap_status != 'leaving':
+                flap_status = 'leaving'
                 id_check_requested.clear()
-                id_is_valid.set()
+                #id_is_valid.set()
                 board.PRINTF("Flap cat leaving (angle {:.2f}°)", angle)
-                board.MQTT.publish('flap', 'cat_leaving')
+                board.MQTT.publish('flap', 'leaving')
                 await asyncio.sleep_ms(1000)  # wait for flap to settle
 
 
@@ -213,12 +236,15 @@ async def uart_reader_task():
             board.MQTT.publish('rfid', rfid)
             known = known_rfids.get(rfid, None)
             if known is None:
-                board.MQTT.publish('alert', 'ALERT: Alien Cat Invader!')
+                # board.MQTT.publish('alert', 'ALERT: Alien Cat Invader!')
+                board.MQTT.publish('access', 'denied')
+                board.MQTT.notify('alarm', 'catflap: access denied for unknown RFID {}'.format(rfid))
                 break
 
             id_is_valid.set()
             id_check_requested.clear()
             board.PRINTF("RFID read: {} --> {}", rfid, known)
+            board.MQTT.publish('access', 'granted')
             board.MQTT.publish('hello', known)
 
         # waiting for the next byte to arrive, but don't block the event loop
@@ -248,13 +274,13 @@ async def servo_control_task():
     while True:
         await id_check_requested.wait()  # wait for ID check request
         board.PRINTF("ID check requested, waiting for validation...")
-        board.MQTT.publish('flap', 'id_check_requested')
+        board.MQTT.publish('access', 'id_check_requested')
         # id_check_requested.clear()  # clear the event after handling
         set_angle(SERVO_CLOSED_ANGLE)
 
         await id_is_valid.wait()  # wait for ID validation
         board.PRINTF("ID is valid or flap closed, opening fence...")
-        board.MQTT.publish('flap', 'open fence')
+        board.MQTT.publish('access', 'reset')
         set_angle(SERVO_OPEN_ANGLE)
         id_is_valid.clear()  # clear the event after opening the flap
 
@@ -279,7 +305,7 @@ board.MQTT.subscribe('barrier/set_angle', set_barrier_angle)
 board.NET.connect_in_background()
 board.MQTT.connect_in_background()
 
-board.MQTT.ignore_topics('invalid', 'rfid', 'flap', 'xrfid', 'alert', 'debug', 'hello', 'error')
+board.MQTT.ignore_topics('invalid', 'rfid', 'flap', 'access', 'xrfid', 'alert', 'debug', 'hello', 'error')
 
 asyncio.create_task(uart_reader_task())
 asyncio.create_task(flap_angle_reader_task())

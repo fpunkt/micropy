@@ -1,1 +1,1 @@
-../../../lib/config_c3supermini.py
+../../../lib/config_generic.py
