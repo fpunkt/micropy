@@ -39,4 +39,4 @@ class AM2302(sensors.Sensor):
             payload[5] = t >> 8
             payload[6] = t & 0xff
 
-        board.MQTT.publish("state/" + str(self.portid), f'{{t={self.dht.temperature():.1f}, h={self.dht.humidity():.1f}}}')
+        board.MQTT.publish("state/" + str(self.portid), f'{{"t": {self.dht.temperature():.1f}, "h": {self.dht.humidity():.1f}}}')
