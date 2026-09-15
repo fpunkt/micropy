@@ -178,8 +178,8 @@ class _MQTT:
             self.publish('info/uptime', time.time())
             return
         if msg == "memstat":
-            board.PRINTF('MEMSTAT: {}', memstat.get())
-            self.publish('info/memstat', memstat.get())
+            import memstat
+            memstat.print_stats()
             return
         if msg == "restart" or msg == "reboot" or msg == "soft-reset":
             board.PRINTF('RESTART')
