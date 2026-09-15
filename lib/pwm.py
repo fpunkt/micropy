@@ -128,13 +128,16 @@ def valid_f(f: float) -> float:
     return min(1.0, max(f, 0.0))
 
 class PWM(port.Port):
-    """TODO: fix docstring? Wrapper for system PWM, using numbers from 0..1 and provide dimming"""
-    def __init__(self, portid, pinid, lastintensity=100, maxu16=0xffff):
+    """PWM instance providing dimming and control by CAN and MQTT.
+    The main function you want to use is dim_u16() and dim_u8().
+    All other functions might be removed in future versions"""
+    def __init__(self, portid, pinid, lastintensity=100, maxu16=0xffff, inverted=False):
         super().__init__(portid, pinid)
         self.maxu16 = maxu16
         self.lastintensity = lastintensity
         self.button = None
         self.pwm = None
+        self.inverted = inverted
         self.toggle_prefer_off = False
         if pinid is not None:
             self.pwm = machine.PWM(machine.Pin(pinid), duty=0, freq=pwm_freq)
@@ -273,6 +276,8 @@ class PWM(port.Port):
         if self.portid is None:
             return
         # TODO - fix resolution
+        if self.inverted:
+            u16 = 0xffff - u16
         ival = u16 >> 6 # assume a 10bit PWM for now
         if board.CAN:
             # self.msg.setsender(self.id)
@@ -326,6 +331,8 @@ class PWM(port.Port):
     def dim_u16(self, u16: int):
         """dim in u16 units (0..0xffff), return False if value is directly set, return True otherwise (dimming)"""
         value = valid_u16(u16)
+        if self.inverted:
+            value = 0xffff - value
         if self.dimtovalue == NODIMMING:
             self.set_u16(value)
             return False

@@ -8,7 +8,7 @@ import net
 import fsmqtt
 import pwm
 
-p1 = pwm.PWM(0x01, 8)
+p1 = pwm.PWM(0x01, 8, inverted=True)
 
 board.NET.connect_in_background()
 board.MQTT.connect_in_background()
