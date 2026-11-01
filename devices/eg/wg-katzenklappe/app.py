@@ -43,7 +43,7 @@ board.I2C = i2c
 AS5600_ADDR = 0x36
 ANGLE_REG = 0x0E  # High-Byte, 2 Bytes lesen
 
-FLAP_ZERO_ANGLE_OFFSET = 306.0  # Winkel, bei dem die Klappe geschlossen ist
+FLAP_ZERO_ANGLE_OFFSET = 270.8  # Winkel, bei dem die Klappe geschlossen ist
 FLAP_CLOSE_MIN_ANGLE = -10  # Minimaler Winkel, bei dem die Klappe geschlossen ist
 FLAP_CLOSE_MAX_ANGLE = 10  # Maximaler Winkel, bei dem die Klappe geschlossen ist
 FLAP_ENTERING_ANGLE = 25  # oder größer: Winkel, bei dem die Klappe geöffnet ist, wenn die Katze reingeht
@@ -81,6 +81,11 @@ known_rfids = {
     '2E01A18A405830110000000000': 'Orange Katze',
     'AD01A18A405830110000000000': 'Stoffkatze',
     '1A249E24614110010000000000': 'Schwarzweiße Katze',
+
+    # Chip Reader 1
+    # 2026-10-31 21:00:07.955 hcm/eg-wg-katzenklappe/rfid 33B1FC8E512820010000000000
+    # 2026-10-31 23:16:23.759 hcm/eg-wg-katzenklappe/rfid 33B1FC8E512820010000000000
+    '33B1FC8E512820010000000000': 'Schwarzweiße Katze',
 }
 
 
@@ -312,16 +317,7 @@ asyncio.create_task(flap_angle_reader_task())
 asyncio.create_task(servo_control_task())
 board.LED.off()
 
-try:
-    if 1 == 1: # pylint: disable=comparison-with-itself
-        board.run()
-    else:
-        print('# run board.run() to start event handler')
-
-except Exception as e: # pylint: disable=bare-except, broad-except
-    print('Exception in main loop: ', e)
-    print("Try to connect to WLAN")
-    import net
-    net.net()
 
 
+# No code needed here, the main.py will start the event loop (board.run()) and run the tasks above.
+# For d
