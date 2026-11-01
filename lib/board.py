@@ -76,6 +76,7 @@ ENABLE_WATCHDOG_AFTER_SECONDS = 120
 
 I2C = None
 WDT = None
+APP = None # keep a reference to the main application object (set in main.py)
 
 PINGTIME = 300
 MEMSTATTIME = 300

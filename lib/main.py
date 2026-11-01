@@ -23,9 +23,10 @@ if False:
         print('Failed to start network: {}'.format(e))
         board.DEBUG = 0
 
-# Init Watchdog
 
 import app
+board.APP = app
+
 # For conveniece debugging: Set net and mqtt as global variables
 NET = board.NET
 MQTT = board.MQTT
@@ -46,5 +47,4 @@ except Exception as e:
     board.PRINTF('Exception in main loop: {}', e)
     board.PRINTF('Try to connect to WLAN')
     board.NET.start_wlan()
-    
- 
+
