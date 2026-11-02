@@ -44,9 +44,10 @@ AS5600_ADDR = 0x36
 ANGLE_REG = 0x0E  # High-Byte, 2 Bytes lesen
 
 FLAP_ZERO_ANGLE_OFFSET = 270.8  # Winkel, bei dem die Klappe geschlossen ist
-FLAP_CLOSE_MIN_ANGLE = -10  # Minimaler Winkel, bei dem die Klappe geschlossen ist
 FLAP_CLOSE_MAX_ANGLE = 10  # Maximaler Winkel, bei dem die Klappe geschlossen ist
 FLAP_ENTERING_ANGLE = 25  # oder größer: Winkel, bei dem die Klappe geöffnet ist, wenn die Katze reingeht
+
+FLAP_CLOSE_MIN_ANGLE = -FLAP_CLOSE_MAX_ANGLE  # Minimaler Winkel, bei dem die Klappe geschlossen ist
 FLAP_LEAVING_ANGLE = -FLAP_ENTERING_ANGLE  # oder kleiner: Winkel, bei dem die Klappe geöffnet ist, wenn die Katze rausgeht
 
 
