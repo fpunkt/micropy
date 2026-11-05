@@ -90,22 +90,26 @@ known_rfids = {
 }
 
 
-def read_angle():
+def read_encoder_angle():
+    """Read the angle from the AS5600 angular encoder and return it in degrees."""
     data = i2c.readfrom_mem(AS5600_ADDR, ANGLE_REG, 2)
     raw = (data[0] << 8) | data[1]
     raw &= 0x0FFF  # nur untere 12 Bit sind gültig
     angle = raw / 4096.0 * 360.0
     return angle - FLAP_ZERO_ANGLE_OFFSET
 
-def read_status():
+def read_encoder_status():
+    """Read the status register from the AS5600 angular encoder and return the magnet
+    status (magnet_detected, too_weak, too_strong)."""
     status = i2c.readfrom_mem(AS5600_ADDR, 0x0B, 1)[0]
     magnet_detected = bool(status & 0x20)
     too_weak = bool(status & 0x10)
     too_strong = bool(status & 0x08)
     return magnet_detected, too_weak, too_strong
 
-def print_status():
-    md, weak, strong = read_status()
+def print_encoder_status():
+    """Read the status of the AS5600 and print it to the console."""
+    md, weak, strong = read_encoder_status()
     if not md:
         print("Kein Magnet erkannt!")
     elif weak:
@@ -115,75 +119,112 @@ def print_status():
     else:
         print("Magnet OK")
 
-def read_loop():
+def print_encoder_angle():
+    """Read the angle from the AS5600 and print it to the console."""
+    angle = read_encoder_angle()
+    print("Winkel: {:.2f}°".format(angle))
+
+def debug_read_encoder_loop():
+    """Debug loop to read the encoder angle and status every 500 ms."""
     while True:
-        print_status()
-        print("Winkel: {:.2f}°".format(read_angle()))
+        print_encoder_status()
+        print_encoder_angle()
         time.sleep_ms(500)
 
 async def flap_angle_reader_task():
+    """Task to read the flap angle and update its status.
+    This task runs in the background and updates the flap_status variable based on the angle read from the AS5600 encoder.
+    It also publishes the flap status and angle to MQTT topics for monitoring.
+    The encoder is read every 100 ms, and the flap status is updated based on the angle thresholds defined above.
+    It does debounce the flap status to avoid rapid changes due to swinging or noise in the angle readings.
+    """
     global flap_status
     last_error_time = 0
+    debounce_counter = 0
+    debounce_start_counter = 50  # number of cycles to wait before considering flap status stable, about 5 seconds (50 * 100 ms)
+
     while True:
         await asyncio.sleep_ms(100)
-        try:
-            angle = read_angle()
-        except Exception as e:
-            time_since_last_error = time.ticks_diff(time.ticks_ms(), last_error_time)
-            if time_since_last_error > 60000:  # only print error every 10 seconds
-                last_error_time = time.ticks_ms()
-                if DEBUG:
-                    board.PRINTF("Error reading flap angle: {}", e)
-                    board.MQTT.publish('error', 'Error reading flap angle: {}'.format(e))
-            angle = 0
-            await asyncio.sleep_ms(1000)
         now = time.ticks_ms()
 
+        try:
+            angle = read_encoder_angle()
+        except Exception as e:
+            time_since_last_error = time.ticks_diff(now, last_error_time)
+            if time_since_last_error > 60 * 1000:  # only print error every ... seconds
+                last_error_time = now
+                if DEBUG:
+                    board.PRINTF("Error reading flap angle: {}", e)
+                board.MQTT.publish('error', 'Error reading flap angle: {}'.format(e))
+            angle = 0
+            await asyncio.sleep_ms(1000)
+            continue  # skip the rest of the loop and try again
+
+        # got valid angle
+
         if DEBUG:
-            print_status()
+            print_encoder_status()
             board.PRINTF("Flap prev status = %s, angle: {:.2f}°", flap_status, angle)
             board.MQTT.publish('debug', angle)
             board.MQTT.publish('debug', flap_status)
 
+        if debounce_counter > 0:
+            debounce_counter -= 1
+            if debounce_counter == 0:
+                board.MQTT.publish('flap', 'stuck {:.2f}'.format(angle))
+                flap_status = 'stuck'
+
         if angle > FLAP_CLOSE_MIN_ANGLE and angle < FLAP_CLOSE_MAX_ANGLE:
+            if flap_status == 'closed':
+                continue  # flap is closed and status unchanged, keep waiting for flap to open
+
             if flap_status == 'swinging':
+                if debounce_counter > 1: # still debouncing, wait for flap to settle
+                    continue
+
+                # debounce completed, flap is now stable closed
+                debounce_counter = 0
                 flap_status = 'closed'
+                board.MQTT.publish('flap', 'closed')
                 id_check_requested.clear()  # clear the event if flap is closed
                 id_is_valid.set()  # clear the event if flap is closed
-                board.PRINTF("Flap closed (angle {:.2f}°)", angle)
-                board.MQTT.publish('access', 'reset')
-                board.MQTT.publish('flap', 'closed')
-                continue
+                continue  # flap is closed, reset the status and continue checking for entering/leaving
 
-            if flap_status == 'closed':
-                continue  # flap is closed, no need to check for entering/leaving
 
-            board.PRINTF("Flap swinging")
+            # flap was open or stuck, but now angle is within closed range, so flap is swinging and need to debounce
             flap_status = 'swinging'
-            await asyncio.sleep_ms(2000)  # wait for flap to settle
-            continue  # ignore swinging flap, wait for it to settle
+            debounce_counter = debounce_start_counter  # start debouncing
+            continue  # flap is swinging, wait for it to settle
 
-        if flap_status != 'closed':
-            await asyncio.sleep_ms(1000)  # wait for flap to settle
-            continue  # flap is swinging, ignore entering/leaving status until it settles
+        if flap_status == 'swinging':
+            # still debouncing, wait for flap to settle
+            continue
 
+        if flap_status in ('stuck', 'swinging'):
+            continue
+
+        new_status = 'in_between'
         if angle >= FLAP_ENTERING_ANGLE:
-            if flap_status != 'entering':
-                flap_status = 'entering'
-                board.PRINTF("Flap cat entering (angle {:.2f}°)", angle)
-                board.MQTT.publish('flap', 'entering')
-                id_is_valid.clear()
-                id_check_requested.set()
-                await asyncio.sleep_ms(1000)  # wait for flap to settle
-
+            new_status = 'entering'
         elif angle <= FLAP_LEAVING_ANGLE:
-            if flap_status != 'leaving':
-                flap_status = 'leaving'
-                id_check_requested.clear()
-                #id_is_valid.set()
-                board.PRINTF("Flap cat leaving (angle {:.2f}°)", angle)
-                board.MQTT.publish('flap', 'leaving')
-                await asyncio.sleep_ms(1000)  # wait for flap to settle
+            new_status = 'leaving'
+
+        if flap_status == new_status:
+            continue  # flap status unchanged, keep waiting
+
+        # new status, send to MQTT and start debouncing
+        flap_status = new_status
+        debounced_counter = debounce_start_counter  # start debouncing
+        if flap_status == 'in_between':
+            # kind of undefined state
+            continue
+
+        # now flap is either entering or leaving, so we can update the flap_status and publish it to MQTT
+        board.PRINTF("Flap cat {} (angle {:.2f}°)", flap_status, angle)
+        board.MQTT.publish('flap', flap_status)
+        id_is_valid.clear()
+        id_check_requested.set()
+        await asyncio.sleep_ms(2000)  # wait for flap to settle
 
 
 
@@ -193,12 +234,14 @@ async def flap_angle_reader_task():
 
 def parse_rfid(buf):
     # board.PRINTF("Parsing RFID buffer: {}", buf)
-    if len(buf) < 30: return None
-    if buf[0] != 0x02 or buf[-1] != 0x03: return None
-    payload = buf[1:27]
+    if len(buf) < 3: return None
+    # if buf[0] != 0x02 or buf[-1] != 0x03: return None
+    # payload = buf[1:27]
+    # strip off the last two bytes (checksum and inverted checksum)
+    payload = buf[0:-2]
     xor_val = 0
     for b in payload: xor_val ^= b
-    if buf[27] != xor_val or buf[28] != (~xor_val & 0xFF):
+    if buf[-2] != xor_val or buf[-1] != (~xor_val & 0xFF):
         return None
     return payload.decode('ascii')
 
@@ -206,55 +249,68 @@ def parse_rfid(buf):
 
 async def uart_reader_task():
     """
-    Read RFID encoder data from the UART interface.
+    Collect RFID encoder data from the UART interface.
+    This task runs in the background and reads data from the UART interface connected to the RFID reader.
+    It looks for the start byte (0x02) and end byte (0x03) to identify complete RFID messages.
+    The data between the start and end bytes is parsed and validated.
+    If the RFID cannot be parsed it publishes an 'invalid' message to MQTT.
+    Otherwise, it checks if the RFID is known and publishes the result to MQTT.
+    The task runs indefinitely. If no data is available, it sleeps briefly to avoid busy-waiting.
     """
     board.PRINTF("Starting UART reader")
     buf = bytearray()
+    board.LED.off()
+    timeout_counter = 0
     while True:
-        board.LED.off()
-        while uart.any():
-            board.LED.on()
-            b = uart.read(1)
-            if b is None:
-                # timeout on uart.read(), wait a bit and try again
-                # although this should not happen because UART.any() returned True, but just in case
-                await asyncio.sleep_ms(1)
+        if not uart.any():
+            timeout_counter += 1
+            if timeout_counter == 50:
+                board.LED.off()
+                buf = bytearray()  # clear the buffer if no data for a while
+            await asyncio.sleep_ms(10)  # wait a bit before checking again
+            continue
+
+        timeout_counter = 0
+        board.LED.on()
+        b = uart.read(1)
+        if b is None:
+            # although this should not happen because UART.any() returned True, but just in case
+            continue
+
+        b = b[0]
+        if b == 0x02:
+            # start of RFID message
+            buf = bytearray()
+            continue
+
+        # keep reading and collecting bytes until we get the end of message byte
+        if b != 0x03:
+            if len(buf) > 50:  # limit buffer size to avoid overflow
+                board.PRINTF("RFID buffer overflow, resyncing...")
+                board.MQTT.publish('error', 'RFID buffer overflow, resyncing...')
+                buf = bytearray()  # clear the buffer
                 continue
 
-            b = b[0]
-            if b == 0x02:
-                # start of RFID message
-                buf = bytearray()
             buf.append(b)
-            if b != 0x03:
-                # keep reading until we get the end of message byte
-                # the chip is sending with 9600 baud, so about 1 ms per byte
-                asyncio.sleep_ms(2)  # wait a bit for the next byte
-                continue  # wait for end of message
+            continue
 
-            rfid = parse_rfid(buf)
-            if rfid is None:
-                board.PRINTF("RFID read: {} --> INVALID", buf)
-                board.MQTT.publish('invalid', 'RFID read: {} bytes'.format(len(buf)))
-                # await asyncio.sleep_ms(10)  # wait a bit before reading the next RFID
-                break
+        # we got the end of message byte 0x03, now parse the RFID
+        board.PRINTF("RFID read: {} bytes", len(buf))
+        board.LED.off()
 
-            board.MQTT.publish('rfid', rfid)
-            known = known_rfids.get(rfid, None)
-            if known is None:
-                # board.MQTT.publish('alert', 'ALERT: Alien Cat Invader!')
-                board.MQTT.publish('access', 'denied')
-                board.MQTT.notify('alarm', 'catflap: access denied for unknown RFID {}'.format(rfid))
-                break
+        rfid = parse_rfid(buf)
+        if rfid is None:
+            board.PRINTF("RFID read: {} --> INVALID", buf)
+            board.MQTT.publish('invalid', 'RFID read: {} bytes'.format(len(buf)))
+            continue
 
+        known = known_rfids.get(rfid, "unknown")
+        board.MQTT.publish('rfid', "{} // {}".format(rfid, known))
+        board.PRINTF("RFID read: {} // {}", rfid, known)
+        if known != "unknown":
             id_is_valid.set()
-            id_check_requested.clear()
-            board.PRINTF("RFID read: {} --> {}", rfid, known)
-            board.MQTT.publish('access', 'granted')
-            board.MQTT.publish('hello', known)
+        id_check_requested.clear()
 
-        # waiting for the next byte to arrive, but don't block the event loop
-        await asyncio.sleep_ms(10)  # wait a bit before reading the next byte
 
 
 
@@ -311,14 +367,15 @@ board.MQTT.subscribe('barrier/set_angle', set_barrier_angle)
 board.NET.connect_in_background()
 board.MQTT.connect_in_background()
 
+board.MQTT.after_connect(lambda: board.MQTT.publish('flap', "connected"))
+
 board.MQTT.ignore_topics('invalid', 'rfid', 'flap', 'access', 'xrfid', 'alert', 'debug', 'hello', 'error')
 
 asyncio.create_task(uart_reader_task())
 asyncio.create_task(flap_angle_reader_task())
-asyncio.create_task(servo_control_task())
+# asyncio.create_task(servo_control_task())
 board.LED.off()
 
 
 
 # No code needed here, the main.py will start the event loop (board.run()) and run the tasks above.
-# For d
