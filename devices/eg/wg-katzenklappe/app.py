@@ -40,6 +40,9 @@ else: # ESP32 WROOM32
 board.I2C = i2c
 
 
+board.NET.connect_in_background()
+
+
 AS5600_ADDR = 0x36
 ANGLE_REG = 0x0E  # High-Byte, 2 Bytes lesen
 
@@ -141,7 +144,7 @@ async def flap_angle_reader_task():
     global flap_status
     last_error_time = 0
     debounce_counter = 0
-    debounce_start_counter = 50  # number of cycles to wait before considering flap status stable, about 5 seconds (50 * 100 ms)
+    debounce_start_counter = 50  # number of successive readings needed to consider flap status stable, about 5 seconds (50 * 100 ms)
 
     while True:
         await asyncio.sleep_ms(100)
@@ -164,9 +167,9 @@ async def flap_angle_reader_task():
 
         if DEBUG:
             print_encoder_status()
-            board.PRINTF("Flap prev status = %s, angle: {:.2f}°", flap_status, angle)
-            board.MQTT.publish('debug', angle)
-            board.MQTT.publish('debug', flap_status)
+            board.PRINTF("Flap prev status = {}, angle: {:.2f}°", flap_status, angle)
+            # board.MQTT.publish('debug', angle)
+            # board.MQTT.publish('debug', flap_status)
 
         if debounce_counter > 0:
             debounce_counter -= 1
@@ -196,11 +199,9 @@ async def flap_angle_reader_task():
             debounce_counter = debounce_start_counter  # start debouncing
             continue  # flap is swinging, wait for it to settle
 
-        if flap_status == 'swinging':
-            # still debouncing, wait for flap to settle
-            continue
-
-        if flap_status in ('stuck', 'swinging'):
+        # if flap_status in ('stuck', 'swinging', 'closed'):
+        if not flap_status in ('closed', 'in_between'):
+            # still debouncing or unknown state, wait for flap to settle
             continue
 
         new_status = 'in_between'
@@ -305,7 +306,7 @@ async def uart_reader_task():
             continue
 
         known = known_rfids.get(rfid, "unknown")
-        board.MQTT.publish('rfid', "{} // {}".format(rfid, known))
+        board.MQTT.publish('flap', "RFID {} // {}".format(rfid, known))
         board.PRINTF("RFID read: {} // {}", rfid, known)
         if known != "unknown":
             id_is_valid.set()
@@ -359,15 +360,39 @@ def set_barrier_angle(topic, angle):
     board.PRINTF("Setting barrier angle to {}°", iangle)
     set_angle(iangle)
 
+def set_command(topic, command):
+    """
+    Set the barrier angle based on MQTT command.
+    :param topic: The MQTT topic (not used here)
+    :param command: The command string ('open', 'close', 'reset')
+    """
+    global DEBUG
+    if command == 'open':
+        board.PRINTF("Opening barrier...")
+        set_angle(SERVO_OPEN_ANGLE)
+    elif command == 'close':
+        board.PRINTF("Closing barrier...")
+        set_angle(SERVO_CLOSED_ANGLE)
+    elif command == 'reset':
+        board.PRINTF("Resetting barrier...")
+        set_angle(SERVO_CLOSED_ANGLE)
+    elif command == 'DEBUG_ON':
+        DEBUG = True
+    elif command == 'DEBUG_OFF':
+        DEBUG = False
+    else:
+        board.MQTT.publish("error", "unknown value for set: {}".format(command))
+        board.PRINTF("Unknown command: {}. Valid commands are 'open', 'close', 'reset'.", command)
+
 def r():
     board.restart()
 
-board.MQTT.subscribe('barrier/set_angle', set_barrier_angle)
+board.MQTT.subscribe('set', set_command)
 
-board.NET.connect_in_background()
+# board.NET.connect_in_background()
 board.MQTT.connect_in_background()
 
-board.MQTT.after_connect(lambda: board.MQTT.publish('flap', "connected"))
+board.MQTT.after_connect.append(lambda: board.MQTT.publish('flap', "connected"))
 
 board.MQTT.ignore_topics('invalid', 'rfid', 'flap', 'access', 'xrfid', 'alert', 'debug', 'hello', 'error')
 
