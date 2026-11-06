@@ -50,10 +50,6 @@ FLAP_ZERO_ANGLE_OFFSET = 270.8  # Winkel, bei dem die Klappe geschlossen ist
 FLAP_CLOSE_MAX_ANGLE = 10  # Maximaler Winkel, bei dem die Klappe geschlossen ist
 FLAP_ENTERING_ANGLE = 25  # oder größer: Winkel, bei dem die Klappe geöffnet ist, wenn die Katze reingeht
 
-FLAP_CLOSE_MIN_ANGLE = -FLAP_CLOSE_MAX_ANGLE  # Minimaler Winkel, bei dem die Klappe geschlossen ist
-FLAP_LEAVING_ANGLE = -FLAP_ENTERING_ANGLE  # oder kleiner: Winkel, bei dem die Klappe geöffnet ist, wenn die Katze rausgeht
-
-
 SERVO_OPEN_ANGLE = 80  # Winkel, bei dem die Klappe geöffnet ist
 SERVO_CLOSED_ANGLE = 20  # Winkel, bei dem die Klappe geschlossen ist
 
@@ -134,6 +130,9 @@ def debug_read_encoder_loop():
         print_encoder_angle()
         time.sleep_ms(500)
 
+def flap_send_mqtt(payload):
+    board.MQTT.publish('event', payload)
+
 async def flap_angle_reader_task():
     """Task to read the flap angle and update its status.
     This task runs in the background and updates the flap_status variable based on the angle read from the AS5600 encoder.
@@ -174,10 +173,10 @@ async def flap_angle_reader_task():
         if debounce_counter > 0:
             debounce_counter -= 1
             if debounce_counter == 0:
-                board.MQTT.publish('flap', 'stuck {:.2f}'.format(angle))
+                flap_send_mqtt('stuck {:.2f}'.format(angle))
                 flap_status = 'stuck'
 
-        if angle > FLAP_CLOSE_MIN_ANGLE and angle < FLAP_CLOSE_MAX_ANGLE:
+        if abs(angle) < FLAP_CLOSE_MAX_ANGLE:
             if flap_status == 'closed':
                 continue  # flap is closed and status unchanged, keep waiting for flap to open
 
@@ -188,7 +187,7 @@ async def flap_angle_reader_task():
                 # debounce completed, flap is now stable closed
                 debounce_counter = 0
                 flap_status = 'closed'
-                board.MQTT.publish('flap', 'closed')
+                flap_send_mqtt('closed')
                 id_check_requested.clear()  # clear the event if flap is closed
                 id_is_valid.set()  # clear the event if flap is closed
                 continue  # flap is closed, reset the status and continue checking for entering/leaving
@@ -207,7 +206,7 @@ async def flap_angle_reader_task():
         new_status = 'in_between'
         if angle >= FLAP_ENTERING_ANGLE:
             new_status = 'entering'
-        elif angle <= FLAP_LEAVING_ANGLE:
+        elif angle <= -FLAP_ENTERING_ANGLE:
             new_status = 'leaving'
 
         if flap_status == new_status:
@@ -222,7 +221,7 @@ async def flap_angle_reader_task():
 
         # now flap is either entering or leaving, so we can update the flap_status and publish it to MQTT
         board.PRINTF("Flap cat {} (angle {:.2f}°)", flap_status, angle)
-        board.MQTT.publish('flap', flap_status)
+        flap_send_mqtt(flap_status)
         id_is_valid.clear()
         id_check_requested.set()
         await asyncio.sleep_ms(2000)  # wait for flap to settle
@@ -306,7 +305,7 @@ async def uart_reader_task():
             continue
 
         known = known_rfids.get(rfid, "unknown")
-        board.MQTT.publish('flap', "RFID {} // {}".format(rfid, known))
+        flap_send_mqtt("RFID {} // {}".format(rfid, known))
         board.PRINTF("RFID read: {} // {}", rfid, known)
         if known != "unknown":
             id_is_valid.set()
@@ -392,7 +391,7 @@ board.MQTT.subscribe('set', set_command)
 # board.NET.connect_in_background()
 board.MQTT.connect_in_background()
 
-board.MQTT.after_connect.append(lambda: board.MQTT.publish('flap', "connected"))
+board.MQTT.after_connect.append(lambda: flap_send_mqtt("connected"))
 
 board.MQTT.ignore_topics('invalid', 'rfid', 'flap', 'access', 'xrfid', 'alert', 'debug', 'hello', 'error')
 
