@@ -74,7 +74,10 @@ print("I2C Geräte gefunden:", [hex(a) for a in i2c.scan()])
 ###############################################################################
 ### Angular encoder AS5600
 
-flap_status = 'closed'  # 'closed', 'entering', 'leaving', 'swinging'
+# Set to undefined so we trigger a close message after startup.
+# Otherwise Homeassisstant does not record subsequent 'connect' messages although
+#  the force_update property is set.
+flap_status = 'undefined'  # 'closed', 'entering', 'leaving', 'swinging'
 
 
 known_rfids = {
@@ -261,6 +264,7 @@ async def uart_reader_task():
     buf = bytearray()
     board.LED.off()
     timeout_counter = 0
+    flush_counter = 0
     while True:
         if not uart.any():
             timeout_counter += 1
@@ -268,7 +272,14 @@ async def uart_reader_task():
                 board.LED.off()
                 buf = bytearray()  # clear the buffer if no data for a while
             await asyncio.sleep_ms(10)  # wait a bit before checking again
+            flush_counter = 0
             continue
+
+        flush_counter += 1
+        if flush_counter > 50:
+            # give other threads some time to handle their tasks
+            await asyncio.sleep_ms(5)
+            flush_counter = 0
 
         timeout_counter = 0
         board.LED.on()
@@ -391,9 +402,9 @@ board.MQTT.subscribe('set', set_command)
 # board.NET.connect_in_background()
 board.MQTT.connect_in_background()
 
-board.MQTT.after_connect.append(lambda: flap_send_mqtt("connected"))
+board.MQTT.after_connect.append(lambda: flap_send_mqtt("connected {}/{}".format(board.MQTT.connection_counter, board.NET.connection_counter)))
 
-board.MQTT.ignore_topics('invalid', 'rfid', 'flap', 'access', 'xrfid', 'alert', 'debug', 'hello', 'error')
+board.MQTT.ignore_topics('invalid', 'rfid', 'event', 'access', 'xrfid', 'alert', 'debug', 'hello', 'error')
 
 asyncio.create_task(uart_reader_task())
 asyncio.create_task(flap_angle_reader_task())
