@@ -90,6 +90,7 @@ class NET:
         self._isconnected_event = asyncio.Event()
         self._keepalive_task = None
         self._wants_repl = False
+        self.connection_counter = 0
 
     def isconnected(self):
         """Return True if connected to WLAN"""
@@ -141,6 +142,7 @@ class NET:
                     # 1 = PM_MIN_MODEM (MicroPython default power saving)
                     self.wlan.config(pm=1)
                     self.status = "connected"
+                    self.connection_counter += 1
                     try:
                         sys.modules['cancommon'].send_wlan_connected()
                     except Exception as e:

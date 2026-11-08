@@ -69,6 +69,7 @@ class _MQTT:
 
         self._rssi_task = None
         self._keepalive_task = None
+        self.connection_counter = 0
 
     def run_after_connect(self, *callbacks):
         self.after_connect.extend(callbacks)
@@ -324,9 +325,11 @@ class _MQTT:
                 # an async function would be nice here
                 self.client.connect()
                 self.status = "connected"
+                self.connection_counter += 1
                 ipstring = board.NET.ipstring()
                 board.PRINTF('MQTT connected {}', ipstring)
-                self.publish_raw("hcm/connected", self.name) # IP address is published by info topic below
+                self.publish_raw("hcm/connected", '{} {} {} {}'.format(
+                    self.name, ipstring, self.connection_counter, board.NET.connection_counter))
                 # TODO: check which of the calls below should be called after each reconnect (e.g. set_callback or subscribe)
                 self.client.set_callback(self._mqtt_callback)
                 self.client.subscribe(self.topic + "#")
@@ -381,8 +384,8 @@ class _MQTT:
             pwms = ','.join([str(p.portid) for p in board.PWMs.pwms])
         else:
             pwms = 'none'
-        info = 'version={}; mac={}; IP={}; rssi={}; pwms={}'.format(
-            board.VERSION, mac, ip, rssi, pwms)
+        info = 'version={}; mac={}; IP={}; rssi={}; pwms={}; cc={}/{}'.format(
+            board.VERSION, mac, ip, rssi, pwms, self.connection_counter, board.NET.connection_counter)
         try:
             mpy = sys.implementation._mpy
             info += "; mpy=" + str(mpy)
