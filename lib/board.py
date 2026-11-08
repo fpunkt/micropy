@@ -221,20 +221,6 @@ def good_time_for_gc():
         run_gc() # pylint: disable=not-callable
 
 
-# Run async processes
-
-async def xxxarun():
-    """Run all background tasks"""
-    try:
-        await asyncio.gather(*BACKGROUND_RUNNERS)
-    except asyncio.TimeoutError:
-        if DEBUG:
-            print('asyncIO timeout!')
-    except Exception as e:
-        if DEBUG:
-            print('**** ERROR in runner: {}'.format(e))
-            sys.print_exception(e)
-
 def run():
     global DEBUG
     # some files use DEBUG as boolean, others as int. Make sure it is an int.

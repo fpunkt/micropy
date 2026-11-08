@@ -119,16 +119,6 @@ class NET:
             return
         self._keepalive_task = asyncio.create_task(self._keepalive())
 
-    def xxxconnect(self, timeout=30, repl=True):
-        """Connect to WLAN in background and keep connection alive, i.e. reconnect if connection is lost
-        The function does not wait for connection and a keepalive task is started."""
-        if self._keepalive_task is not None:
-            # already connected or connecting, do not start another task
-            return
-        self._keepalive_task = asyncio.create_task(self._keepalive())
-        if repl:
-            self.start_repl()
-
     async def _keepalive(self):
         """Keep WLAN connection alive, reconnect if connection is lost"""
         PRINTF("Starting keepalive task for WLAN connection")
@@ -289,23 +279,6 @@ class NET:
             board.MQTT.publish("info/repl", "REPL stopped")
         except Exception as e:
             PRINTF("Cannot publish REPL stopped: {}", e)
-
-    def xxx_stop_hotspot(self):
-        """Stop hotspot"""
-        ap = network.WLAN(network.AP_IF) # create access-point interface
-        ap.active(False)
-
-    def xxx_start_hotspot(self):
-        """Start hotspot"""
-        self.stop()
-        self.wlan.active(False)
-        self.wlan.active(True)
-        ap = network.WLAN(network.AP_IF) # create access-point interface
-        ap.config(essid='ESP-AP-{:02x}{:02x}'.format(machine.unique_id()[-2], machine.unique_id()[-1]))
-        ap.config(max_clients=3) # set how many clients can connect to the network
-        ap.active(True)         # activate the interface
-        time.sleep(1)
-        return machine.unique_id()
 
 
 ### Troubleshooting

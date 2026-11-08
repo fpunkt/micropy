@@ -448,10 +448,6 @@ async def _print_rssi_task(period_ms):
         await asyncio.sleep_ms(period_ms)
         _print_rssi()
 
-# def xxxregister_mqtt_client(client):
-#     board.MQTT = client
-
-# register_mqtt_client(_MQTT())
 
 board.MQTT = _MQTT()
 
@@ -529,13 +525,6 @@ def xxpublish(topic, message):
     """publish message to topic, prefixing with options.topic"""
     return publish_raw(options.topic + topic, message)
 
-
-xxx_ignored_topics = dict()
-
-def xxxignore_topics(*topics):
-    """ignore topics, do not pass them to callbacks or raise errors"""
-    for topic in topics:
-        _ignored_topics[topic] = True
 
 def _mqtt_callback(topic, message):
     # board.PRINTF("got MQTT message: T='{}, M='{}'", topic, message)
