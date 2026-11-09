@@ -83,12 +83,12 @@ flap_status = 'undefined'  # 'closed', 'entering', 'leaving', 'swinging'
 known_rfids = {
     '2E01A18A405830110000000000': 'Orange Katze',
     'AD01A18A405830110000000000': 'Stoffkatze',
-    '1A249E24614110010000000000': 'Schwarzweiße Katze',
+    '1A249E24614110010000000000': 'Zoe - SW Katze',
 
     # Chip Reader 1
     # 2026-10-31 21:00:07.955 hcm/eg-wg-katzenklappe/rfid 33B1FC8E512820010000000000
     # 2026-10-31 23:16:23.759 hcm/eg-wg-katzenklappe/rfid 33B1FC8E512820010000000000
-    '33B1FC8E512820010000000000': 'Schwarzweiße Katze',
+    '33B1FC8E512820010000000000': 'Zoe - SW Katze',
 }
 
 
@@ -147,6 +147,7 @@ async def flap_angle_reader_task():
     last_error_time = 0
     debounce_counter = 0
     debounce_start_counter = 50  # number of successive readings needed to consider flap status stable, about 5 seconds (50 * 100 ms)
+    stuck_counter = 0
 
     while True:
         await asyncio.sleep_ms(100)
@@ -173,37 +174,42 @@ async def flap_angle_reader_task():
             # board.MQTT.publish('debug', angle)
             # board.MQTT.publish('debug', flap_status)
 
-        if debounce_counter > 0:
-            debounce_counter -= 1
-            if debounce_counter == 0:
-                flap_send_mqtt('stuck {:.2f}'.format(angle))
-                flap_status = 'stuck'
-
         if abs(angle) < FLAP_CLOSE_MAX_ANGLE:
             if flap_status == 'closed':
                 continue  # flap is closed and status unchanged, keep waiting for flap to open
 
-            if flap_status == 'swinging':
-                if debounce_counter > 1: # still debouncing, wait for flap to settle
-                    continue
+            if debounce_counter > 0:
+                debounce_counter -= 1
 
-                # debounce completed, flap is now stable closed
-                debounce_counter = 0
+            if debounce_counter == 0:
+                # now we are stable closed
+                stuck_counter = 0
                 flap_status = 'closed'
                 flap_send_mqtt('closed')
                 id_check_requested.clear()  # clear the event if flap is closed
                 id_is_valid.set()  # clear the event if flap is closed
-                continue  # flap is closed, reset the status and continue checking for entering/leaving
 
-
-            # flap was open or stuck, but now angle is within closed range, so flap is swinging and need to debounce
-            flap_status = 'swinging'
-            debounce_counter = debounce_start_counter  # start debouncing
             continue  # flap is swinging, wait for it to settle
 
-        # if flap_status in ('stuck', 'swinging', 'closed'):
+        # not in closed position, reset close debouncing counter and check for new status
+        debounced_counter = debounce_start_counter  # start debouncing
+
+        if flap_status == 'stuck':
+            # "stuck" status can only be reset by "close"
+            continue
+
+        # check whether flap is stuck in a non-closed position
+        stuck_counter -= 1
+        if stuck_counter == 0:
+            flap_send_mqtt('stuck {:.2f}'.format(angle))
+            flap_status = 'stuck'
+            continue
+
+
+        # OK, here the flap is not closed and not stuck in a fixed position
+
+        # Only report a new status when we are comming from close or in_between
         if not flap_status in ('closed', 'in_between'):
-            # still debouncing or unknown state, wait for flap to settle
             continue
 
         new_status = 'in_between'
@@ -215,11 +221,13 @@ async def flap_angle_reader_task():
         if flap_status == new_status:
             continue  # flap status unchanged, keep waiting
 
+        # Arm stuck detection if not already triggered before (by earlier in_between position)
+        if stuck_counter == 0:
+            stuck_counter = 10 * 60 # about one minute
+
         # new status, send to MQTT and start debouncing
         flap_status = new_status
-        debounced_counter = debounce_start_counter  # start debouncing
         if flap_status == 'in_between':
-            # kind of undefined state
             continue
 
         # now flap is either entering or leaving, so we can update the flap_status and publish it to MQTT
@@ -278,7 +286,7 @@ async def uart_reader_task():
         flush_counter += 1
         if flush_counter > 50:
             # give other threads some time to handle their tasks
-            await asyncio.sleep_ms(5)
+            await asyncio.sleep_ms(1000)
             flush_counter = 0
 
         timeout_counter = 0
@@ -300,6 +308,7 @@ async def uart_reader_task():
                 board.PRINTF("RFID buffer overflow, resyncing...")
                 board.MQTT.publish('error', 'RFID buffer overflow, resyncing...')
                 buf = bytearray()  # clear the buffer
+                await asyncio.sleep_ms(200)
                 continue
 
             buf.append(b)
@@ -356,6 +365,7 @@ async def servo_control_task():
         board.MQTT.publish('access', 'reset')
         set_angle(SERVO_OPEN_ANGLE)
         id_is_valid.clear()  # clear the event after opening the flap
+        await asyncio.sleep_ms(500)
 
 def set_barrier_angle(topic, angle):
     """
