@@ -24,12 +24,22 @@ if False:
         board.DEBUG = 0
 
 
-import app
-board.APP = app
 
-# For conveniece debugging: Set net and mqtt as global variables
-NET = board.NET
-MQTT = board.MQTT
+try:
+    import app
+    board.APP = app
+except:
+    # fallback, try to connect to network
+    import net
+    net.net()
+
+try:
+    # For conveniece debugging: Set net and mqtt as global variables
+    NET = board.NET
+    MQTT = board.MQTT
+except:
+    pass
+
 
 def restart():
     """Restart the board"""
