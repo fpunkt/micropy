@@ -1,3 +1,12 @@
+"""
+Katzenklappe
+
+Upload / compile with
+
+mpycompile -r -v
+
+"""
+
 
 import board
 board.LOCATION = 'eg-wg-katzenklappe'
@@ -83,12 +92,13 @@ flap_status = 'undefined'  # 'closed', 'entering', 'leaving', 'swinging'
 known_rfids = {
     '2E01A18A405830110000000000': 'Orange Katze',
     'AD01A18A405830110000000000': 'Stoffkatze',
-    '1A249E24614110010000000000': 'Zoe - SW Katze',
+    '1A249E24614110010000000000': 'Zoe - SW Katze (read error?)',
 
     # Chip Reader 1
     # 2026-10-31 21:00:07.955 hcm/eg-wg-katzenklappe/rfid 33B1FC8E512820010000000000
     # 2026-10-31 23:16:23.759 hcm/eg-wg-katzenklappe/rfid 33B1FC8E512820010000000000
-    '33B1FC8E512820010000000000': 'Zoe - SW Katze',
+    '33B1FC8E512820010000000000': 'Zoe - SchwaWeiKa',
+    '24B1FC8E512820010000000000': 'Boney - SchwaKa'
 }
 
 
